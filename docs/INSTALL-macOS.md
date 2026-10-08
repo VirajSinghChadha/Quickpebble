@@ -49,6 +49,19 @@ Only the **Screen** assistant mode needs these, and only when you use it. Both l
 
 Switch **Quick Pebble** on in each list. Say no, or leave them off, if you don't plan to use Screen mode. The browser works fully without them.
 
+## Using Screen mode (optional)
+
+The **Screen** assistant mode is the only part that needs extra setup. It needs Python 3 and a few packages, plus a free Gemini key (Settings → AI). One time only:
+
+1. Install Python 3 from <https://www.python.org/downloads/> if `python3 --version` in Terminal doesn't print a version.
+2. Paste this into Terminal and press Return:
+
+```bash
+python3 -m pip install -r "/Applications/Quick Pebble.app/Contents/Resources/agent/requirements.txt"
+```
+
+Skip this if you won't use Screen mode: everything else works without it.
+
 ## Is it safe?
 
 - Quick Pebble is open source (MIT). You can read every line at <https://github.com/VirajSinghChadha/Quickpebble>.

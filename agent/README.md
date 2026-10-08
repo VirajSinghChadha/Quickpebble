@@ -12,7 +12,7 @@ Python sidecar that lets Gemini operate the screen. Quick Pebble starts it on de
 
 ```bash
 cd agent
-python3 -m pip install -r requirements.txt
+python3 -m pip install -r requirements-dev.txt   # runtime packages + pytest
 python3 -m pytest
 ```
 

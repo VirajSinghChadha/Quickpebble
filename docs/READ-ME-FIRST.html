@@ -84,6 +84,15 @@
   </ul>
   <p>Switch <strong>Quick Pebble</strong> on in each list. The browser works fully without them.</p>
 
+  <h2>4 · Using Screen mode (optional)</h2>
+  <p>The <strong>Screen</strong> assistant mode is the only part that needs extra setup: <strong>Python 3</strong>, a few packages, and a free Gemini key (Settings → AI). One time only:</p>
+  <ol>
+    <li>If <code>python3 --version</code> in Terminal doesn't print a version, install Python 3 from <a href="https://www.python.org/downloads/">python.org</a>.</li>
+    <li>Paste this into Terminal and press Return:</li>
+  </ol>
+  <pre>python3 -m pip install -r "/Applications/Quick Pebble.app/Contents/Resources/agent/requirements.txt"</pre>
+  <p>Skip this if you won't use Screen mode. Everything else works without it.</p>
+
   <div class="note good"><strong>Is it safe?</strong> Quick Pebble is open source (MIT); every line is public at <a href="https://github.com/VirajSinghChadha/Quickpebble">github.com/VirajSinghChadha/Quickpebble</a>. Only download it from there. Your saved passwords are encrypted with a master password that only you know.</div>
 
   <footer>Prefer Homebrew? <code>brew tap VirajSinghChadha/quickpebble https://github.com/VirajSinghChadha/Quickpebble &amp;&amp; brew install --cask quick-pebble</code> clears this warning for you.</footer>
