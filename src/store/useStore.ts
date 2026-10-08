@@ -332,14 +332,15 @@ export const useStore = create<State>((set, get) => ({
   },
   focusAddress: () => set((s) => ({ focusAddressNonce: s.focusAddressNonce + 1 })),
 
+  // Runs in the side panel: pop-up overlays hide the page (they sit beneath page webviews), the panel does not.
   summarize: async (id) => {
-    set({ overlay: "summary", summary: { tabId: id, text: null, error: null, loading: true } });
-    try {
-      const text = await ipc.aiRun({ task: "summarize", tab_id: id });
-      set({ summary: { tabId: id, text, error: null, loading: false } });
-    } catch (e) {
-      set({ summary: { tabId: id, text: null, error: String(e), loading: false } });
-    }
+    if (id !== get().activeId) get().activate(id);
+    get().setSidebar("assistant");
+    const { useChat } = await import("./useChat");
+    const chat = useChat.getState();
+    if (chat.busy) return;
+    chat.setMode("ask");
+    await chat.send("Summarize this page");
   },
 
   classify: async (id) => {
