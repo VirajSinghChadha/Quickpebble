@@ -132,7 +132,7 @@ Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / P
 
 ## Updates
 
-Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off.
+Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off. Settings displays release notes and download progress, keeps progress when you close and reopen the panel, and lets you retry a failed update. Installing an update preserves your saved tabs, workspaces and settings; there is no need to download another installer.
 
 Every update is verified against an Ed25519 public key embedded in the app before it is installed, so a tampered download is rejected. Nothing installs without your click.
 
@@ -245,9 +245,11 @@ git tag v1.1.0 && git push origin v1.1.0
 
 The **Release** workflow then:
 
-1. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and publishes the GitHub release together with `latest.json`;
-2. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
-3. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
+1. validates that the tag matches every app version and a signing key is configured;
+2. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and uploads them with `latest.json` to a draft release;
+3. publishes the release only after all platform builds succeed;
+4. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
+5. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
 
 If the private key is lost, existing installs can't receive updates and users must reinstall.
 
