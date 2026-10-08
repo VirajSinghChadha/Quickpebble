@@ -181,6 +181,9 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  weatherSearch: (query: string) => call<Place[]>("weather_search", { query }),
+  weatherFetch: (lat: number, lon: number, fahrenheit: boolean) => call<Weather>("weather_fetch", { lat, lon, fahrenheit }),
+  newsFetch: (source: string, count = 5) => call<Headline[]>("news_fetch", { source, count }),
   downloadsList: () => call<DownloadItem[]>("downloads_list", undefined, []),
   downloadOpen: (id: number) => call<void>("download_open", { id }),
   downloadReveal: (id: number) => call<void>("download_reveal", { id }),
@@ -288,4 +291,26 @@ export interface DownloadItem {
 export async function onDownloads(cb: (items: DownloadItem[]) => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   return listen<DownloadItem[]>("qp://downloads", (e) => cb(e.payload));
+}
+
+export interface Place {
+  name: string;
+  region: string;
+  country: string;
+  lat: number;
+  lon: number;
+}
+export interface Weather {
+  temp: number;
+  feels: number;
+  code: number;
+  is_day: boolean;
+  high: number;
+  low: number;
+  rain_chance: number | null;
+  wind: number;
+}
+export interface Headline {
+  title: string;
+  url: string;
 }

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { ipc, isPrivateWindow, type DownloadItem, type TabEvent } from "../lib/ipc";
+import { defaultHome, homeToSettings, parseHome, type HomeSettings } from "../lib/home";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
@@ -76,6 +77,9 @@ interface State {
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
+  home: HomeSettings;
+  loadHome: () => Promise<void>;
+  setHome: (patch: Partial<HomeSettings>) => Promise<void>;
   downloads: DownloadItem[];
   setDownloads: (d: DownloadItem[]) => void;
   /** A login the person was just seen submitting; waiting for Save / Not now / Never. */
@@ -169,6 +173,15 @@ export const useStore = create<State>((set, get) => ({
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
+  home: defaultHome,
+  loadHome: async () => {
+    const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+    set({ home: parseHome(s) });
+  },
+  setHome: async (patch) => {
+    set((st) => ({ home: { ...st.home, ...patch, loaded: true } }));
+    for (const [k, v] of Object.entries(homeToSettings(patch))) await ipc.settingsSet(k, v).catch(() => {});
+  },
   downloads: [],
   setDownloads: (downloads) => set({ downloads }),
   loginPrompt: null,

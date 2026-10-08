@@ -6,6 +6,7 @@ mod daemon;
 mod downloads;
 mod database;
 mod extensions;
+mod home;
 mod memory_saver;
 mod security;
 mod vault;
@@ -94,6 +95,9 @@ pub fn run() {
             screen::screen_act,
             screen::screen_verify,
             screen::gemini_models,
+            home::weather_search,
+            home::weather_fetch,
+            home::news_fetch,
             downloads::downloads_list,
             downloads::download_open,
             downloads::download_reveal,

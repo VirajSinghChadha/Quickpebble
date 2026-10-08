@@ -726,6 +726,14 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "home_weather",
+    "home_weather_place",
+    "home_weather_unit",
+    "home_news",
+    "home_news_source",
+    "home_tiles",
+    "home_cards",
+    "home_onboarded",
     "cookie_banners",
     "chrome_ua",
     "block_level",
@@ -758,6 +766,15 @@ pub fn settings_set(db: State<Db>, key: String, value: String) -> Result<(), Str
     }
     if key == "search_engine" && !security::SEARCH_ENGINES.iter().any(|(n, _)| *n == value) {
         return Err("unknown search engine".into());
+    }
+    if key == "home_weather_place" && (value.len() > 512 || (!value.is_empty() && serde_json::from_str::<serde_json::Value>(&value).is_err())) {
+        return Err("invalid place".into());
+    }
+    if key == "home_news_source" && !crate::home::NEWS_SOURCES.iter().any(|(id, _)| *id == value) {
+        return Err("unknown news source".into());
+    }
+    if key.starts_with("home_") && key != "home_weather_place" && value.len() > 64 {
+        return Err("value too long".into());
     }
     if key == "site_profiles" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
         return Err("invalid site profiles".into());

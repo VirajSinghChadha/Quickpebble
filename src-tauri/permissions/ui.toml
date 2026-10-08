@@ -16,5 +16,5 @@ permissions = [
   "allow-extension-list", "allow-extension-install-store", "allow-extension-install-file",
   "allow-extension-set-enabled", "allow-extension-remove",
   "allow-screen-propose", "allow-screen-act", "allow-screen-verify", "allow-gemini-models",
-  "allow-downloads-list", "allow-download-open", "allow-download-reveal", "allow-download-remove", "allow-downloads-clear-finished", "allow-vault-status", "allow-vault-create", "allow-vault-unlock", "allow-vault-lock", "allow-vault-list", "allow-vault-reveal", "allow-vault-save", "allow-vault-delete", "allow-vault-import-file", "allow-vault-fill", "allow-vault-save-pending", "allow-vault-dismiss-pending",
+  "allow-weather-search", "allow-weather-fetch", "allow-news-fetch", "allow-downloads-list", "allow-download-open", "allow-download-reveal", "allow-download-remove", "allow-downloads-clear-finished", "allow-vault-status", "allow-vault-create", "allow-vault-unlock", "allow-vault-lock", "allow-vault-list", "allow-vault-reveal", "allow-vault-save", "allow-vault-delete", "allow-vault-import-file", "allow-vault-fill", "allow-vault-save-pending", "allow-vault-dismiss-pending",
 ]

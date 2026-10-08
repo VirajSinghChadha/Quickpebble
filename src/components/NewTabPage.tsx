@@ -6,6 +6,10 @@ import { displayUrl, hostOf } from "../lib/url";
 import { modKey } from "../lib/actions";
 import { selectActive, useStore } from "../store/useStore";
 import { Favicon } from "./Favicon";
+import { HomeCustomize } from "./home/HomeCustomize";
+import { HomeOnboarding } from "./home/HomeOnboarding";
+import { NewsCard } from "./home/NewsCard";
+import { WeatherCard } from "./home/WeatherCard";
 
 const QUICK_LINKS = [
   { name: "Wikipedia", url: "https://wikipedia.org" },
@@ -63,7 +67,15 @@ function Tiles({ items }: { items: { name: string; url: string }[] }) {
   );
 }
 
+/** Weather and news side by side, only the ones the person turned on. */
+function Widgets({ max = 2, count = 5 }: { max?: number; count?: number }) {
+  const { weather, news } = useStore((s) => s.home);
+  if (!weather && !news) return null;
+  return <div className={`mx-auto mt-8 grid w-full max-w-3xl gap-3 ${weather && news && max > 1 ? "md:grid-cols-2" : ""}`}>{weather && <WeatherCard />}{news && <NewsCard count={count} />}</div>;
+}
+
 function Classic() {
+  const { tiles, cards } = useStore((s) => s.home);
   const [marks, setMarks] = useState<Bm[]>([]);
   const bookmarksVersion = useStore(s => s.bookmarksVersion);
   useEffect(() => { let active = true; void ipc.bookmarkList().then(b => { if (active) setMarks(b.slice(0, 6)); }); return () => { active = false; }; }, [bookmarksVersion]);
@@ -72,12 +84,13 @@ function Classic() {
       <div className="mb-14 flex items-center justify-between text-xs text-text-secondary"><span className="flex items-center gap-2 font-medium"><Logo size={24}/> QUICK PEBBLE</span><span>{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span></div>
       <div className="mb-8 text-center"><span className="newtab-eyebrow">YOUR SPACE TO EXPLORE</span><h1 className="mt-4 text-[clamp(32px,4vw,48px)] font-semibold tracking-[-0.045em] leading-tight">A clearer view of the web.</h1><p className="mt-3 text-sm text-text-secondary">Less noise. More room for what matters.</p></div>
       <SearchBox big />
-      <div className="mt-7"><Tiles items={marks.length ? marks.map(b => ({ name: b.title || hostOf(b.url), url: b.url })) : QUICK_LINKS}/></div>
-      <div className="newtab-actions mt-12 grid gap-3 sm:grid-cols-3">
+      {tiles && <div className="mt-7"><Tiles items={marks.length ? marks.map(b => ({ name: b.title || hostOf(b.url), url: b.url })) : QUICK_LINKS}/></div>}
+      <Widgets />
+      {cards && <div className="newtab-actions mt-12 grid gap-3 sm:grid-cols-3">
         <button type="button" className="home-card" onClick={() => useStore.getState().setSidebar('assistant')}><span className="home-card-icon"><Sparkles size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Ask Pebble</strong><span className="mt-1 block text-xs text-text-secondary">Answers with page sources</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
         <button type="button" className="home-card" onClick={() => useStore.getState().setSidebar('therapist')}><span className="home-card-icon"><Bookmark size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Your workspaces</strong><span className="mt-1 block text-xs text-text-secondary">Pick up where you left off</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
         <button type="button" className="home-card" onClick={() => useStore.getState().setOverlay('privacy')}><span className="home-card-icon"><ShieldCheck size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Privacy center</strong><span className="mt-1 block text-xs text-text-secondary">Browse with control</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
-      </div>
+      </div>}
       <button type="button" onClick={() => useStore.getState().setOverlay('palette')} className="mx-auto mt-9 flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-text-secondary hover:bg-surface"><Command size={13}/> Quick actions <kbd className="shortcut-key">{modKey}⇧P</kbd></button>
     </div>
   );
@@ -88,6 +101,7 @@ function Minimal() {
     <div className="flex flex-col items-center gap-6 pt-[26vh]">
       <Logo size={48} />
       <SearchBox big />
+      <div className="w-full max-w-xl"><Widgets max={1} count={3} /></div>
       <p className="text-[12px] text-text-secondary">Press {modKey}⇧P for quick actions</p>
     </div>
   );
@@ -100,6 +114,7 @@ function Productivity() {
   const tabs = useStore((s) => s.tabs);
   const tab = useStore(selectActive);
   const { status } = useOllama();
+  const home = useStore((s) => s.home);
   useEffect(() => {
     void ipc.bookmarkList().then((b) => setBookmarks(b.slice(0, 8)));
     void ipc.historySearch("", 8).then(setRecent);
@@ -129,6 +144,8 @@ function Productivity() {
       </div>
       <SearchBox />
       <div className="grid gap-4 md:grid-cols-2">
+        {home.weather && <WeatherCard />}
+        {home.news && <NewsCard count={4} />}
         <section className={card}><h2 className="mb-2 flex items-center gap-2 font-semibold"><Bookmark size={14} /> Bookmarks</h2><List items={bookmarks} /></section>
         <section className={card}><h2 className="mb-2 flex items-center gap-2 font-semibold"><Clock size={14} /> Recently visited</h2><List items={recent} /></section>
         <section className={card}>
@@ -146,9 +163,14 @@ function Productivity() {
 
 export function NewTabPage() {
   const layout = useStore((s) => s.layout);
+  useEffect(() => void useStore.getState().loadHome(), []);
   return (
-    <main className="newtab h-full overflow-y-auto bg-bg" aria-label="New tab">
-      {layout === "minimal" ? <Minimal /> : layout === "productivity" ? <Productivity /> : <Classic />}
-    </main>
+    <div className="relative h-full">
+      <main className="newtab h-full overflow-y-auto bg-bg" aria-label="New tab">
+        {layout === "minimal" ? <Minimal /> : layout === "productivity" ? <Productivity /> : <Classic />}
+      </main>
+      <HomeCustomize />
+      <HomeOnboarding />
+    </div>
   );
 }

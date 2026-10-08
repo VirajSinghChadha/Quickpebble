@@ -5,6 +5,7 @@ import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
+import { HomeOptions } from "./home/HomeOptions";
 
 const ENGINES = ["google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const PROVIDERS = ["ollama", "openai", "anthropic", "gemini"];
@@ -46,6 +47,7 @@ export function SettingsPanel() {
   const { status, refresh } = useOllama(5000);
   const close = () => useStore.getState().setOverlay(null);
 
+  useEffect(() => void useStore.getState().loadHome(), []);
   useEffect(() => {
     void ipc.researchStatus().then(setResearchReady);
     void ipc.memorySaverGet().then(setMem);
@@ -112,6 +114,12 @@ export function SettingsPanel() {
               {ENGINES.map((e) => <option key={e} value={e}>{e[0].toUpperCase() + e.slice(1)}</option>)}
             </select>
           </Row>
+        </div>
+
+        <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Home page</h3>
+          <div className="py-2"><HomeOptions /></div>
+          <p className="pb-1 text-[11.5px] text-text-secondary">You can also change these from the small wrench icon at the bottom left of the home page.</p>
         </div>
 
         <div className="py-2">
