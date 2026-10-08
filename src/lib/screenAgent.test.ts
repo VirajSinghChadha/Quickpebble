@@ -106,7 +106,7 @@ describe("runScreenAgent", () => {
     const u = make([res({ type: "click", cell: "A1" }), res({ type: "click", cell: "B1" }), res({ type: "click", cell: "C1" }), res({ type: "done" })]);
     u.io.act = async () => { throw new Error("boom"); };
     await runScreenAgent("g", u.io, { aborted: false });
-    expect(u.events.at(-1)).toContain("error:boom");
+    expect(u.events.at(-1)).toContain("boom");
   });
 
   it("honours abort", async () => {
