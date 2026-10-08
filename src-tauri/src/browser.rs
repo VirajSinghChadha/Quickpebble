@@ -185,6 +185,10 @@ pub fn ai_config(db: &Db) -> AiConfig {
     }
 }
 
+#[cfg(target_os = "macos")]
+const CHROME_UA: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+
 fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, private: bool) -> Result<Webview, String> {
     let blocked: Vec<String> = url
         .host_str()
@@ -206,6 +210,11 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
     let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .initialization_script(&script)
         .incognito(private);
+    // macOS renders with WebKit, and some sites refuse anything that doesn't say it's Chrome.
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.user_agent(CHROME_UA);
+    }
     // Content scripts of enabled Chrome extensions (not injected into private windows).
     if !private {
         if let Ok(root) = crate::extensions::root_dir(app) {
