@@ -140,6 +140,7 @@ export function AddressBar() {
           aria-controls="suggestions"
           role="combobox"
           aria-autocomplete="list"
+          aria-activedescendant={open ? `suggestion-${sel}` : undefined}
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -153,6 +154,7 @@ export function AddressBar() {
             return (
               <li
                 key={r.key}
+                id={`suggestion-${i}`}
                 role="option"
                 aria-selected={i === sel}
                 onMouseEnter={() => setSel(i)}

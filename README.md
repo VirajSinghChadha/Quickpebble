@@ -64,7 +64,7 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 
 | | |
 |---|---|
-| **Pebble UI** | Compact 92 px chrome, floating "pebble" tabs, 12 px radii, light/dark themes, 150–180 ms transitions. |
+| **Pebble UI** | Refined new-tab dashboard, uncluttered toolbar, scrollable tabs and collapsible groups, keyboard focus handling, and reduced-motion support. |
 | **AI Assistant** | Side panel (`⌘J`) that answers questions about the page or operates the browser for you. |
 | **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
 | **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
@@ -81,7 +81,11 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 
 ### AI Assistant
 
-Open it with `⌘J` or the robot icon. Two modes:
+Open it with `⌘J` or the robot icon. **Ask** is the default. Answers use readable paragraphs, numbered citations, source cards, and a copy button. Choose up to four loaded tabs as evidence. With no selected tabs, the current page is used unless you turn that off. Answers without citations are labelled as general answers.
+
+For sources beyond open tabs, add a **Brave Search API key in Settings → Web research**, then enable **Search the web for sources** in chat. Your question is sent to Brave only when this option is enabled; result excerpts are passed to your chosen AI provider. Search sources are labelled as excerpts, not full articles. The key stays in your OS keychain. Search API usage is subject to your own Brave account plan. The app validates source IDs and uses URLs from retrieved metadata; this prevents invented citation links, but does not guarantee that the model interprets every source correctly.
+
+Two modes:
 
 - **Ask** answers questions using the page you're on.
 - **Do tasks** runs a loop — read the page → the model picks one action → you approve it → it runs → repeat (max 15 steps). It can click, type, select, scroll, press keys, navigate, open tabs and switch tabs.

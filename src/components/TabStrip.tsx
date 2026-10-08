@@ -26,6 +26,8 @@ export function TabStrip() {
   const tabs = useStore((s) => s.tabs);
   const activeId = useStore((s) => s.activeId);
   const { activate, closeTab, newTab, setOverlay, setMenuOpen } = useStore.getState();
+  const [collapsed, setCollapsed] = useState<Set<GroupName>>(new Set());
+  const groups = GROUPS.filter(g => tabs.some(t => !t.pinned && t.group === g));
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   useEffect(() => setMenuOpen(menu !== null), [menu, setMenuOpen]);
@@ -38,9 +40,10 @@ export function TabStrip() {
       role="tablist"
       aria-label="Tabs"
     >
-      <div className="flex min-w-0 flex-1 items-end gap-1 overflow-hidden" data-tauri-drag-region>
+      <div className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden" data-tauri-drag-region>
+        {groups.map(g => <button type="button" key={g} aria-expanded={!collapsed.has(g)} title={`Toggle ${g} tabs`} className="mb-1 shrink-0 rounded-lg bg-surface px-2 py-1 text-xs" onClick={() => setCollapsed(prev => { const next = new Set(prev); if (next.has(g)) next.delete(g); else next.add(g); return next; })}>{g} ({tabs.filter(t => t.group === g && !t.pinned).length})</button>)}
         <AnimatePresence initial={false}>
-          {tabs.map((tab) => (
+          {tabs.filter(tab => tab.pinned || !tab.group || !collapsed.has(tab.group) || tab.id === activeId).map((tab) => (
             <PebbleTab
               key={tab.id}
               tab={tab}
@@ -97,7 +100,7 @@ function PebbleTab({
         onMenu(e.clientX, e.clientY);
       }}
       className={`group relative flex h-8 min-w-0 items-center gap-2 rounded-xl px-2.5 text-[12.5px] transition-colors duration-150
-        ${tab.pinned ? "w-10 shrink-0 justify-center px-0" : "max-w-56 min-w-24 flex-1 basis-0"}
+        ${tab.pinned ? "w-10 shrink-0 justify-center px-0" : "max-w-56 min-w-28 flex-1 basis-0"}
         ${active ? "bg-surface text-text-primary shadow-pebble" : "text-text-secondary hover:bg-surface-secondary"}`}
     >
       {tab.group && <span className={`absolute inset-x-3 -top-px h-0.5 rounded-full ${GROUP_COLOR[tab.group]}`} aria-hidden />}

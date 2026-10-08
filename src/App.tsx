@@ -1,4 +1,4 @@
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
@@ -29,8 +29,9 @@ export default function App() {
   const bar = useStore((s) => s.bookmarksBar);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className={`flex h-full flex-col bg-bg ${priv ? "dark" : ""}`}>
-      <header className="shrink-0 overflow-hidden bg-bg" style={{ height: BASE_CHROME + (bar ? BOOKMARKS_BAR : 0) }}>
+      <header className="browser-chrome shrink-0 bg-bg" style={{ height: BASE_CHROME + (bar ? BOOKMARKS_BAR : 0) }}>
         <TabStrip />
         <Toolbar />
         {bar && <BookmarksBar />}
@@ -51,6 +52,7 @@ export default function App() {
         {overlay === "https" && <HttpsPrompt key="https" />}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
 

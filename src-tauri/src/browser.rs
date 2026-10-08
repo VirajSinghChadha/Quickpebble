@@ -988,7 +988,7 @@ pub struct ChatRequest {
 
 #[tauri::command]
 pub async fn ai_chat(db: State<'_, Db>, req: ChatRequest) -> Result<String, String> {
-    if req.messages.len() > 60 || req.system.len() > 20_000 || req.messages.iter().any(|m| m.content.len() > 60_000) {
+    if req.messages.len() > 60 || req.system.len() > 120_000 || req.messages.iter().any(|m| m.content.len() > 60_000) {
         return Err("Conversation is too large".into());
     }
     let cfg = ai_config(&db);
