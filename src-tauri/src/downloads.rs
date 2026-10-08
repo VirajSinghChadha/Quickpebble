@@ -98,7 +98,7 @@ impl Downloads {
                 tab: String::new(),
             })
             .collect();
-        Self { items: Mutex::new(items), next: AtomicU64::new(next as u64) }
+        Self { items: Mutex::new(items), next: AtomicU64::new(next) }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Vec<DownloadItem>> {
@@ -107,7 +107,7 @@ impl Downloads {
 
     fn snapshot(&self) -> Vec<DownloadItem> {
         let mut v = self.lock().clone();
-        v.sort_by(|a, b| b.id.cmp(&a.id));
+        v.sort_by_key(|d| std::cmp::Reverse(d.id));
         v
     }
 }
@@ -124,7 +124,7 @@ pub fn handle(app: &AppHandle, webview: &Webview, event: DownloadEvent<'_>) -> b
             if !matches!(url.scheme(), "http" | "https") {
                 return false;
             }
-            let suggested = destination.file_name().and_then(|n| n.to_str()).map(String::from).or_else(|| url.path_segments().and_then(|s| s.last()).map(String::from)).unwrap_or_default();
+            let suggested = destination.file_name().and_then(|n| n.to_str()).map(String::from).or_else(|| url.path_segments().and_then(|mut s| s.next_back()).map(String::from)).unwrap_or_default();
             let name = sanitize_filename(&suggested);
             let dir = app.path().download_dir().or_else(|_| app.path().home_dir()).unwrap_or_else(|_| PathBuf::from("."));
             // Reserve names already in the list too, so two downloads started together don't collide.

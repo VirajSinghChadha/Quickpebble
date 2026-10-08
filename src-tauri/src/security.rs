@@ -38,6 +38,7 @@ pub const TRACKER_HOSTS: &[&str] = &[
 ];
 
 /// Sites that trust the real browser string and flag a spoofed one as a bot (e.g. Google's "are you a robot" page).
+#[cfg(any(target_os = "macos", test))]
 pub fn skip_ua_spoof(host: &str) -> bool {
     let h = host.trim_end_matches('.').to_ascii_lowercase();
     ["google.com", "youtube.com", "gstatic.com", "apple.com", "icloud.com"].iter().any(|d| h == *d || h.ends_with(&format!(".{d}")))

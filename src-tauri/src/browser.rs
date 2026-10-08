@@ -217,6 +217,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .filter(|p| p.policy == "block")
         .map(|p| p.permission)
         .collect();
+    #[cfg(target_os = "macos")]
     let host = url.host_str().unwrap_or_default().to_string();
     let profile = url.host_str().map(|h| site_profile(app, h)).unwrap_or_default();
     let block_trackers = profile.trackers.unwrap_or_else(|| setting(app, "block_trackers").as_deref() != Some("false"));
