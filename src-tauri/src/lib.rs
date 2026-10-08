@@ -7,6 +7,7 @@ mod extensions;
 mod memory_saver;
 mod security;
 mod updater;
+mod research;
 
 use tauri::Manager;
 
@@ -68,6 +69,9 @@ pub fn run() {
             browser::tab_zoom,
             browser::tab_find,
             browser::ai_chat,
+            research::research_search,
+            research::research_status,
+            research::research_key_set,
             browser::agent_exec,
             browser::qp_agent_result,
             extensions::extension_list,
