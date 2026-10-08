@@ -1,17 +1,25 @@
 /**
  * Screen agent loop. Each turn the Python agent returns two parts:
  *   user   → shown in the chat (its reasoning and message, or the final answer when action.type is "done")
- *   action → the exact instruction for the backend, executed only after the person approves it
- * Every action needs approval; there is no autopilot because the whole screen is in scope.
+ *   action → the exact instruction for the backend
+ * Routine actions run automatically ("smart" mode); only risky ones, or every step in "ask" mode, wait for the person.
  */
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
-export const MAX_SCREEN_STEPS = 20;
+export const MAX_SCREEN_STEPS = 25;
+const MAX_WAITS_IN_A_ROW = 5;
+const RISKY = /\b(buy|purchase|pay|checkout|check out|place order|order|delete|erase|remove|overwrite|send|submit|post|publish|confirm|accept|transfer|install|sign out|log out|quit|close without saving|unsubscribe|donate)\b/i;
+
+export type Choice = "allow" | "auto" | "skip" | "stop";
+export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = confirm only risky steps
 
 export interface ScreenIO {
   propose(goal: string, history: string[]): Promise<ScreenResponse>;
   act(action: ScreenAction): Promise<void>;
-  approve(description: string): Promise<boolean>;
+  /** Numbered choice dialog. `risky` steps never offer "auto". */
+  choose(description: string, risky: boolean): Promise<Choice>;
+  mode(): ScreenMode;
+  setMode(m: ScreenMode): void;
   sleep(ms: number): Promise<void>;
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
 }
@@ -28,6 +36,13 @@ export function describeScreenAction(a: ScreenAction): string {
     case "wait": return "Wait for the screen to update";
     default: return a.type;
   }
+}
+
+/** Is this step risky enough to need the person's OK even in smart mode? */
+export function isRisky(res: ScreenResponse): boolean {
+  const { action, user } = res;
+  if (action.type === "wait" || action.type === "scroll") return false;
+  return action.risk === "high" || RISKY.test(user.message ?? "");
 }
 
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS): Promise<void> {
@@ -48,21 +63,34 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     if (action.type === "done") return io.onEvent({ kind: "final", text: user.message || "Done." });
     if (action.type === "ask") return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" });
 
+    // Waiting for a page to load is legitimate for a while; anything else repeated 3x means we're stuck.
     const key = JSON.stringify([action.type, action.cell, action.fx, action.fy, action.text, action.key]);
     repeats = key === lastKey ? repeats + 1 : 0;
     lastKey = key;
-    if (repeats >= 2) return io.onEvent({ kind: "error", text: "I keep repeating the same action, so I stopped. Try rephrasing the task." });
+    if (repeats >= (action.type === "wait" ? MAX_WAITS_IN_A_ROW : 2)) {
+      return io.onEvent({ kind: "error", text: "I keep repeating the same action, so I stopped. Try rephrasing the task." });
+    }
 
     const desc = describeScreenAction(action);
-    if (!(await io.approve(user.message ? `${desc} — ${user.message}` : desc))) {
-      io.onEvent({ kind: "step", text: `${desc} — declined`, ok: false });
-      return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });
+    const risky = isRisky(res);
+    if (risky || io.mode() === "ask") {
+      const choice = await io.choose(user.message ? `${desc} — ${user.message}` : desc, risky);
+      if (signal.aborted || choice === "stop") {
+        io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
+        return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });
+      }
+      if (choice === "skip") {
+        io.onEvent({ kind: "step", text: `${desc} — skipped`, ok: false });
+        history.push(`${n + 1}. (the person refused: ${desc}) — try a different approach`);
+        continue;
+      }
+      if (choice === "auto") io.setMode("auto");
     }
     try {
       await io.act(action);
       io.onEvent({ kind: "step", text: desc, ok: true });
       history.push(`${n + 1}. ${desc}`);
-      await io.sleep(1200);
+      if (action.type !== "wait") await io.sleep(500);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
       return io.onEvent({ kind: "error", text: String(e) });

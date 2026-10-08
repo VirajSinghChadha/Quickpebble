@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
-import { runScreenAgent } from "../lib/screenAgent";
+import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent";
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
 import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
@@ -27,7 +27,10 @@ interface ChatState {
   setIncludeCurrentPage: (value: boolean) => void;
   setWebResearch: (value: boolean) => void;
   setSourceTabIds: (ids: string[]) => void;
-  approval: { description: string; resolve: (ok: boolean) => void } | null;
+  /** Screen mode: "auto" asks only for risky steps, "ask" confirms every step. */
+  screenApprovalMode: ScreenMode;
+  setScreenApprovalMode: (m: ScreenMode) => void;
+  approval: { description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
   setMode: (m: "ask" | "act" | "screen") => void;
   setApprovalMode: (m: Mode) => void;
   send: (text: string) => Promise<void>;
@@ -50,6 +53,18 @@ function history(items: ChatItem[]): ChatMsg[] {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** Numbered choices shown in the chat panel; resolves with the one the person picks. */
+function askChoice(description: string, risky: boolean, offerAuto: boolean): Promise<Choice> {
+  const options: { choice: Choice; label: string }[] = [{ choice: "allow", label: "Allow this step" }];
+  if (offerAuto && !risky) options.push({ choice: "auto", label: "Allow, and auto-run routine steps from now on" });
+  options.push({ choice: "skip", label: "Skip this step and try another way" }, { choice: "stop", label: "Stop" });
+  return new Promise<Choice>((resolve) => {
+    useChat.setState({
+      approval: { description, risky, options, resolve: (c) => { useChat.setState({ approval: null }); resolve(c); } },
+    });
+  });
+}
+
 function makeIO(): AgentIO {
   const st = () => useStore.getState();
   return {
@@ -61,18 +76,11 @@ function makeIO(): AgentIO {
     navigate: (tabId, url) => st().navigate(tabId, url),
     newTab: async (url) => st().newTab(url),
     switchTab: (id) => st().activate(id),
-    approve: (description) =>
-      new Promise<boolean>((resolve) => {
-        useChat.setState({
-          approval: {
-            description,
-            resolve: (ok) => {
-              useChat.setState({ approval: null });
-              resolve(ok);
-            },
-          },
-        });
-      }),
+    approve: async (description) => {
+      const c = await askChoice(description, false, true);
+      if (c === "auto") useChat.setState({ approvalMode: "auto" });
+      return c === "allow" || c === "auto";
+    },
     sleep,
     onEvent: (e) => {
       if (e.kind === "say") add("say", e.text);
@@ -95,6 +103,8 @@ export const useChat = create<ChatState>((set, get) => ({
   setWebResearch: (webResearch) => set({ webResearch }),
   setSourceTabIds: (sourceTabIds) => set({ sourceTabIds: sourceTabIds.slice(0, 4) }),
   approvalMode: "ask",
+  screenApprovalMode: "auto",
+  setScreenApprovalMode: (screenApprovalMode) => set({ screenApprovalMode }),
   approval: null,
   setMode: (mode) => set({ mode }),
   setApprovalMode: (approvalMode) => set({ approvalMode }),
@@ -102,7 +112,7 @@ export const useChat = create<ChatState>((set, get) => ({
 
   stop: () => {
     signal.aborted = true;
-    get().approval?.resolve(false);
+    get().approval?.resolve("stop");
   },
 
   send: async (text) => {
@@ -142,14 +152,22 @@ export const useChat = create<ChatState>((set, get) => ({
         set(s => ({ items: [...s.items, { id: nextId++, kind: "assistant", ...answer }] }));
       } else if (mode === "screen") {
         const io = makeIO();
-        await runScreenAgent(goal, { propose: ipc.screenPropose, act: ipc.screenAct, approve: io.approve, sleep, onEvent: io.onEvent }, runSignal);
+        await runScreenAgent(goal, {
+          propose: ipc.screenPropose,
+          act: ipc.screenAct,
+          choose: (description, risky) => askChoice(description, risky, get().screenApprovalMode === "ask"),
+          mode: () => get().screenApprovalMode,
+          setMode: (m) => set({ screenApprovalMode: m }),
+          sleep,
+          onEvent: io.onEvent,
+        }, runSignal);
       } else {
         await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
       }
     } catch (e) {
       if (!runSignal.aborted) add("error", String(e));
     } finally {
-      get().approval?.resolve(false);
+      get().approval?.resolve("stop");
       set({ busy: false });
     }
   },

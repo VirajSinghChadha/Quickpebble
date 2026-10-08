@@ -215,6 +215,7 @@ export interface ScreenAction {
   key?: string;
   direction?: "up" | "down";
   amount?: number;
+  risk?: "low" | "high";
 }
 
 /** User half of the agent's reply: how it got there, and the message or final answer. Never executed. */

@@ -36,6 +36,7 @@ class Action(BaseModel):
     key: Optional[str] = Field(default=None, max_length=40)
     direction: Optional[Literal["up", "down"]] = None
     amount: int = 3
+    risk: Literal["low", "high"] = "low"     # "high" = hard to undo or affects others; the app asks the person first
 
     @field_validator("fx", "fy")
     @classmethod
@@ -91,8 +92,9 @@ GEMINI_SCHEMA = {
                 "key": {"type": "STRING", "nullable": True},
                 "direction": {"type": "STRING", "enum": ["up", "down"], "nullable": True},
                 "amount": {"type": "INTEGER"},
+                "risk": {"type": "STRING", "enum": ["low", "high"]},
             },
-            "required": ["type"],
+            "required": ["type", "risk"],
         },
     },
     "required": ["user", "action"],

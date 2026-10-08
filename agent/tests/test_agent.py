@@ -61,3 +61,10 @@ def test_values_are_clamped():
 def test_grid_overlay_keeps_size():
     img = Image.new("RGB", (1600, 900), "white")
     assert draw_grid(img, G).size == (1600, 900)
+
+
+def test_risk_defaults_low_and_rejects_unknown():
+    assert parse_reply(reply(type="wait"), G).action.risk == "low"
+    assert parse_reply(reply(type="click", cell="A1", risk="high"), G).action.risk == "high"
+    with pytest.raises(ValueError):
+        parse_reply(reply(type="click", cell="A1", risk="maybe"), G)
