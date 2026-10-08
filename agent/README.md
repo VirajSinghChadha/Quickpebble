@@ -24,6 +24,6 @@ Slam the mouse into a screen corner to abort (pyautogui fail-safe).
 | Variable | Meaning |
 |---|---|
 | `GEMINI_API_KEY` | Set by Quick Pebble from the keychain (Settings → AI → Gemini). |
-| `QP_AGENT_MODEL` | Gemini model ID. Defaults to `gemini-3.5-flash-lite`; change it if Google names it differently. |
+| `QP_AGENT_MODEL` | Gemini model ID. Defaults to `gemini-3.8-flash`; change it if Google names it differently. |
 
 Privacy: every step sends a screenshot of your whole screen to Google.

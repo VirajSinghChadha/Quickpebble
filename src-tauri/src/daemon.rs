@@ -48,7 +48,7 @@ pub fn default_model(provider: &str) -> &'static str {
     match provider {
         "openai" => "gpt-4o-mini",
         "anthropic" => "claude-haiku-5-5",
-        "gemini" => "gemini-2.0-flash",
+        "gemini" => "gemini-3.8-flash",
         _ => DEFAULT_LOCAL_MODEL,
     }
 }
