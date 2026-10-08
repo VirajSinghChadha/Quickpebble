@@ -9,7 +9,7 @@ from .prompt import system_prompt, user_prompt
 from .schema import GEMINI_SCHEMA, AgentResponse
 
 # "light" Gemini. Change with the QP_AGENT_MODEL environment variable (or the Quick Pebble setting).
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
