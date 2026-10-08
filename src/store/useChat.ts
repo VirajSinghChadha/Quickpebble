@@ -4,6 +4,7 @@ import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
 import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
+import { rankUpgrades, wantsUpgrade, type ModelChoice } from "../lib/models";
 import { fallbackSite, hostOf, loadSite, parseGenerated, PERMISSION_PROMPT, saveSite, type Scope, type SitePerms } from "../lib/permissions";
 
 export type ChatKind = "user" | "assistant" | "say" | "step" | "error" | "question";
@@ -35,6 +36,8 @@ interface ChatState {
   permissionRequest: { host: string; site: SitePerms; resolve: (r: { site: SitePerms; scope: Scope } | null) => void } | null;
   /** True while Gemini is writing the permission list for a site. */
   preparingPermissions: boolean;
+  /** Offered when the person asks for something detailed: switch to a stronger model? */
+  modelOffer: { current: string; models: ModelChoice[]; resolve: (model: string | null) => void } | null;
   editPermissions: () => Promise<void>;
   approval: { description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
   setMode: (m: "ask" | "act" | "screen") => void;
@@ -58,6 +61,7 @@ async function activePageText(): Promise<string | undefined> {
 
 /** Per-site permissions chosen for this session only. */
 const sessionPerms = new Map<string, SitePerms>();
+let upgradeOffered = false;
 let activePerms: SitePerms = fallbackSite();
 
 async function savedSite(host: string): Promise<SitePerms | null> {
@@ -66,7 +70,7 @@ async function savedSite(host: string): Promise<SitePerms | null> {
 }
 
 /** Asks Gemini which sensitive things matter on this website; falls back to a generic list. */
-async function curateSite(host: string): Promise<SitePerms> {
+async function curateSite(host: string, task: string): Promise<SitePerms> {
   try {
     const tab = selectActive(useStore.getState());
     let text = "";
@@ -74,7 +78,7 @@ async function curateSite(host: string): Promise<SitePerms> {
       const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot").catch(() => null);
       text = (snap?.text ?? "").slice(0, 1500);
     }
-    const reply = await ipc.aiChat(PERMISSION_PROMPT, [{ role: "user", content: `Website: ${host}\nPage title: ${tab.title ?? ""}\nURL: ${tab.url ?? ""}\n<<<PAGE\n${text}\n>>>PAGE` }], true);
+    const reply = await ipc.aiChat(PERMISSION_PROMPT, [{ role: "user", content: `The person's task: ${task.slice(0, 500)}\nWebsite: ${host}\nPage title: ${tab.title ?? ""}\nURL: ${tab.url ?? ""}\n<<<PAGE\n${text}\n>>>PAGE` }], true);
     return parseGenerated(reply) ?? fallbackSite();
   } catch {
     return fallbackSite();
@@ -97,6 +101,27 @@ async function askPermissions(host: string, start: SitePerms): Promise<SitePerms
 
 const add = (kind: ChatKind, text: string, ok?: boolean) =>
   useChat.setState((s) => ({ items: [...s.items, { id: nextId++, kind, text, ok }] }));
+
+/** Asks (once) whether to switch to a stronger Gemini model, listing only models this key can really use. */
+async function offerUpgrade(): Promise<void> {
+  try {
+    const settings = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+    if ((settings.ai_provider ?? "ollama") !== "gemini") return;
+    const status = await ipc.aiStatus().catch(() => null);
+    const current = settings.ai_model || status?.model || "";
+    const models = rankUpgrades(await ipc.geminiModels().catch(() => []), current);
+    if (!models.length) return;
+    const pick = await new Promise<string | null>((resolve) => {
+      useChat.setState({ modelOffer: { current, models, resolve: (m) => { useChat.setState({ modelOffer: null }); resolve(m); } } });
+    });
+    if (pick) {
+      await ipc.settingsSet("ai_model", pick);
+      add("say", `Switched to ${pick}.`);
+    }
+  } catch {
+    /* never block the request because the offer failed */
+  }
+}
 
 /** Plain conversation turns only (no step logs), for model context. */
 function history(items: ChatItem[]): ChatMsg[] {
@@ -170,12 +195,13 @@ export const useChat = create<ChatState>((set, get) => ({
   approval: null,
   permissionRequest: null,
   preparingPermissions: false,
+  modelOffer: null,
   editPermissions: async () => {
     const host = hostOf(selectActive(useStore.getState()).url);
     let start = sessionPerms.get(host) ?? (await savedSite(host));
     if (!start) {
       set({ preparingPermissions: true });
-      start = await curateSite(host);
+      start = await curateSite(host, "(not stated yet)");
       set({ preparingPermissions: false });
     }
     const site = await askPermissions(host, start);
@@ -186,6 +212,7 @@ export const useChat = create<ChatState>((set, get) => ({
   clear: () => {
     screenHistory.length = 0;
     sessionPerms.clear();
+    upgradeOffered = false;
     set({ items: [] });
   },
 
@@ -193,11 +220,16 @@ export const useChat = create<ChatState>((set, get) => ({
     signal.aborted = true;
     get().approval?.resolve("stop");
     get().permissionRequest?.resolve(null);
+    get().modelOffer?.resolve(null);
   },
 
   send: async (text) => {
     const goal = text.trim();
     if (!goal || get().busy) return;
+    if (!upgradeOffered && wantsUpgrade(goal)) {
+      upgradeOffered = true; // ask once per session so it never nags
+      await offerUpgrade();
+    }
     const prior = history(get().items);
     add("user", goal);
     signal = { aborted: false };
@@ -236,7 +268,7 @@ export const useChat = create<ChatState>((set, get) => ({
         let perms = sessionPerms.get(host) ?? (await savedSite(host));
         if (!perms) {
           set({ preparingPermissions: true });
-          const curated = await curateSite(host);
+          const curated = await curateSite(host, goal);
           set({ preparingPermissions: false });
           if (runSignal.aborted) return;
           perms = await askPermissions(host, curated);

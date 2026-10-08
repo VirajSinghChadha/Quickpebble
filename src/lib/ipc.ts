@@ -177,6 +177,7 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  geminiModels: () => call<string[]>("gemini_models", undefined, []),
   screenAct: (action: ScreenAction) => call<void>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
   extensionInstallStore: (input: string) => call<ExtensionInfo>("extension_install_store", { input }),

@@ -53,6 +53,7 @@ fn main() {
                 "screen_propose",
                 "screen_act",
                 "screen_verify",
+                "gemini_models",
             ]),
         ),
     )

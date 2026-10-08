@@ -13,7 +13,7 @@ const SUGGESTIONS = {
 };
 
 export function ChatPanel() {
-  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
   const [showSources, setShowSources] = useState(false);
@@ -27,6 +27,19 @@ export function ChatPanel() {
 
   useEffect(() => { if (follow.current) end.current?.scrollIntoView({ block: "end", behavior: "auto" }); }, [items, approval, busy]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(composer.current.scrollHeight, 112)}px`; } }, [text]);
+
+  useEffect(() => {
+    if (!modelOffer) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= modelOffer.models.length) { e.preventDefault(); modelOffer.resolve(modelOffer.models[n - 1].id); }
+      else if (n === modelOffer.models.length + 1) { e.preventDefault(); modelOffer.resolve(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modelOffer]);
 
   useEffect(() => {
     if (!approval) return;
@@ -144,6 +157,25 @@ export function ChatPanel() {
           ),
         )}
         {preparingPermissions && <div className="flex items-center gap-2 px-1 text-text-secondary" role="status"><span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-primary" /> Working out which permissions matter on this site…</div>}
+        {modelOffer && (
+          <div role="alertdialog" aria-label="Upgrade model" className="rounded-2xl border border-primary/50 bg-surface p-3 shadow-pebble">
+            <p className="mb-1 font-semibold">Do you want to upgrade models?</p>
+            <p className="mb-2 text-[12px] text-text-secondary">You asked for something detailed. I'm on <b>{modelOffer.current || "the light model"}</b>, which is fast but less thorough. These models from your Gemini account would do better:</p>
+            <div className="flex flex-col gap-1.5">
+              {modelOffer.models.map((m, i) => (
+                <button key={m.id} type="button" autoFocus={i === 0} onClick={() => modelOffer.resolve(m.id)} className="flex items-start gap-2.5 rounded-lg border border-border px-2.5 py-1.5 text-left hover:bg-surface-secondary focus-visible:border-primary">
+                  <kbd className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-surface-secondary text-[11px] font-semibold">{i + 1}</kbd>
+                  <span><span className="block font-medium">{m.id}</span><span className="block text-[11.5px] text-text-secondary">{m.note}</span></span>
+                </button>
+              ))}
+              <button type="button" onClick={() => modelOffer.resolve(null)} className="flex items-center gap-2.5 rounded-lg border border-border px-2.5 py-1.5 text-left hover:bg-surface-secondary focus-visible:border-primary">
+                <kbd className="grid size-5 shrink-0 place-items-center rounded-md bg-surface-secondary text-[11px] font-semibold">{modelOffer.models.length + 1}</kbd>
+                <span>Keep {modelOffer.current || "the current model"}</span>
+              </button>
+            </div>
+            <p className="mt-2 text-[10.5px] text-text-secondary">Press {Array.from({ length: modelOffer.models.length + 1 }, (_, i) => i + 1).join(", ")} on your keyboard. Better models use more of your Gemini quota.</p>
+          </div>
+        )}
         <PermissionDialog />
         {approval && (
           <div role="alertdialog" aria-label="Approve action" className={`rounded-2xl border bg-surface p-3 shadow-pebble ${approval.risky ? "border-red-500/60" : "border-primary/50"}`}>
@@ -160,7 +192,7 @@ export function ChatPanel() {
             <p className="mt-2 text-[10.5px] text-text-secondary">Press {approval.options.map((_, i) => i + 1).join(", ")} on your keyboard to choose.</p>
           </div>
         )}
-        {busy && !approval && !permissionRequest && !preparingPermissions && (
+        {busy && !approval && !permissionRequest && !preparingPermissions && !modelOffer && (
           <div className="flex items-center gap-2 px-1 text-text-secondary" role="status">
             <span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-primary" /> Working…
           </div>

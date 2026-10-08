@@ -58,6 +58,8 @@ export function describeScreenAction(a: ScreenAction): string {
 /** Is this a click/Enter that sends something off? Those get a double-check first. */
 export function needsDoubleCheck(res: ScreenResponse): boolean {
   const { action, user } = res;
+  // Typing an answer is checked BEFORE it is entered, so a wrong or empty answer never reaches the page.
+  if (action.type === "type") return /\b(answer|response|solution|result|working|reply)\b/i.test(`${user.message ?? ""} ${action.category ?? ""}`);
   if (action.type !== "click" && !(action.type === "key" && /^(enter|return)$/i.test(action.key ?? ""))) return false;
   return SUBMITTY.test(action.category ?? "") || /\b(submit|confirm|send|finish|check (my )?answer|publish|post|place order)\b/i.test(user.message ?? "");
 }
@@ -120,7 +122,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     // Double-check before anything is submitted: an independent look at the work against the task.
     let doubtful = "";
     if (needsDoubleCheck(res)) {
-      io.onEvent({ kind: "say", text: "Double-checking before I submit…" });
+      io.onEvent({ kind: "say", text: action.type === "type" ? "Double-checking the answer before I enter it…" : "Double-checking before I submit…" });
       try {
         const v = await io.verify(goal, history.slice(-12), desc);
         if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });

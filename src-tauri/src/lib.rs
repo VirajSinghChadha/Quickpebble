@@ -84,6 +84,7 @@ pub fn run() {
             screen::screen_propose,
             screen::screen_act,
             screen::screen_verify,
+            screen::gemini_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

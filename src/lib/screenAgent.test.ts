@@ -145,7 +145,8 @@ describe("runScreenAgent", () => {
 
   it("only double-checks submit-like steps", () => {
     expect(needsDoubleCheck(res({ type: "click", cell: "A1" }, "Open the menu"))).toBe(false);
-    expect(needsDoubleCheck(res({ type: "type", text: "x" }, "Submit"))).toBe(false);
+    expect(needsDoubleCheck(res({ type: "type", text: "x" }, "Type the search term"))).toBe(false);
+    expect(needsDoubleCheck(res({ type: "type", text: "7^4" }, "Enter the answer 7^4"))).toBe(true);
     expect(needsDoubleCheck(res({ type: "key", key: "enter" }, "Press enter to submit the answer"))).toBe(true);
     expect(needsDoubleCheck(res({ type: "click", cell: "A1", category: "submit_quiz_answers" }))).toBe(true);
   });

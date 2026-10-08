@@ -172,3 +172,29 @@ pub async fn screen_verify(
     };
     post(port, &token, "/verify", json!({ "goal": goal, "history": history, "pending": pending, "page_text": page_text })).await
 }
+
+/// Gemini models this key can call for text generation (names without the `models/` prefix).
+#[tauri::command]
+pub async fn gemini_models() -> Result<Vec<String>, String> {
+    let key = daemon::get_key("gemini").ok_or("Add a Gemini API key in Settings → AI first.")?;
+    let v: Value = reqwest::Client::new()
+        .get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200")
+        .header("x-goog-api-key", key)
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach Gemini: {e}"))?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(msg) = v["error"]["message"].as_str() {
+        return Err(msg.to_string());
+    }
+    Ok(v["models"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|m| m["supportedGenerationMethods"].as_array().is_some_and(|a| a.iter().any(|x| x == "generateContent")))
+        .filter_map(|m| m["name"].as_str().and_then(|n| n.strip_prefix("models/")).map(String::from))
+        .collect())
+}
