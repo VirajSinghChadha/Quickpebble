@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -102,6 +102,12 @@ export interface UpdateInfo {
   notes: string | null;
 }
 
+export interface UpdateProgress {
+  phase: "downloading" | "installing";
+  downloaded: number;
+  total: number | null;
+}
+
 export const defaultMemory: MemoryConfig = { enabled: true, mode: "balanced", timeout_minutes: null };
 
 export const ipc = {
@@ -137,8 +143,16 @@ export const ipc = {
   windowNewPrivate: () => call<void>("window_new_private"),
   chromeSet: (height: number) => call<void>("chrome_set", { height }),
   tabReader: (id: string) => call<void>("tab_reader", { id }),
-  updateCheck: () => call<UpdateInfo | null>("update_check", undefined, null),
-  updateInstall: () => call<void>("update_install"),
+  updateCheck: async () => {
+    if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
+    return call<UpdateInfo | null>("update_check");
+  },
+  updateInstall: async (onProgress: (progress: UpdateProgress) => void) => {
+    if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
+    const progress = new Channel<UpdateProgress>();
+    progress.onmessage = onProgress;
+    return call<void>("update_install", { progress });
+  },
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
   tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),
