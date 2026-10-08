@@ -18,6 +18,26 @@ jobs:
     outputs:
       release_id: ${{ steps.release.outputs.release_id }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Validate release version and signing setup
+        env:
+          TAG: ${{ github.ref_name }}
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$SIGNING_KEY" || { echo "Missing TAURI_SIGNING_PRIVATE_KEY repository secret"; exit 1; }
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const version = process.env.TAG.replace(/^v/, '');
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
+          const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json'));
+          const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1];
+          if (![pkg.version, lock.version, lock.packages[''].version, config.version, cargo].every(v => v === version)) {
+            throw new Error(`Release tag ${process.env.TAG} must match all app versions`);
+          }
+          JS
       - id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -25,7 +45,7 @@ jobs:
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
-              --title "Quick Pebble $TAG" \
+              --draft --title "Quick Pebble $TAG" \
               --notes "See the [README](https://github.com/$GITHUB_REPOSITORY#install) for install options. Existing installs will offer this update in-app."
           echo "release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)" >> "$GITHUB_OUTPUT"
 
@@ -58,12 +78,26 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseDraft: true
           includeUpdaterJson: true
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
 
+  publish:
+    name: Publish complete update
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish after every platform is ready
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx latest.json
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
   homebrew:
     name: Update Homebrew cask
-    needs: build
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
