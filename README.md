@@ -6,134 +6,187 @@
 
 **Browse quicker.**
 
-A lightweight, privacy-first desktop browser with a calm design, tab memory saving, and AI that runs on your own machine.
+A lightweight, privacy-first desktop browser with a calm design, tab memory saving,
+and an AI assistant that runs on your own machine.
 
 [![CI](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml/badge.svg)](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/VirajSinghChadha/Quickpebble)](https://github.com/VirajSinghChadha/Quickpebble/releases/latest)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2.x-24C8DB)
 ![React 19](https://img.shields.io/badge/React-19-61DAFB)
+
+[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Privacy](#privacy-and-security) · [Development](#development) · [Releasing](#releasing)
 
 </div>
 
 ---
 
-## Highlights
-
-| | |
-|---|---|
-| **Pebble UI** | A compact 92 px chrome, floating "pebble" tabs, 12 px radii, light and dark themes, and 150–180 ms transitions. |
-| **Local AI first** | Page summaries, tab auto-grouping and address-bar completions run through [Ollama](https://ollama.com) on `localhost`. Cloud providers (OpenAI, Anthropic, Gemini) are opt-in. |
-| **AI Assistant side panel** | Chat about the page, or tell it to do things: it can click, type, scroll, open tabs and navigate. Every action is shown, approval is on by default, and a Stop button is always there. |
-| **Chrome extensions** | Add extensions from the Chrome Web Store (link or ID) or a `.crx` file. Content scripts and `chrome.storage` run natively; see [Extensions](#chrome-extensions). |
-| **Tab Therapist (built in)** | Tab health score, duplicate cleanup, auto-organise into groups and saved tabs — ported from the Tab Therapist extension and runs natively. |
-| **Reader mode** | `⌘⇧R` strips a page to clean, resizable text with light / sepia / dark themes. |
-| **Bookmarks bar** | `⌘⇧B` toggles a bookmarks strip under the toolbar. |
-| **HTTPS-only mode** | `http://` links are upgraded to `https://`; if a site has no HTTPS you get a warning before continuing. |
-| **Signed auto-updates** | Checks GitHub Releases, verifies the signature, and installs only when you click. |
-| **Memory Saver** | Idle background tabs are suspended and restored when you return. Never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
-| **Privacy Center** | Tracker blocking, per-site camera / microphone / location / notification rules, private windows, one-click data clearing. |
-| **Quick Actions** | `⌘⇧P` command palette and `⌘⇧A` tab search. |
-| **Small and native** | Tauri 2 + Rust, using the OS web engine (WKWebView on macOS, WebView2 on Windows). No bundled Chromium. |
-
 ## Install
 
-Grab a build from the [Releases](https://github.com/VirajSinghChadha/Quickpebble/releases) page once one is published, or build from source below.
-
-macOS builds are unsigned unless you add your own signing identity, so the first launch needs *right-click → Open*.
-
-## Build from source
-
-**Requirements:** Node 20+, Rust (stable), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your OS (Xcode Command Line Tools on macOS; WebView2 and MSVC Build Tools on Windows).
+### macOS — Homebrew (recommended)
 
 ```bash
-git clone https://github.com/VirajSinghChadha/Quickpebble.git
-cd Quickpebble
-npm install
-npm run tauri:dev      # run the app with hot reload
+brew tap VirajSinghChadha/quickpebble https://github.com/VirajSinghChadha/Quickpebble
+brew install --cask quick-pebble
 ```
 
-```bash
-npm run tauri:build    # production bundle for the current OS
-./scripts/package_macos.sh          # macOS .dmg
-iscc scripts\installer_windows.iss  # Windows installer (after `npx tauri build --no-bundle`)
-```
+Works on Apple silicon and Intel. The app updates itself afterwards (see [Updates](#updates)), so you don't need `brew upgrade`.
+
+### macOS / Windows — direct download
+
+Download the installer for your system from the [latest release](https://github.com/VirajSinghChadha/Quickpebble/releases/latest):
+
+| System | File |
+|---|---|
+| macOS, Apple silicon | `Quick.Pebble_<version>_aarch64.dmg` |
+| macOS, Intel | `Quick.Pebble_<version>_x64.dmg` |
+| Windows 10/11 (64-bit) | `Quick.Pebble_<version>_x64-setup.exe` (or `.msi`) |
+
+> **Builds are not code-signed or notarised yet.** On macOS, right-click the app → **Open** the first time (the Homebrew cask clears the quarantine flag for you). On Windows, SmartScreen may show "unknown publisher" → **More info → Run anyway**. Releases are verified by a separate update signature, described under [Updates](#updates).
+
+### Linux
+
+Not packaged yet. You can [build from source](#development); CI compiles it on Ubuntu.
 
 ### Optional: local AI
 
+The assistant works best with [Ollama](https://ollama.com), which keeps everything on your machine:
+
 ```bash
-brew install ollama        # or https://ollama.com/download
+brew install ollama     # or download from https://ollama.com/download
 ollama serve
-ollama pull llama3         # or: ollama pull mistral
+ollama pull llama3      # or: ollama pull mistral
 ```
 
-Quick Pebble detects Ollama automatically. Change the model or provider under **Settings → AI**.
+Quick Pebble finds Ollama automatically. Change the model or provider in **Settings → AI**.
 
-## Keyboard shortcuts
+## Features
 
-Use `⌘` on macOS and `Ctrl` on Windows/Linux.
-
-| Shortcut | Action |
+| | |
 |---|---|
-| `⌘T` / `⌘W` | New tab / close tab |
-| `⌘L` | Focus the address bar |
-| `⌘R` | Reload |
-| `⌘[` / `⌘]` | Back / forward |
-| `⌘D` | Bookmark this page |
-| `⌘⇧P` | Quick Actions |
-| `⌘⇧A` | Search tabs |
-| `⌘⇧N` | Private window |
-| `⌘J` | AI Assistant side panel |
-| `⌘F` | Find in page |
-| `⌘+` / `⌘-` / `⌘0` | Zoom in / out / reset |
-| `⌘⇧T` | Reopen closed tab |
-| `⌘Y` | History & bookmarks |
-| `⌘⇧R` | Reader mode |
-| `⌘⇧B` | Show / hide bookmarks bar |
+| **Pebble UI** | Compact 92 px chrome, floating "pebble" tabs, 12 px radii, light/dark themes, 150–180 ms transitions. |
+| **AI Assistant** | Side panel (`⌘J`) that answers questions about the page or operates the browser for you. |
+| **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
+| **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
+| **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
+| **Memory Saver** | Suspends idle background tabs; never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
+| **Privacy Center** | Tracker blocking, per-site camera / mic / location / notification rules, private windows, one-click data clearing. |
+| **HTTPS-only mode** | Upgrades `http://` to `https://` and warns before opening a site insecurely. |
+| **Reader mode** | `⌘⇧R` turns an article into clean text with font size and light/sepia/dark themes. |
+| **Productivity** | Command palette (`⌘⇧P`), tab search (`⌘⇧A`), find in page, zoom, bookmarks bar, history search, reopen closed tab. |
+| **Small and native** | Tauri 2 + Rust on the OS web engine (WKWebView / WebView2). No bundled Chromium. |
+| **Signed auto-updates** | New releases show up inside the app; install is one click. |
 
-Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal** group (or let the AI choose).
-
-## AI Assistant
+### AI Assistant
 
 Open it with `⌘J` or the robot icon. Two modes:
 
-- **Ask** answers questions about the page you're on.
-- **Do tasks** runs a loop: read the page → the model picks one action → you approve it (by default) → it runs → repeat, up to 15 steps.
+- **Ask** answers questions using the page you're on.
+- **Do tasks** runs a loop — read the page → the model picks one action → you approve it → it runs → repeat (max 15 steps). It can click, type, select, scroll, press keys, navigate, open tabs and switch tabs.
 
-The agent controls **browser tabs only**, not the rest of your computer. It uses a text snapshot of the page (visible text plus a numbered list of buttons, links and fields), so it does not "see" images or canvases.
+It controls **browser tabs only**, not the rest of your computer, and it works from a text snapshot of the page, so it does not see images or canvases.
 
 Safety rails:
 
-- **Ask before acting** (default) needs your approval for each click, keystroke and navigation. **Autopilot** only interrupts for sensitive clicks (buy, pay, delete, send, submit…).
-- It never types into password fields; it asks you instead.
-- Page text is passed to the model as untrusted data, and the prompt tells it to ignore instructions found on pages. That reduces prompt-injection risk but cannot eliminate it, so keep approval on when visiting sites you don't trust.
-- It stops on repeated actions, invalid model output, or when you press Stop.
-- With a cloud provider selected, page content is sent to that provider; the panel footer shows which provider is active.
+- **Ask before acting** (default) needs your approval for every click, keystroke and navigation. **Autopilot** only interrupts for sensitive clicks (buy, pay, delete, send, submit…).
+- It never types into password fields.
+- Page text is passed to the model as untrusted data and the prompt tells it to ignore instructions found on pages. That reduces prompt-injection risk but can't eliminate it — keep approval on for sites you don't trust.
+- It stops on repeated actions, invalid model output, or when you press **Stop**.
+- With a cloud provider selected, page content is sent to that provider; the panel footer always shows which one is active.
 
-Small local models (e.g. an 8B `llama3`) follow the JSON action format less reliably than larger ones. If the agent keeps failing, pick a bigger model in Settings.
+Small local models follow the action format less reliably than large ones. If the agent keeps failing, choose a bigger model.
 
-## Chrome extensions
+### Chrome extensions
 
-System web engines can't host Chrome's extension runtime, so Quick Pebble ships a small compatibility layer instead:
+System web engines can't host Chrome's extension runtime, so Quick Pebble ships a small compatibility layer:
 
 | Works | Doesn't work |
 |---|---|
 | Content scripts (JS + CSS), URL match patterns, `run_at` | Background / service workers |
 | `chrome.storage.local` / `sync` (per site) | Toolbar popups and options pages |
-| `chrome.runtime.getManifest` / `id` | `chrome.tabs`, `webRequest`, `declarativeNetRequest`, other APIs |
+| `chrome.runtime.getManifest` / `id` | `chrome.tabs`, `webRequest`, `declarativeNetRequest` and other APIs |
 
-- **Install:** *Extensions* (puzzle icon) → paste a Chrome Web Store link or ID, or pick a `.crx` file. Downloads use Google's public update endpoint, the same one other Chromium-based tools use.
-- **Consent:** extensions install **switched off**. The list shows which sites each one can read and change, plus warnings about unsupported parts. You turn them on yourself.
-- **Scope:** extensions apply to tabs opened after you enable them, and never run in private windows. Content scripts run in the page's own JavaScript world (no isolated world), so a page can see what an extension adds.
-- **Tab Therapist** is built in as a native feature (side panel → *Tab Therapist*), because its original popup relies on `chrome.tabs` / `chrome.tabGroups`.
+- **Install:** puzzle icon → paste a Chrome Web Store link or ID, or choose a `.crx` file. Downloads use Google's public update endpoint.
+- **Consent:** extensions install **switched off**. The list shows which sites each can read and change, plus warnings about unsupported parts. You switch them on.
+- **Scope:** applies to tabs opened afterwards; never in private windows. Scripts run in the page's own JavaScript world, so a page can observe what an extension adds.
+- Most popular extensions (ad blockers, password managers) depend on background workers and **won't function**.
 
-## How it works
+## Keyboard shortcuts
+
+Use `⌘` on macOS and `Ctrl` on Windows/Linux.
+
+| Shortcut | Action | | Shortcut | Action |
+|---|---|---|---|---|
+| `⌘T` / `⌘W` | New / close tab | | `⌘⇧P` | Quick Actions |
+| `⌘⇧T` | Reopen closed tab | | `⌘⇧A` | Search tabs |
+| `⌘L` | Focus address bar | | `⌘J` | AI Assistant |
+| `⌘R` | Reload | | `⌘F` | Find in page |
+| `⌘[` / `⌘]` | Back / forward | | `⌘+` `⌘-` `⌘0` | Zoom in / out / reset |
+| `⌘D` | Bookmark page | | `⌘⇧R` | Reader mode |
+| `⌘Y` | History & bookmarks | | `⌘⇧B` | Bookmarks bar |
+| `⌘⇧N` | Private window | | | |
+
+Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal / Entertainment / Shopping** group (or let the AI choose).
+
+## Updates
+
+Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off.
+
+Every update is verified against an Ed25519 public key embedded in the app before it is installed, so a tampered download is rejected. Nothing installs without your click.
+
+## Privacy and security
+
+- **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to it, and the app tells you so. API keys live in the OS keychain, never in the database.
+- **Tracker blocking** has two layers. Navigations to known ad/analytics hosts are refused natively. Inside pages, a script injected before page code blocks `fetch`, `XMLHttpRequest`, `sendBeacon` and dynamically added `<script>`/`<img>`/`<iframe>` elements for those hosts and hides common ad containers. System webviews expose no request-interception API, so this is **best-effort**: resources the HTML parser loads before the script runs can still get through. It is not uBlock Origin.
+- **HTTPS-only** upgrades `http://` navigations (not localhost, private IPs or `.local`). It first checks the HTTPS site responds; if not, you choose whether to continue over HTTP for that site for the session.
+- **Navigation policy.** Only `http`, `https` and `about:blank` load; `javascript:`, `file:`, `data:` and custom schemes are refused.
+- **Pages get almost no IPC.** A web page can call only three commands (report its own state, forward a shortcut, return an agent result). The calling tab is identified from the webview label, never from the payload. The UI webview has a separate capability.
+- **Site permissions.** "Block" rules override `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run (best-effort, applied on next load). "Ask"/"Allow" use the web engine's own behaviour.
+- **Private windows** use non-persistent webview storage, record no history, save no tab session, and don't load extensions.
+- **The SQLite database is not encrypted.** It sits in your OS app-data folder, protected by your user account. Use full-disk encryption if you need encryption at rest.
+
+Found a vulnerability? See [SECURITY.md](SECURITY.md).
+
+## Known limitations
+
+- Only macOS has been exercised by hand; Windows and Linux are built by CI but not hand-tested.
+- Releases are unsigned (no Apple Developer ID / Windows certificate), so first launch needs the steps in [Install](#install).
+- No cross-platform API reports per-tab memory, so Memory Saver's "MB saved" is an estimate (~100 MB per suspended tab).
+- Download tracking isn't wired up, so the "don't suspend during a download" rule exists in the policy but the flag is never set.
+- Audio detection looks at `<audio>`/`<video>` elements only (not Web Audio or WebRTC-only pages).
+- Reader mode uses a density heuristic (not Mozilla Readability) and can miss unusual layouts.
+- The agent can't handle drag-and-drop, canvas apps or CAPTCHAs, and can struggle on heavily dynamic sites.
+- Tab groups are coloured labels, not Chrome-style collapsible groups.
+- Not in v1: sync, a password manager, a PDF viewer, Chrome-style extension popups.
+- Keyboard shortcuts inside pages rely on an injected script and won't fire where script injection is blocked.
+
+## Development
+
+**Requirements:** Node 20+, Rust (stable), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your OS (Xcode Command Line Tools on macOS; WebView2 + MSVC Build Tools on Windows).
+
+```bash
+git clone https://github.com/VirajSinghChadha/Quickpebble.git
+cd Quickpebble
+npm install
+npm run tauri:dev        # app with hot reload
+```
+
+```bash
+npm run typecheck                                    # TypeScript
+npm test                                             # Vitest (frontend logic)
+cargo test   --manifest-path src-tauri/Cargo.toml    # Rust unit tests
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+npm run tauri:build                                  # production bundle for this OS
+```
+
+### Architecture
 
 ```text
 ┌─────────────────────────── window ───────────────────────────┐
-│ UI webview (React)  ── tab strip + toolbar + overlays        │
-│ ┌───────────────────────────────────────────────────────────┐│
-│ │ Page webview per tab (child webview, 92 px below the top) ││
-│ └───────────────────────────────────────────────────────────┘│
+│ UI webview (React) ── tab strip · toolbar · panels · overlays│
+│ ┌──────────────────────────────────────────┐ ┌─────────────┐ │
+│ │ one child webview per live tab           │ │ side panel  │ │
+│ └──────────────────────────────────────────┘ └─────────────┘ │
 └───────────────────────────────┬───────────────────────────────┘
                                 │ Tauri IPC
         ┌───────────────────────┴────────────────────────┐
@@ -143,83 +196,62 @@ System web engines can't host Chrome's extension runtime, so Quick Pebble ships 
 
 ```text
 quick-pebble/
-├── src/                      React 19 + TypeScript + Tailwind v4 frontend
-│   ├── components/           TabStrip, AddressBar, Toolbar, QuickActions, PrivacyCenter, NewTabPage, …
-│   ├── hooks/                useTabs, useOllama, useShortcuts, useTheme
-│   ├── store/                Zustand store (tabs, theme, overlays, session restore)
-│   ├── lib/                  typed IPC client, shortcut table, URL helpers
-│   └── styles/globals.css    Pebble UI design tokens
+├── src/                       React 19 + TypeScript + Tailwind v4
+│   ├── components/            TabStrip, AddressBar, Toolbar, ChatPanel, TherapistPanel, …
+│   ├── hooks/                 useTabs, useOllama, useShortcuts, useTheme
+│   ├── store/                 Zustand stores (tabs/UI, assistant chat)
+│   ├── lib/                   typed IPC client, agent loop, shortcuts, helpers
+│   └── styles/globals.css     Pebble UI design tokens
 ├── src-tauri/
-│   ├── src/browser.rs        tab webviews, windows, IPC commands
-│   ├── src/daemon.rs         Ollama bridge + OpenAI / Anthropic / Gemini fallbacks
-│   ├── src/memory_saver.rs   suspension policy and exclusion rules
-│   ├── src/database.rs       SQLite: history, bookmarks, settings, site permissions
-│   ├── src/extensions.rs     CRX unpacking, Web Store download, content-script runtime
-│   ├── src/security.rs       URL normalisation, navigation policy, tracker blocklist
-│   ├── src/inject.js         script injected into pages (state reporting, shortcuts, permission blocks)
-│   ├── capabilities/         least-privilege IPC permissions
+│   ├── src/browser.rs         tab webviews, windows, IPC commands, HTTPS-only
+│   ├── src/daemon.rs          Ollama bridge + OpenAI / Anthropic / Gemini
+│   ├── src/memory_saver.rs    suspension policy and exclusion rules
+│   ├── src/extensions.rs      CRX unpacking, Web Store download, content-script runtime
+│   ├── src/updater.rs         signed update checks
+│   ├── src/database.rs        SQLite: history, bookmarks, settings, permissions
+│   ├── src/security.rs        URL normalisation, navigation policy, tracker list
+│   ├── src/inject.js          page script: state, shortcuts, agent ops, blocker, reader
+│   ├── capabilities/          least-privilege IPC permissions
 │   └── tauri.conf.json
-├── scripts/                  macOS DMG script, Inno Setup installer
-└── .github/workflows/        CI and release pipelines
+├── Casks/quick-pebble.rb      Homebrew cask (auto-updated on release)
+├── scripts/                   macOS DMG, Windows installer, cask generator
+└── .github/workflows/         CI and release pipelines
 ```
 
-- **Tabs are native child webviews.** The React UI draws the chrome; each live tab is its own webview placed below it. Tabs showing the new tab page, and suspended tabs, have no webview at all.
-- **Memory Saver** runs a 30-second background loop. *Balanced* suspends after 20 idle minutes, *Maximum* after 5; the timeout halves when system memory is above 85 % used. Suspending closes the webview, and activating the tab reloads its URL.
-- **Overlays** (menus, palette, dialogs) are drawn by the UI webview, which sits beneath page webviews, so the page is briefly hidden while one is open.
+Notes for contributors:
 
-## Privacy and security model
+- Design tokens live in `src/styles/globals.css`; changing a `--color-*` value re-themes the app.
+- Adding a Rust command means three edits: register it in `lib.rs`, list it in `build.rs`, and grant it in `src-tauri/permissions/ui.toml` (or `capabilities/pages.json` if pages may call it).
+- Overlays (menus, palette, dialogs) are drawn by the UI webview, which sits beneath page webviews, so the active page is hidden while one is open.
 
-- **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to that provider, and the app tells you so each time. API keys are stored in the OS keychain, never in the database.
-- **Tracker blocking** has two layers. Navigations to known ad and analytics hosts are refused natively. Inside pages, a script injected before page code blocks `fetch`, `XMLHttpRequest`, `sendBeacon` and dynamically added `<script>`/`<img>`/`<iframe>` elements pointing at those hosts, and hides common ad containers. System webviews offer no request-interception API, so this is **best-effort**: resources the HTML parser loads before the script runs (for example a hard-coded `<script src>` in the page source) can still get through. It is not uBlock Origin.
-- **HTTPS-only mode** upgrades `http://` navigations (not localhost, private IPs or `.local`). It first checks that the HTTPS site responds; if not, you decide whether to continue over HTTP for that site for the session.
-- **Updates** are verified with an Ed25519 signature against the public key embedded in `tauri.conf.json`. Install requires an explicit click.
-- **Navigation policy.** Only `http`, `https` and `about:blank` can load. `javascript:`, `file:`, `data:` and custom schemes are refused.
-- **Pages get almost no IPC.** Web pages may call exactly two commands (report their own state, forward a shortcut). Which tab is calling comes from the webview label, never from the payload. The UI webview has a separate capability.
-- **Site permissions.** "Block" rules are enforced by overriding `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run. This is best-effort and applies on the next page load. "Ask" and "Allow" fall through to the system web engine's own behaviour.
-- **Private windows** use non-persistent webview storage, don't write history, and don't save tab sessions.
-- **The SQLite database is not encrypted.** It sits in your OS app-data folder, protected by your user account. If you need encryption at rest, rely on full-disk encryption or swap in SQLCipher.
+## Releasing
 
-## Known limitations
+Releases are tag-driven. One-time setup (repository admin):
 
-These are the honest edges of v1.0:
-
-- Only macOS compilation and unit tests have been run so far. Windows and Linux builds are covered by the CI matrix but haven't been exercised by hand.
-- No cross-platform API reports per-tab memory, so the "MB saved" figure is an estimate (about 100 MB per suspended tab).
-- Download tracking isn't wired up yet, so the "don't suspend during a download" rule is implemented in the policy but the flag is never set.
-- Reader mode uses a simple density heuristic (not Mozilla Readability), so it can miss unusual layouts; the toolbar button reports when it finds nothing.
-- Auto-update has not been exercised end to end yet — that needs a first signed release to exist.
-- Audio detection looks at `<audio>`/`<video>` elements; audio from Web Audio or WebRTC-only pages isn't detected.
-- Web extensions, sync, a password manager and a built-in PDF viewer are not part of v1.0.
-- The agent can't use pages that need pointer drags, canvas games or CAPTCHAs, and it can fail on heavily dynamic sites.
-- Only content-script extensions work; most popular extensions (ad blockers, password managers) rely on background workers and won't function.
-- Built-in Tab Therapist "groups" are labels on tabs (a colour bar), not Chrome-style collapsible groups.
-- Keyboard shortcuts are captured inside pages by an injected script, so they won't fire on pages that block script injection.
-
-## Development
-
-```bash
-npm run typecheck                                  # TypeScript
-npm test                                           # Vitest (frontend logic)
-cargo test --manifest-path src-tauri/Cargo.toml    # Rust unit tests
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-```
-
-Design tokens live in `src/styles/globals.css`; changing a `--color-*` value re-themes the whole app. When you add a Rust command, register it in `lib.rs`, list it in `build.rs`, and grant it in `src-tauri/permissions/ui.toml`.
-
-## Releasing (maintainers)
-
-Updates are signed, so a release needs the signing key:
-
-1. Generate a key pair once: `npx tauri signer generate -w ~/.tauri/quickpebble.key` (keep the private key and password out of git).
+1. Generate a signing key: `npx tauri signer generate -w ~/.tauri/quickpebble.key` (keep it and its password out of git).
 2. Put the **public** key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
 3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-4. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, then push a tag like `v1.1.0`. The release workflow builds the installers and publishes `latest.json`, which running apps read.
+4. Settings → Actions → General → Workflow permissions → **Read and write**.
 
-If you lose the private key, existing installs can't receive updates and users must reinstall.
+To ship a version:
+
+```bash
+# 1. bump the version in package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json
+# 2. commit, then tag and push
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+The **Release** workflow then:
+
+1. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and publishes the GitHub release together with `latest.json`;
+2. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
+3. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
+
+If the private key is lost, existing installs can't receive updates and users must reinstall.
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run the checks above before opening a PR.
+Issues and pull requests are welcome. Please run the checks under [Development](#development) first.
 
 ## License
 

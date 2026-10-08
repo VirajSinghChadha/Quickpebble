@@ -47,20 +47,22 @@ pub async fn update_install(app: AppHandle, pending: State<'_, PendingUpdate>) -
     app.restart();
 }
 
-/// Quietly looks for an update shortly after launch (unless switched off in Settings).
+/// Looks for an update 15 s after launch and then every 6 hours (unless switched off in Settings).
 pub fn spawn_startup_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(15)).await;
-        let enabled = app
-            .try_state::<crate::database::Db>()
-            .and_then(|db| db.get_setting("auto_update_check"))
-            .as_deref()
-            != Some("false");
-        if !enabled {
-            return;
-        }
-        if let Ok(Some(info)) = check(&app).await {
-            let _ = app.emit("qp://update", info);
+        loop {
+            let enabled = app
+                .try_state::<crate::database::Db>()
+                .and_then(|db| db.get_setting("auto_update_check"))
+                .as_deref()
+                != Some("false");
+            if enabled {
+                if let Ok(Some(info)) = check(&app).await {
+                    let _ = app.emit("qp://update", info);
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
         }
     });
 }

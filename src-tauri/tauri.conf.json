@@ -18,14 +18,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "dmg",
-      "app",
-      "nsis",
-      "msi",
-      "deb",
-      "appimage"
-    ],
+    "targets": "all",
     "category": "Productivity",
     "shortDescription": "Browse quicker.",
     "icon": [
