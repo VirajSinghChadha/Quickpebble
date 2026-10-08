@@ -181,6 +181,11 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  downloadsList: () => call<DownloadItem[]>("downloads_list", undefined, []),
+  downloadOpen: (id: number) => call<void>("download_open", { id }),
+  downloadReveal: (id: number) => call<void>("download_reveal", { id }),
+  downloadRemove: (id: number) => call<void>("download_remove", { id }),
+  downloadsClearFinished: () => call<void>("downloads_clear_finished"),
   vaultStatus: () => call<{ exists: boolean; unlocked: boolean }>("vault_status", undefined, { exists: false, unlocked: false }),
   vaultCreate: (master: string) => call<void>("vault_create", { master }),
   vaultUnlock: (master: string) => call<void>("vault_unlock", { master }),
@@ -265,4 +270,22 @@ export async function onLoginSeen(cb: (e: { id: string; host: string; username: 
   if (!isTauri) return () => {};
   const label = windowLabel();
   return listen<{ window: string; id: string; host: string; username: string }>("qp://login-seen", (e) => e.payload.window === label && cb(e.payload));
+}
+
+export interface DownloadItem {
+  id: number;
+  name: string;
+  url: string;
+  host: string;
+  path: string;
+  state: "active" | "done" | "failed";
+  started: number;
+  finished: number | null;
+  size: number | null;
+  can_open: boolean;
+}
+
+export async function onDownloads(cb: (items: DownloadItem[]) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<DownloadItem[]>("qp://downloads", (e) => cb(e.payload));
 }

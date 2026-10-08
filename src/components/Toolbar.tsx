@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, KeyRound, Languages, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, Download as DownloadIcon, KeyRound, Languages, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
 import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
@@ -26,6 +26,7 @@ export function Toolbar() {
   const sidebar = useStore((s) => s.sidebar);
   const update = useUpdater((s) => s.info);
   const hasPage = !!tab.url;
+  const activeDownloads = useStore((s) => s.downloads.filter((d) => d.state === "active").length);
 
   return (
     <div className="flex h-[52px] items-center gap-1 border-b border-border bg-surface px-3" role="toolbar" aria-label="Browser toolbar">
@@ -50,6 +51,12 @@ export function Toolbar() {
       {/* Side panels: they sit next to the page instead of covering it */}
       <IconButton label={`Assistant (${modKey}J)`} active={sidebar === "assistant"} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
       <IconButton label="Bookmarks" active={sidebar === "bookmarks"} onClick={() => useStore.getState().toggleSidebar("bookmarks")}><BookMarked size={16} /></IconButton>
+      <span className="relative">
+        <IconButton label={activeDownloads ? `Downloads (${activeDownloads} in progress)` : "Downloads"} active={sidebar === "downloads"} onClick={() => useStore.getState().toggleSidebar("downloads")}>
+          <DownloadIcon size={16} className={activeDownloads ? "animate-pulse text-primary" : ""} />
+        </IconButton>
+        {activeDownloads > 0 && <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 grid min-w-3.5 place-items-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-3.5 text-white dark:text-bg">{activeDownloads}</span>}
+      </span>
       <IconButton label="Passwords" active={sidebar === "passwords"} onClick={() => useStore.getState().toggleSidebar("passwords")}><KeyRound size={16} /></IconButton>
       <IconButton label="This site's settings" disabled={!hasPage} active={sidebar === "site"} onClick={() => useStore.getState().toggleSidebar("site")}><SlidersHorizontal size={16} /></IconButton>
 

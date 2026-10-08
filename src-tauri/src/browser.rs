@@ -56,6 +56,13 @@ impl Browser {
         lock(&self.tabs).get(label).map(|t| (t.url.clone(), t.private))
     }
 
+    /// Marks a tab as downloading so Memory Saver never suspends it mid-download.
+    pub fn set_downloading(&self, label: &str, on: bool) {
+        if let Some(t) = lock(&self.tabs).get_mut(label) {
+            t.downloading = on;
+        }
+    }
+
     /// (window label, tab id) for a tab, looked up by webview label.
     pub fn tab_window_id(&self, label: &str) -> Option<(String, String)> {
         lock(&self.tabs).get(label).map(|t| (t.window.clone(), t.id.clone()))
@@ -223,6 +230,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
     let nav_app = app.clone();
     let nav_label = label.to_string();
     let load_app = app.clone();
+    let dl_app = app.clone();
     let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .initialization_script(&script)
         .incognito(private);
@@ -240,6 +248,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         }
     }
     let builder = builder
+        .on_download(move |wv, event| crate::downloads::handle(&dl_app, &wv, event))
         .on_navigation(move |u| {
             let block = setting(&nav_app, "block_trackers").as_deref() != Some("false");
             if !security::allow_navigation(u, block) {

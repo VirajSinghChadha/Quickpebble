@@ -3,6 +3,7 @@
 mod bookmarks;
 mod browser;
 mod daemon;
+mod downloads;
 mod database;
 mod extensions;
 mod memory_saver;
@@ -26,6 +27,7 @@ pub fn run() {
             let db = database::Db::open(&dir.join("pebble.db"))?;
             let state = browser::Browser::default();
             *state.memory.lock().unwrap() = browser::load_memory_config(&db);
+            app.manage(downloads::Downloads::load(&db));
             app.manage(db);
             app.manage(state);
             app.manage(updater::PendingUpdate::default());
@@ -92,6 +94,11 @@ pub fn run() {
             screen::screen_act,
             screen::screen_verify,
             screen::gemini_models,
+            downloads::downloads_list,
+            downloads::download_open,
+            downloads::download_reveal,
+            downloads::download_remove,
+            downloads::downloads_clear_finished,
             vault::vault_status,
             vault::vault_create,
             vault::vault_unlock,

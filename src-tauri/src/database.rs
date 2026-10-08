@@ -67,6 +67,9 @@ impl Db {
              CREATE TABLE IF NOT EXISTS vault_items (
                id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT NOT NULL, username TEXT NOT NULL,
                blob BLOB NOT NULL, created_at INTEGER NOT NULL, UNIQUE(host, username));
+             CREATE TABLE IF NOT EXISTS downloads (
+               id INTEGER PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, path TEXT NOT NULL,
+               ok INTEGER NOT NULL, started INTEGER NOT NULL, finished INTEGER NOT NULL, size INTEGER);
              CREATE TABLE IF NOT EXISTS vault_never (host TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_permissions (
@@ -168,6 +171,35 @@ impl Db {
 
     pub fn vault_delete(&self, id: i64) -> rusqlite::Result<()> {
         self.lock().execute("DELETE FROM vault_items WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn downloads_put(&self, id: u64, name: &str, url: &str, path: &str, ok: bool, started: i64, finished: i64, size: Option<u64>) -> rusqlite::Result<()> {
+        self.lock().execute(
+            "INSERT OR REPLACE INTO downloads (id, name, url, path, ok, started, finished, size) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![id as i64, name, url, path, ok as i64, started, finished, size.map(|s| s as i64)],
+        )?;
+        Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn downloads_recent(&self, limit: usize) -> Vec<(u64, String, String, String, bool, i64, i64, Option<u64>)> {
+        let conn = self.lock();
+        let Ok(mut stmt) = conn.prepare("SELECT id, name, url, path, ok, started, finished, size FROM downloads ORDER BY id DESC LIMIT ?1") else { return vec![] };
+        let rows = stmt.query_map(params![limit as i64], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, i64>(4)? != 0, r.get(5)?, r.get(6)?, r.get::<_, Option<i64>>(7)?.map(|s| s as u64)))
+        });
+        rows.map(|r| r.flatten().collect()).unwrap_or_default()
+    }
+
+    pub fn downloads_delete(&self, id: u64) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM downloads WHERE id = ?1", params![id as i64])?;
+        Ok(())
+    }
+
+    pub fn downloads_clear(&self) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM downloads", [])?;
         Ok(())
     }
 
@@ -298,6 +330,21 @@ mod tests {
         db.set_bookmark_folder("https://b.com/", "School").unwrap();
         let all = db.bookmarks("", 10).unwrap();
         assert_eq!(all.iter().find(|b| b.url == "https://b.com/").unwrap().folder, "School");
+    }
+
+    #[test]
+    fn downloads_persist_and_clear() {
+        let db = Db::memory().unwrap();
+        db.downloads_put(1, "a.pdf", "https://x.com/a.pdf", "/d/a.pdf", true, 10, 12, Some(99)).unwrap();
+        db.downloads_put(2, "b.zip", "https://x.com/b.zip", "/d/b.zip", false, 11, 13, None).unwrap();
+        let rows = db.downloads_recent(10);
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].0, rows[0].4), (2, false));
+        assert_eq!(rows[1].7, Some(99));
+        db.downloads_delete(2).unwrap();
+        assert_eq!(db.downloads_recent(10).len(), 1);
+        db.downloads_clear().unwrap();
+        assert!(db.downloads_recent(10).is_empty());
     }
 
     #[test]

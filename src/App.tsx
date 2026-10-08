@@ -3,7 +3,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
 import { useEffect } from "react";
-import { isPrivateWindow, onLoginSeen } from "./lib/ipc";
+import { ipc, isPrivateWindow, onDownloads, onLoginSeen } from "./lib/ipc";
 import { BASE_CHROME, BOOKMARKS_BAR, selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
 import { PrivacyCenter } from "./components/PrivacyCenter";
@@ -24,6 +24,13 @@ export default function App() {
   useTabs();
   useShortcuts();
   useContentVisibility();
+  // Keep the downloads list live, and open the panel's badge when something starts.
+  useEffect(() => {
+    let off = () => {};
+    void ipc.downloadsList().then((d) => useStore.getState().setDownloads(d));
+    void onDownloads((d) => useStore.getState().setDownloads(d)).then((u) => (off = u));
+    return () => off();
+  }, []);
   // A login was submitted somewhere: open the Passwords panel so the person can choose Save / Not now / Never.
   useEffect(() => {
     let off = () => {};
