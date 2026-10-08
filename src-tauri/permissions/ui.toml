@@ -12,7 +12,7 @@ permissions = [
   "allow-ai-status", "allow-ai-run", "allow-ai-set-key",
   "allow-privacy-stats", "allow-privacy-permissions", "allow-privacy-set-permission", "allow-privacy-clear-data",
   "allow-window-new-private", "allow-window-control",
-  "allow-sidebar-set", "allow-chrome-set", "allow-tab-reader", "allow-update-check", "allow-update-install", "allow-tab-zoom", "allow-tab-find", "allow-ai-chat", "allow-agent-exec",
+  "allow-sidebar-set", "allow-chrome-set", "allow-tab-reader", "allow-update-check", "allow-update-install", "allow-tab-zoom", "allow-tab-find", "allow-ai-chat", "allow-research-search", "allow-research-status", "allow-research-key-set", "allow-agent-exec",
   "allow-extension-list", "allow-extension-install-store", "allow-extension-install-file",
   "allow-extension-set-enabled", "allow-extension-remove",
 ]
