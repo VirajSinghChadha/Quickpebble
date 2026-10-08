@@ -156,6 +156,15 @@ export const ipc = {
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
   tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),
+  researchStatus: () => call<boolean>("research_status", undefined, false),
+  researchKeySet: async (key: string) => {
+    if (!isTauri) throw new Error("Configure web research in the installed Quick Pebble app.");
+    return call<void>("research_key_set", { key });
+  },
+  researchSearch: async (query: string) => {
+    if (!isTauri) throw new Error("Web research is available in the installed Quick Pebble app.");
+    return call<{ title: string; url: string; text: string }[]>("research_search", { query });
+  },
   aiChat: (system: string, messages: ChatMsg[], json = false) =>
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
