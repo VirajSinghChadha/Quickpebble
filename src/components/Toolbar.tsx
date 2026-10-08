@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Bot, Download, MoonStar, Puzzle, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
+import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
 import { selectActive, useStore, type Theme } from "../store/useStore";
@@ -28,7 +29,7 @@ export function Toolbar() {
   const setTheme = useStore((s) => s.setTheme);
   const setOverlay = useStore((s) => s.setOverlay);
   const sidebar = useStore((s) => s.sidebar);
-  const update = useStore((s) => s.update);
+  const update = useUpdater((s) => s.info);
   const hasPage = !!tab.url;
   const ThemeIcon = THEME_ICON[theme];
 
