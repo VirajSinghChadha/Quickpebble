@@ -626,6 +626,8 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "screen_permissions",
+    "screen_model",
     "https_only",
     "auto_update_check",
     "theme",
@@ -652,6 +654,9 @@ pub fn settings_set(db: State<Db>, key: String, value: String) -> Result<(), Str
     }
     if key == "search_engine" && !security::SEARCH_ENGINES.iter().any(|(n, _)| *n == value) {
         return Err("unknown search engine".into());
+    }
+    if key == "screen_permissions" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
+        return Err("invalid screen permissions".into());
     }
     if key == "ollama_url" && !Url::parse(&value).map(|u| matches!(u.scheme(), "http" | "https")).unwrap_or(false) {
         return Err("Ollama URL must be http(s)".into());

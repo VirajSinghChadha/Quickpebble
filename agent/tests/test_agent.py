@@ -68,3 +68,10 @@ def test_risk_defaults_low_and_rejects_unknown():
     assert parse_reply(reply(type="click", cell="A1", risk="high"), G).action.risk == "high"
     with pytest.raises(ValueError):
         parse_reply(reply(type="click", cell="A1", risk="maybe"), G)
+
+
+def test_category_defaults_none_and_validates():
+    assert parse_reply(reply(type="wait"), G).action.category == "none"
+    assert parse_reply(reply(type="click", cell="A1", category="purchases"), G).action.category == "purchases"
+    with pytest.raises(ValueError):
+        parse_reply(reply(type="click", cell="A1", category="nukes"), G)

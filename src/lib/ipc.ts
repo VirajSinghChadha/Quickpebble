@@ -215,6 +215,7 @@ export interface ScreenAction {
   key?: string;
   direction?: "up" | "down";
   amount?: number;
+  category?: "none" | "purchases" | "deleting" | "messages" | "accounts" | "installs" | "submit";
   risk?: "low" | "high";
 }
 

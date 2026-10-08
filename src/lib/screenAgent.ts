@@ -5,6 +5,7 @@
  * Routine actions run automatically ("smart" mode); only risky ones, or every step in "ask" mode, wait for the person.
  */
 import type { ScreenAction, ScreenResponse } from "./ipc";
+import { categoryLabel, defaultPerms, type CategoryId, type Perms } from "./permissions";
 
 export const MAX_SCREEN_STEPS = 40;
 const MAX_WAITS_IN_A_ROW = 8;
@@ -13,7 +14,12 @@ const NUDGE_AFTER_REPEATS = 2;    // after this many, tell the model its approac
 const MAX_ACTION_FAILURES = 3;    // failed actions in a row before giving up
 const PROPOSE_ATTEMPTS = 3;
 const TRANSIENT = /HTTP (408|429|5\d\d)|not responding|invalid response|Could not reach|timed out|overloaded/i;
-const RISKY = /\b(buy|purchase|pay|checkout|check out|place order|delete|erase|overwrite|transfer|donate|sign out|log out|unsubscribe)\b/i;
+/** Backstop when the model says "none" but its own message describes a sensitive step. */
+const WORD_CATEGORY: [RegExp, CategoryId][] = [
+  [/\b(buy|purchase|pay|checkout|check out|place order|donate|transfer)\b/i, "purchases"],
+  [/\b(delete|erase|overwrite)\b/i, "deleting"],
+  [/\b(sign out|log out|unsubscribe)\b/i, "accounts"],
+];
 
 export type Choice = "allow" | "auto" | "skip" | "stop";
 export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = confirm only risky steps
@@ -24,6 +30,8 @@ export interface ScreenIO {
   /** Numbered choice dialog. `risky` steps never offer "auto". */
   choose(description: string, risky: boolean): Promise<Choice>;
   mode(): ScreenMode;
+  /** Which sensitive categories the person has allowed without asking (per website, per session or saved). */
+  permissions(): Perms;
   setMode(m: ScreenMode): void;
   sleep(ms: number): Promise<void>;
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
@@ -43,14 +51,23 @@ export function describeScreenAction(a: ScreenAction): string {
   }
 }
 
-/** Is this step risky enough to need the person's OK even in smart mode? */
-export function isRisky(res: ScreenResponse): boolean {
+/** Which sensitive category (if any) does this step fall under? */
+export function categoryOf(res: ScreenResponse): CategoryId | "unknown" | null {
   const { action, user } = res;
-  if (action.type === "wait" || action.type === "scroll") return false;
-  return action.risk === "high" || RISKY.test(user.message ?? "");
+  if (action.type === "wait" || action.type === "scroll") return null;
+  if (action.category && action.category !== "none") return action.category;
+  const hit = WORD_CATEGORY.find(([re]) => re.test(user.message ?? ""));
+  if (hit) return hit[1];
+  return action.risk === "high" ? "unknown" : null;
 }
 
-/** `history` is shared across messages in a session so the agent remembers what it already did. */
+/** Does this step need the person's OK, given what they have allowed? */
+export function isRisky(res: ScreenResponse, perms: Perms = defaultPerms()): boolean {
+  const c = categoryOf(res);
+  if (c === null) return false;
+  return c === "unknown" ? true : !perms[c];
+}
+
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
   let lastKey = "";
   let repeats = 0;
@@ -87,9 +104,11 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     }
 
     const desc = describeScreenAction(action);
-    const risky = isRisky(res);
+    const risky = isRisky(res, io.permissions());
+    const cat = categoryOf(res);
     if (risky || io.mode() === "ask") {
-      const choice = await io.choose(user.message ? `${desc} — ${user.message}` : desc, risky);
+      const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(cat)}] ` : "";
+      const choice = await io.choose(`${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
         return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultPerms } from "./permissions";
 import { isRisky, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
@@ -14,6 +15,7 @@ function make(steps: ScreenResponse[], answers: Choice[] = [], startMode: Screen
     act: async (a) => void acted.push(a),
     choose: async (description, risky) => (asked.push({ description, risky }), answers.shift() ?? "allow"),
     mode: () => mode,
+    permissions: () => defaultPerms(),
     setMode: (m) => (mode = m),
     sleep: async () => {},
     onEvent: (e) => void events.push(`${e.kind}:${e.text}`),
@@ -32,7 +34,7 @@ describe("runScreenAgent", () => {
   });
 
   it("asks before a high-risk action and respects Stop", async () => {
-    const { io, acted, asked, events } = make([res({ type: "click", cell: "B2", risk: "high" }, "Sending the email")], ["stop"]);
+    const { io, acted, asked, events } = make([res({ type: "click", cell: "B2", category: "messages" }, "Sending the email")], ["stop"]);
     await runScreenAgent("g", io, { aborted: false });
     expect(asked[0].risky).toBe(true);
     expect(acted).toHaveLength(0);
@@ -45,8 +47,18 @@ describe("runScreenAgent", () => {
     expect(isRisky(res({ type: "wait", risk: "high" }))).toBe(false);
   });
 
+  it("respects the person's per-category permissions", () => {
+    const buy = res({ type: "click", cell: "A1", category: "purchases" });
+    expect(isRisky(buy, { ...defaultPerms(), purchases: false })).toBe(true);
+    expect(isRisky(buy, { ...defaultPerms(), purchases: true })).toBe(false);
+    const submit = res({ type: "click", cell: "A1", category: "submit" });
+    expect(isRisky(submit, { ...defaultPerms(), submit: false })).toBe(true);
+    expect(isRisky(submit)).toBe(false);
+    expect(isRisky(res({ type: "click", cell: "A1", risk: "high", category: "none" }), { ...defaultPerms(), purchases: true })).toBe(true);
+  });
+
   it("skip tells the model to try another way and keeps going", async () => {
-    const { io, acted, events } = make([res({ type: "click", cell: "A1", risk: "high" }), res({ type: "done" }, "ok")], ["skip"]);
+    const { io, acted, events } = make([res({ type: "click", cell: "A1", category: "deleting" }), res({ type: "done" }, "ok")], ["skip"]);
     await runScreenAgent("g", io, { aborted: false });
     expect(acted).toHaveLength(0);
     expect(events.some((e) => e.includes("skipped"))).toBe(true);
