@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Eye, EyeOff, KeyRound, Lock, LogIn, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, KeyRound, Lock, LogIn, Plus, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import { ipc, type VaultEntry } from "../lib/ipc";
 import { generatePassword, strength } from "../lib/passwords";
 import { hostOf } from "../lib/url";
@@ -103,6 +103,7 @@ function Vault({ onLocked }: { onLocked: () => void }) {
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState<Record<number, string>>({});
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const clipTimer = useRef<number | undefined>(undefined);
 
@@ -130,6 +131,15 @@ function Vault({ onLocked }: { onLocked: () => void }) {
   };
   const fill = async (id: number) => {
     try { await ipc.vaultFill(tab.id, id); setMsg("Filled. Check the page, then sign in."); } catch (e) { fail(e); }
+  };
+  const runImport = async () => {
+    try {
+      const r = await ipc.vaultImportFile();
+      if (!r) return;
+      const bits = [`${r.added} added`, r.updated ? `${r.updated} updated` : "", r.unchanged ? `${r.unchanged} already saved` : "", r.skipped ? `${r.skipped} skipped (no password, no website, or not a login)` : ""].filter(Boolean);
+      setMsg(`Import finished: ${bits.join(", ")}. Now delete the CSV file: it holds your passwords unencrypted.`);
+      load();
+    } catch (e) { fail(e); }
   };
   const remove = async (e: VaultEntry) => {
     if (!window.confirm(`Delete the saved login for ${e.username || "(no username)"} on ${e.host}?`)) return;
@@ -164,9 +174,23 @@ function Vault({ onLocked }: { onLocked: () => void }) {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search logins" aria-label="Search logins" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-text-secondary" />
           </label>
           <button type="button" className={btn} onClick={() => setAdding(!adding)} aria-expanded={adding}><Plus size={13} className="mr-1 inline" />Add</button>
+          <button type="button" className={btn} onClick={() => setImporting(!importing)} aria-expanded={importing} title="Import from another password manager"><Upload size={13} /></button>
           <button type="button" className={btn} onClick={() => { void ipc.vaultLock(); onLocked(); }} title="Lock the vault now"><Lock size={13} /></button>
         </div>
         {msg && <p role="status" className="text-[11.5px] text-text-secondary">{msg}</p>}
+        {importing && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface-secondary/50 p-3 text-[12px]">
+            <p className="font-medium">Import passwords from a CSV file</p>
+            <ol className="list-decimal space-y-0.5 pl-4 text-text-secondary">
+              <li><b>Chrome / Edge / Brave:</b> Settings → Passwords → Export.</li>
+              <li><b>Safari / Apple Passwords:</b> Passwords app → File → Export All Passwords.</li>
+              <li><b>Firefox:</b> Passwords → ⋯ → Export Logins.</li>
+              <li><b>1Password, Bitwarden, LastPass, Dashlane:</b> use their Export → CSV option.</li>
+            </ol>
+            <p className="text-text-secondary">The file contains your passwords <b>unencrypted</b>. Import it, then delete it and empty the Trash. Logins already saved here are updated, not duplicated.</p>
+            <button type="button" className={primary} onClick={() => void runImport()}>Choose CSV file…</button>
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {adding && <AddLogin initialHost={site} onDone={() => { setAdding(false); load(); }} onError={fail} />}

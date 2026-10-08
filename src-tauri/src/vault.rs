@@ -229,6 +229,57 @@ pub fn vault_save(db: State<Db>, vault: State<Vault>, host: String, username: St
     store(&db, &vault, &host, &username, &password)
 }
 
+#[derive(Serialize)]
+pub struct ImportReport {
+    added: usize,
+    updated: usize,
+    unchanged: usize,
+    skipped: usize,
+}
+
+/// Imports a password-manager CSV chosen by the person. Passwords go straight from the file into the
+/// encrypted vault: they never pass through the interface. Returns None if the dialog was cancelled.
+#[tauri::command]
+pub async fn vault_import_file(app: AppHandle) -> Result<Option<ImportReport>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (db, vault) = (app.state::<Db>(), app.state::<Vault>());
+    if !vault.unlocked() {
+        return Err("Unlock the vault first.".into());
+    }
+    let handle = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || handle.dialog().file().add_filter("Passwords (CSV)", &["csv"]).blocking_pick_file())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(file) = picked else { return Ok(None) };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 10_000_000 {
+        return Err("That file is too large to be a password export.".into());
+    }
+    let mut text = std::fs::read_to_string(&path).map_err(|_| "Could not read that file as text.".to_string())?;
+    let parsed = crate::vault_import::parse_logins(&text);
+    text.zeroize(); // the plaintext export is no longer needed in memory
+    let parsed = parsed?;
+
+    let mut report = ImportReport { added: 0, updated: 0, unchanged: 0, skipped: parsed.skipped };
+    for login in &parsed.logins {
+        let existing = db.vault_list(&login.host).ok().and_then(|rows| rows.into_iter().find(|r| r.1 == login.host && r.2 == login.username));
+        let same = existing.as_ref().is_some_and(|(id, h, u, _)| {
+            db.vault_item(*id)
+                .and_then(|(_, _, blob)| vault.with_key(|k| decrypt(k, &blob, &aad(h, u))).ok().flatten())
+                .as_deref()
+                == Some(login.password.as_bytes())
+        });
+        if same {
+            report.unchanged += 1;
+        } else if store(&db, &vault, &login.host, &login.username, &login.password).is_ok() {
+            if existing.is_some() { report.updated += 1 } else { report.added += 1 }
+        } else {
+            report.skipped += 1;
+        }
+    }
+    Ok(Some(report))
+}
+
 #[tauri::command]
 pub fn vault_delete(db: State<Db>, vault: State<Vault>, id: i64) -> Result<(), String> {
     vault.with_key(|_| ())?;

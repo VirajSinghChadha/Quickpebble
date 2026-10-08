@@ -8,6 +8,7 @@ mod extensions;
 mod memory_saver;
 mod security;
 mod vault;
+mod vault_import;
 mod updater;
 mod research;
 mod screen;
@@ -99,6 +100,7 @@ pub fn run() {
             vault::vault_reveal,
             vault::vault_save,
             vault::vault_delete,
+            vault::vault_import_file,
             vault::vault_fill,
             vault::qp_login_seen,
             vault::vault_save_pending,

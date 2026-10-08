@@ -65,6 +65,7 @@ fn main() {
                 "vault_reveal",
                 "vault_save",
                 "vault_delete",
+                "vault_import_file",
                 "vault_fill",
                 "qp_login_seen",
                 "vault_save_pending",

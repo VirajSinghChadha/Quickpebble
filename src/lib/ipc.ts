@@ -188,6 +188,7 @@ export const ipc = {
   vaultList: (query = "") => call<VaultEntry[]>("vault_list", { query }, []),
   vaultReveal: (id: number) => call<string>("vault_reveal", { id }),
   vaultSave: (host: string, username: string, password: string) => call<number>("vault_save", { host, username, password }),
+  vaultImportFile: () => call<{ added: number; updated: number; unchanged: number; skipped: number } | null>("vault_import_file", undefined, null),
   vaultDelete: (id: number) => call<void>("vault_delete", { id }),
   vaultFill: (tabId: string, id: number) => call<void>("vault_fill", { tabId, id }),
   vaultSavePending: (tabId: string) => call<number>("vault_save_pending", { tabId }),
