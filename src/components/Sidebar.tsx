@@ -1,13 +1,15 @@
-import { Bookmark, Bot, HeartPulse, PanelRightClose, SlidersHorizontal } from "lucide-react";
+import { Bookmark, Bot, HeartPulse, KeyRound, PanelRightClose, SlidersHorizontal } from "lucide-react";
 import { SIDEBAR_WIDTH, useStore, type Sidebar as SidebarId } from "../store/useStore";
 import { BookmarksPanel } from "./BookmarksPanel";
 import { ChatPanel } from "./ChatPanel";
+import { PasswordsPanel } from "./PasswordsPanel";
 import { SitePanel } from "./SitePanel";
 import { TherapistPanel } from "./TherapistPanel";
 
 const TABS: { id: Exclude<SidebarId, null>; label: string; Icon: typeof Bot }[] = [
   { id: "assistant", label: "Assistant", Icon: Bot },
   { id: "bookmarks", label: "Bookmarks", Icon: Bookmark },
+  { id: "passwords", label: "Passwords", Icon: KeyRound },
   { id: "site", label: "This site", Icon: SlidersHorizontal },
   { id: "therapist", label: "Tabs", Icon: HeartPulse },
 ];
@@ -36,7 +38,7 @@ export function Sidebar() {
         <button type="button" aria-label="Close side panel" onClick={() => setSidebar(null)} className="ml-auto grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary"><PanelRightClose size={15} /></button>
       </div>
       <div className="min-h-0 flex-1">
-        {sidebar === "assistant" ? <ChatPanel /> : sidebar === "bookmarks" ? <BookmarksPanel /> : sidebar === "site" ? <SitePanel /> : <TherapistPanel />}
+        {sidebar === "assistant" ? <ChatPanel /> : sidebar === "bookmarks" ? <BookmarksPanel /> : sidebar === "site" ? <SitePanel /> : sidebar === "passwords" ? <PasswordsPanel /> : <TherapistPanel />}
       </div>
     </aside>
   );

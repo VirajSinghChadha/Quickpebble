@@ -119,6 +119,30 @@
     document.head || document.documentElement ? addCss() : document.addEventListener("DOMContentLoaded", addCss, { once: true });
   }
 
+  // ---- login capture ---------------------------------------------------------
+  // Only REPORTS a submitted login (username + password) to the browser, which asks the person before saving anything.
+  let lastLogin = "";
+  const seenLogin = (form) => {
+    try {
+      const pws = form.querySelectorAll("input[type=password]");
+      const pw = pws[0];
+      if (!pw || !pw.value || pws.length > 2) return;
+      const cands = Array.from(form.querySelectorAll("input")).filter((i) => i !== pw && /^(text|email|tel)$/i.test(i.type || "text") && i.value);
+      const user = cands.filter((i) => i.compareDocumentPosition(pw) & Node.DOCUMENT_POSITION_FOLLOWING).pop() || cands[0];
+      const key = (user ? user.value : "") + "\u0000" + pw.value;
+      if (key === lastLogin) return;
+      lastLogin = key;
+      setTimeout(() => { lastLogin = ""; }, 3000);
+      invoke("qp_login_seen", { username: user ? user.value : "", password: pw.value });
+    } catch (_) { /* never break the page */ }
+  };
+  document.addEventListener("submit", (e) => { if (e.target instanceof HTMLFormElement) seenLogin(e.target); }, true);
+  document.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest && e.target.closest("button,input[type=submit],[role=button]");
+    const f = b && (b.form || b.closest("form"));
+    if (f && f.querySelector("input[type=password]")) setTimeout(() => seenLogin(f), 0); // sites that log in with JS and skip "submit"
+  }, true);
+
   // ---- reader mode ---------------------------------------------------------
   const READER_BAD = "script,style,noscript,nav,aside,footer,form,iframe,button,svg,canvas,video,audio,object,embed,select,input,textarea,[role=navigation],[role=banner],[aria-hidden=true]";
   const READER_OK = new Set("h1 h2 h3 h4 h5 h6 p ul ol li blockquote pre code em strong b i a img figure figcaption br hr table thead tbody tr th td sup sub".split(" "));

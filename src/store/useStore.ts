@@ -3,7 +3,7 @@ import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
-export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site";
+export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site" | "passwords";
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
 export const BOOKMARKS_BAR = 34;
@@ -76,6 +76,9 @@ interface State {
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
+  /** A login the person was just seen submitting; waiting for Save / Not now / Never. */
+  loginPrompt: { tabId: string; host: string; username: string } | null;
+  setLoginPrompt: (p: { tabId: string; host: string; username: string } | null) => void;
   bookmarksBar: boolean;
   bookmarksVersion: number;
   httpsPrompt: { id: string; url: string } | null;
@@ -164,6 +167,8 @@ export const useStore = create<State>((set, get) => ({
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
+  loginPrompt: null,
+  setLoginPrompt: (loginPrompt) => set({ loginPrompt }),
   bookmarksBar: safeGet("qp.bookmarksBar") !== "0", // on by default, like most browsers
   bookmarksVersion: 0,
   httpsPrompt: null,

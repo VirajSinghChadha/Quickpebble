@@ -181,6 +181,17 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  vaultStatus: () => call<{ exists: boolean; unlocked: boolean }>("vault_status", undefined, { exists: false, unlocked: false }),
+  vaultCreate: (master: string) => call<void>("vault_create", { master }),
+  vaultUnlock: (master: string) => call<void>("vault_unlock", { master }),
+  vaultLock: () => call<void>("vault_lock"),
+  vaultList: (query = "") => call<VaultEntry[]>("vault_list", { query }, []),
+  vaultReveal: (id: number) => call<string>("vault_reveal", { id }),
+  vaultSave: (host: string, username: string, password: string) => call<number>("vault_save", { host, username, password }),
+  vaultDelete: (id: number) => call<void>("vault_delete", { id }),
+  vaultFill: (tabId: string, id: number) => call<void>("vault_fill", { tabId, id }),
+  vaultSavePending: (tabId: string) => call<number>("vault_save_pending", { tabId }),
+  vaultDismissPending: (tabId: string, never: boolean) => call<void>("vault_dismiss_pending", { tabId, never }),
   geminiModels: () => call<string[]>("gemini_models", undefined, []),
   screenAct: (action: ScreenAction) => call<{ ok: boolean; changed: boolean | null }>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
@@ -237,4 +248,18 @@ export interface ScreenUser {
 export interface ScreenResponse {
   user: ScreenUser;
   action: ScreenAction;
+}
+
+export interface VaultEntry {
+  id: number;
+  host: string;
+  username: string;
+  created_at: number;
+}
+
+/** A login form was submitted in a tab. The password stays in the browser until the person agrees to save it. */
+export async function onLoginSeen(cb: (e: { id: string; host: string; username: string }) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  const label = windowLabel();
+  return listen<{ window: string; id: string; host: string; username: string }>("qp://login-seen", (e) => e.payload.window === label && cb(e.payload));
 }

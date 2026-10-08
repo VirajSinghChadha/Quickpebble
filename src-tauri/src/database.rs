@@ -63,6 +63,11 @@ impl Db {
              CREATE INDEX IF NOT EXISTS idx_history_visited ON history(visited_at DESC);
              CREATE TABLE IF NOT EXISTS bookmarks (
                url TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS vault_meta (k TEXT PRIMARY KEY, v BLOB NOT NULL);
+             CREATE TABLE IF NOT EXISTS vault_items (
+               id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT NOT NULL, username TEXT NOT NULL,
+               blob BLOB NOT NULL, created_at INTEGER NOT NULL, UNIQUE(host, username));
+             CREATE TABLE IF NOT EXISTS vault_never (host TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_permissions (
                host TEXT NOT NULL, permission TEXT NOT NULL, policy TEXT NOT NULL,
@@ -125,6 +130,54 @@ impl Db {
             params![url, title, now()],
         )?;
         Ok(true)
+    }
+
+    pub fn vault_meta_get(&self, k: &str) -> Option<Vec<u8>> {
+        self.lock().query_row("SELECT v FROM vault_meta WHERE k = ?1", params![k], |r| r.get(0)).ok()
+    }
+
+    pub fn vault_meta_set(&self, k: &str, v: &[u8]) -> rusqlite::Result<()> {
+        self.lock().execute("INSERT INTO vault_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v", params![k, v])?;
+        Ok(())
+    }
+
+    /// Adds a login, or replaces the password of an existing (host, username) pair.
+    pub fn vault_put(&self, host: &str, username: &str, blob: &[u8]) -> rusqlite::Result<i64> {
+        let conn = self.lock();
+        conn.execute(
+            "INSERT INTO vault_items (host, username, blob, created_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(host, username) DO UPDATE SET blob = excluded.blob",
+            params![host, username, blob, now()],
+        )?;
+        conn.query_row("SELECT id FROM vault_items WHERE host = ?1 AND username = ?2", params![host, username], |r| r.get(0))
+    }
+
+    pub fn vault_list(&self, q: &str) -> rusqlite::Result<Vec<(i64, String, String, i64)>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, host, username, created_at FROM vault_items
+             WHERE host LIKE ?1 ESCAPE '\\' OR username LIKE ?1 ESCAPE '\\' ORDER BY host, username",
+        )?;
+        let rows = stmt.query_map(params![like_pattern(q)], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        rows.collect()
+    }
+
+    pub fn vault_item(&self, id: i64) -> Option<(String, String, Vec<u8>)> {
+        self.lock().query_row("SELECT host, username, blob FROM vault_items WHERE id = ?1", params![id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).ok()
+    }
+
+    pub fn vault_delete(&self, id: i64) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM vault_items WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn vault_never_add(&self, host: &str) -> rusqlite::Result<()> {
+        self.lock().execute("INSERT OR IGNORE INTO vault_never (host) VALUES (?1)", params![host])?;
+        Ok(())
+    }
+
+    pub fn vault_never_has(&self, host: &str) -> bool {
+        self.lock().query_row("SELECT 1 FROM vault_never WHERE host = ?1", params![host], |_| Ok(())).is_ok()
     }
 
     pub fn set_bookmark_folder(&self, url: &str, folder: &str) -> rusqlite::Result<()> {

@@ -7,6 +7,7 @@ mod database;
 mod extensions;
 mod memory_saver;
 mod security;
+mod vault;
 mod updater;
 mod research;
 mod screen;
@@ -28,6 +29,7 @@ pub fn run() {
             app.manage(state);
             app.manage(updater::PendingUpdate::default());
             app.manage(screen::ScreenAgent::default());
+            app.manage(vault::Vault::default());
             browser::open_window(app.handle(), "main")?;
             browser::spawn_memory_saver(app.handle().clone());
             updater::spawn_startup_check(app.handle().clone());
@@ -89,6 +91,18 @@ pub fn run() {
             screen::screen_act,
             screen::screen_verify,
             screen::gemini_models,
+            vault::vault_status,
+            vault::vault_create,
+            vault::vault_unlock,
+            vault::vault_lock,
+            vault::vault_list,
+            vault::vault_reveal,
+            vault::vault_save,
+            vault::vault_delete,
+            vault::vault_fill,
+            vault::qp_login_seen,
+            vault::vault_save_pending,
+            vault::vault_dismiss_pending,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

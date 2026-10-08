@@ -50,6 +50,18 @@ pub struct TabInfo {
     pub zoom: f64,
 }
 
+impl Browser {
+    /// (current url, is private) for a tab, looked up by webview label.
+    pub fn tab_url(&self, label: &str) -> Option<(String, bool)> {
+        lock(&self.tabs).get(label).map(|t| (t.url.clone(), t.private))
+    }
+
+    /// (window label, tab id) for a tab, looked up by webview label.
+    pub fn tab_window_id(&self, label: &str) -> Option<(String, String)> {
+        lock(&self.tabs).get(label).map(|t| (t.window.clone(), t.id.clone()))
+    }
+}
+
 #[derive(Default)]
 pub struct Browser {
     tabs: Mutex<HashMap<String, TabInfo>>,

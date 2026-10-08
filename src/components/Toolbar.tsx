@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, KeyRound, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
 import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
@@ -49,6 +49,7 @@ export function Toolbar() {
       {/* Side panels: they sit next to the page instead of covering it */}
       <IconButton label={`Assistant (${modKey}J)`} active={sidebar === "assistant"} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
       <IconButton label="Bookmarks" active={sidebar === "bookmarks"} onClick={() => useStore.getState().toggleSidebar("bookmarks")}><BookMarked size={16} /></IconButton>
+      <IconButton label="Passwords" active={sidebar === "passwords"} onClick={() => useStore.getState().toggleSidebar("passwords")}><KeyRound size={16} /></IconButton>
       <IconButton label="This site's settings" disabled={!hasPage} active={sidebar === "site"} onClick={() => useStore.getState().toggleSidebar("site")}><SlidersHorizontal size={16} /></IconButton>
 
       <span aria-hidden className="mx-1 h-5 w-px bg-border" />
