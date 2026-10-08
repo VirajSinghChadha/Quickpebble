@@ -1,11 +1,13 @@
-//! Signed auto-updates via GitHub Releases (`latest.json`), verified against the public key in
-//! `tauri.conf.json`. Nothing is installed without the user pressing "Install".
+//! Signed in-app updates via GitHub Releases. Installation requires a user click.
 
 use serde::Serialize;
-use std::{sync::Mutex, time::Duration};
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::time::Duration;
+use tauri::{ipc::Channel, AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use tokio::sync::Mutex;
 
+// Hold the async lock throughout each operation, including network requests. This prevents
+// background checks from replacing the update while another window is installing it.
 #[derive(Default)]
 pub struct PendingUpdate(Mutex<Option<Update>>);
 
@@ -16,7 +18,16 @@ pub struct UpdateInfo {
     notes: Option<String>,
 }
 
+#[derive(Serialize, Clone)]
+pub struct UpdateProgress {
+    phase: &'static str,
+    downloaded: u64,
+    total: Option<u64>,
+}
+
 async fn check(app: &AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let pending = app.state::<PendingUpdate>();
+    let mut pending = pending.0.try_lock().map_err(|_| "An update operation is already running")?;
     let update = app
         .updater()
         .map_err(|e| e.to_string())?
@@ -28,7 +39,7 @@ async fn check(app: &AppHandle) -> Result<Option<UpdateInfo>, String> {
         current: u.current_version.clone(),
         notes: u.body.clone(),
     });
-    *app.state::<PendingUpdate>().0.lock().unwrap_or_else(|e| e.into_inner()) = update;
+    *pending = update;
     Ok(info)
 }
 
@@ -38,16 +49,31 @@ pub async fn update_check(app: AppHandle) -> Result<Option<UpdateInfo>, String> 
 }
 
 #[tauri::command]
-pub async fn update_install(app: AppHandle, pending: State<'_, PendingUpdate>) -> Result<(), String> {
-    let update = pending.0.lock().unwrap_or_else(|e| e.into_inner()).take().ok_or("No update has been checked yet")?;
+pub async fn update_install(
+    app: AppHandle,
+    pending: State<'_, PendingUpdate>,
+    progress: Channel<UpdateProgress>,
+) -> Result<(), String> {
+    let pending = pending.0.try_lock().map_err(|_| "An update operation is already running")?;
+    // Borrow instead of taking the update so a failed download can be retried.
+    let update = pending.as_ref().ok_or("Check for an update before installing")?;
+    let mut downloaded = 0_u64;
     update
-        .download_and_install(|_, _| {}, || {})
+        .download_and_install(
+            |chunk, total| {
+                downloaded = downloaded.saturating_add(chunk as u64);
+                let _ = progress.send(UpdateProgress { phase: "downloading", downloaded, total });
+            },
+            || {
+                let _ = progress.send(UpdateProgress { phase: "installing", downloaded: 0, total: None });
+            },
+        )
         .await
-        .map_err(|e| format!("Update failed: {e}"))?;
+        .map_err(|e| format!("Update failed. You can retry: {e}"))?;
     app.restart();
 }
 
-/// Looks for an update 15 s after launch and then every 6 hours (unless switched off in Settings).
+/// Check 15 seconds after launch and every 6 hours, unless disabled in Settings.
 pub fn spawn_startup_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(15)).await;
