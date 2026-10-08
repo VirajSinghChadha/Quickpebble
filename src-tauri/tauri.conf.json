@@ -31,6 +31,10 @@
     "macOS": {
       "minimumSystemVersion": "11.0"
     },
+    "resources": {
+      "../agent/qp_agent": "agent/qp_agent",
+      "../agent/requirements.txt": "agent/requirements.txt"
+    },
     "createUpdaterArtifacts": true
   },
   "plugins": {

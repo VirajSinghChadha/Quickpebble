@@ -169,6 +169,11 @@ export const ipc = {
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
     call<T>("agent_exec", { tabId, op, args }),
+  screenPropose: async (goal: string, history: string[]) => {
+    if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
+    return call<ScreenResponse>("screen_propose", { goal, history });
+  },
+  screenAct: (action: ScreenAction) => call<void>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
   extensionInstallStore: (input: string) => call<ExtensionInfo>("extension_install_store", { input }),
   extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
@@ -198,4 +203,27 @@ export async function onHttpsFallback(cb: (e: { id: string; url: string }) => vo
 export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   return listen<UpdateInfo>("qp://update", (e) => cb(e.payload));
+}
+
+/** Backend half of the agent's reply: executed exactly as given. `cell` is a grid label such as "M7". */
+export interface ScreenAction {
+  type: "click" | "double_click" | "right_click" | "type" | "key" | "scroll" | "wait" | "ask" | "done";
+  cell?: string;
+  fx?: number;
+  fy?: number;
+  text?: string;
+  key?: string;
+  direction?: "up" | "down";
+  amount?: number;
+}
+
+/** User half of the agent's reply: how it got there, and the message or final answer. Never executed. */
+export interface ScreenUser {
+  thinking: string;
+  message: string;
+}
+
+export interface ScreenResponse {
+  user: ScreenUser;
+  action: ScreenAction;
 }

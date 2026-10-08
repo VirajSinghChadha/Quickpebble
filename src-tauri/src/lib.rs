@@ -8,6 +8,7 @@ mod memory_saver;
 mod security;
 mod updater;
 mod research;
+mod screen;
 
 use tauri::Manager;
 
@@ -25,6 +26,7 @@ pub fn run() {
             app.manage(db);
             app.manage(state);
             app.manage(updater::PendingUpdate::default());
+            app.manage(screen::ScreenAgent::default());
             browser::open_window(app.handle(), "main")?;
             browser::spawn_memory_saver(app.handle().clone());
             updater::spawn_startup_check(app.handle().clone());
@@ -79,6 +81,8 @@ pub fn run() {
             extensions::extension_install_file,
             extensions::extension_set_enabled,
             extensions::extension_remove,
+            screen::screen_propose,
+            screen::screen_act,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

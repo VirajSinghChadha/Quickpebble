@@ -50,6 +50,8 @@ fn main() {
                 "extension_install_file",
                 "extension_set_enabled",
                 "extension_remove",
+                "screen_propose",
+                "screen_act",
             ]),
         ),
     )

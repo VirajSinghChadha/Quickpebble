@@ -6,6 +6,7 @@ import { selectActive, useStore } from "../store/useStore";
 import { useChat } from "../store/useChat";
 
 const SUGGESTIONS = {
+  screen: ["Open Notes and write a shopping list", "Find my latest download in Finder", "Turn on dark mode in System Settings"],
   act: ["Open the first search result", "Find the pricing page on this site", "Close all YouTube tabs"],
   ask: ["Summarize this page", "What are the key points?", "Explain this like I'm new to it"],
 };
@@ -38,7 +39,7 @@ export function ChatPanel() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <div className="flex rounded-lg bg-surface-secondary p-0.5" role="tablist" aria-label="Assistant mode">
-          {(["act", "ask"] as const).map((m) => (
+          {(["act", "ask", "screen"] as const).map((m) => (
             <button
               key={m}
               role="tab"
@@ -48,7 +49,7 @@ export function ChatPanel() {
               onClick={() => setMode(m)}
               className={`rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-150 ${mode === m ? "bg-surface text-text-primary shadow-pebble" : "text-text-secondary"}`}
             >
-              {m === "act" ? "Do tasks" : "Ask"}
+              {m === "act" ? "Do tasks" : m === "ask" ? "Ask" : "Screen"}
             </button>
           ))}
         </div>
@@ -84,9 +85,9 @@ export function ChatPanel() {
           <div className="mt-6 space-y-4 text-center">
             <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-surface-secondary text-primary"><Bot size={24} /></div>
             <div>
-              <p className="text-[14px] font-semibold">{mode === "act" ? "Tell me what to do" : "A little clarity, one question away"}</p>
+              <p className="text-[14px] font-semibold">{mode === "ask" ? "A little clarity, one question away" : "Tell me what to do"}</p>
               <p className="mx-auto mt-1 max-w-[260px] text-text-secondary">
-                {mode === "act" ? "I can click, type, scroll and open tabs in this browser for you. You stay in control." : "Get clear answers with citations from the pages you choose."}
+                {mode === "act" ? "I can click, type, scroll and open tabs in this browser for you. You stay in control." : mode === "screen" ? "I look at your whole screen and use the mouse and keyboard, one approved step at a time. Needs a Gemini key and Python 3." : "Get clear answers with citations from the pages you choose."}
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -145,7 +146,7 @@ export function ChatPanel() {
                 submit();
               }
             }}
-            placeholder={mode === "act" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask a question…"}
+            placeholder={mode !== "ask" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask a question…"}
             aria-label="Message"
             className="max-h-28 min-h-5 flex-1 resize-none bg-transparent outline-none placeholder:text-text-secondary"
           />
@@ -158,6 +159,7 @@ export function ChatPanel() {
         <p className="mt-2 text-[11px] text-text-secondary">
           {status?.online ? `${status.provider === "ollama" ? "Local · " : "Cloud · "}${status.provider} · ${status.model}` : (status?.error ?? "Checking AI…")}
           {cloud && " — page content is sent to this provider."}
+          {mode === "screen" && " Screen mode sends a screenshot of your whole screen to Google Gemini at every step. Move the mouse into a screen corner to abort."}
         </p>
       </div>
     </div>

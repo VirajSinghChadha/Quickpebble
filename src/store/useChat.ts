@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
+import { runScreenAgent } from "../lib/screenAgent";
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
 import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
@@ -18,7 +19,7 @@ interface ChatState {
   items: ChatItem[];
   busy: boolean;
   /** "ask" answers questions about the page; "act" operates the browser. */
-  mode: "ask" | "act";
+  mode: "ask" | "act" | "screen";
   approvalMode: Mode;
   sourceTabIds: string[];
   webResearch: boolean;
@@ -27,7 +28,7 @@ interface ChatState {
   setWebResearch: (value: boolean) => void;
   setSourceTabIds: (ids: string[]) => void;
   approval: { description: string; resolve: (ok: boolean) => void } | null;
-  setMode: (m: "ask" | "act") => void;
+  setMode: (m: "ask" | "act" | "screen") => void;
   setApprovalMode: (m: Mode) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
@@ -139,6 +140,9 @@ export const useChat = create<ChatState>((set, get) => ({
         if (runSignal.aborted) return;
         const answer = parseAnswer(reply, sources);
         set(s => ({ items: [...s.items, { id: nextId++, kind: "assistant", ...answer }] }));
+      } else if (mode === "screen") {
+        const io = makeIO();
+        await runScreenAgent(goal, { propose: ipc.screenPropose, act: ipc.screenAct, approve: io.approve, sleep, onEvent: io.onEvent }, runSignal);
       } else {
         await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
       }
