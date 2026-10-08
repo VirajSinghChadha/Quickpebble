@@ -23,6 +23,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 url = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tauri-plugin-dialog = "2"
 
 [profile.release]
 panic = "abort"

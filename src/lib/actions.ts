@@ -36,6 +36,27 @@ export function runAction(action: string): void {
     case "private":
       void ipc.windowNewPrivate();
       break;
+    case "assistant":
+      s.toggleSidebar("assistant");
+      break;
+    case "find":
+      void ipc.tabFind(active.id);
+      break;
+    case "zoom-in":
+      void ipc.tabZoom(active.id, "in");
+      break;
+    case "zoom-out":
+      void ipc.tabZoom(active.id, "out");
+      break;
+    case "zoom-reset":
+      void ipc.tabZoom(active.id, "reset");
+      break;
+    case "reopen-tab":
+      s.reopenTab();
+      break;
+    case "library":
+      s.setOverlay(s.overlay === "library" ? null : "library");
+      break;
   }
 }
 
@@ -51,6 +72,14 @@ export const SHORTCUTS: { key: string; shift: boolean; action: string }[] = [
   { key: "p", shift: true, action: "palette" },
   { key: "a", shift: true, action: "tab-search" },
   { key: "n", shift: true, action: "private" },
+  { key: "t", shift: true, action: "reopen-tab" },
+  { key: "j", shift: false, action: "assistant" },
+  { key: "f", shift: false, action: "find" },
+  { key: "y", shift: false, action: "library" },
+  { key: "=", shift: false, action: "zoom-in" },
+  { key: "+", shift: true, action: "zoom-in" },
+  { key: "-", shift: false, action: "zoom-out" },
+  { key: "0", shift: false, action: "zoom-reset" },
 ];
 
 export function matchShortcut(e: Pick<KeyboardEvent, "key" | "shiftKey" | "altKey" | "metaKey" | "ctrlKey">, mac: boolean): string | null {

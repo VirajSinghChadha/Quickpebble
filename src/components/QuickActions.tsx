@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Brain, EyeOff, FileText, Layers, Moon, Palette, Plus, Settings, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Bot, Brain, EyeOff, FileText, HeartPulse, History, Layers, Moon, Palette, Plus, Puzzle, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { ipc } from "../lib/ipc";
 import { modKey } from "../lib/actions";
 import { selectActive, useStore } from "../store/useStore";
@@ -53,6 +53,12 @@ export function QuickActions() {
       { id: "summary", title: "Summarize This Page", icon: Sparkles, run: () => void s.summarize(selectActive(useStore.getState()).id) },
       { id: "bookmark", title: "Bookmark This Page", hint: `${modKey}D`, icon: Star, run: () => void s.toggleBookmark(selectActive(useStore.getState()).id) },
       { id: "pin", title: "Pin / Unpin Tab", icon: FileText, run: () => s.togglePin(selectActive(useStore.getState()).id) },
+      { id: "assistant", title: "Open AI Assistant", hint: `${modKey}J`, icon: Bot, run: () => s.setSidebar("assistant") },
+      { id: "therapist", title: "Open Tab Therapist", icon: HeartPulse, run: () => s.setSidebar("therapist") },
+      { id: "extensions", title: "Manage Extensions", icon: Puzzle, run: () => s.setOverlay("extensions") },
+      { id: "library", title: "Open History & Bookmarks", hint: `${modKey}Y`, icon: History, run: () => s.setOverlay("library") },
+      { id: "reopen", title: "Reopen Closed Tab", hint: `${modKey}⇧T`, icon: RotateCcw, run: () => s.reopenTab() },
+      { id: "find", title: "Find in Page", hint: `${modKey}F`, icon: Search, run: () => void ipc.tabFind(selectActive(useStore.getState()).id) },
       { id: "privacy", title: "Open Privacy Center", icon: ShieldCheck, run: () => s.setOverlay("privacy") },
       { id: "settings", title: "Open Settings", icon: Settings, run: () => s.setOverlay("settings") },
       { id: "ai", title: "Toggle AI Address Suggestions", icon: Brain, run: () => s.setAiAutocomplete(!useStore.getState().aiAutocomplete) },
@@ -64,7 +70,7 @@ export function QuickActions() {
   const shown = commands.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase()));
   const run = (c: Cmd | undefined) => {
     if (!c) return;
-    const keepOpen = c.id === "search-tabs" || c.id === "privacy" || c.id === "settings";
+    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library"].includes(c.id);
     if (!keepOpen) close();
     void c.run();
   };

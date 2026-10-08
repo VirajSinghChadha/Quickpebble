@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
 
-export type GroupName = "School" | "Work" | "Personal";
-export const GROUPS: GroupName[] = ["School", "Work", "Personal"];
-export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary";
+export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
+export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
+export type Sidebar = null | "assistant" | "therapist";
+export const SIDEBAR_WIDTH = 380;
+export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary" | "extensions" | "library";
 export type Theme = "light" | "dark" | "system";
 export type Layout = "classic" | "minimal" | "productivity";
 
@@ -68,7 +70,12 @@ interface State {
   aiAutocomplete: boolean;
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
+  sidebar: Sidebar;
+  closedTabs: { url: string; title: string; group: GroupName | null; pinned: boolean }[];
 
+  setSidebar: (s: Sidebar) => void;
+  toggleSidebar: (s: Exclude<Sidebar, null>) => void;
+  reopenTab: () => void;
   init: () => Promise<void>;
   newTab: (url?: string, opts?: Partial<Tab>) => string;
   closeTab: (id: string) => void;
@@ -139,6 +146,20 @@ export const useStore = create<State>((set, get) => ({
   aiAutocomplete: safeGet("qp.aiAutocomplete") === "1",
   summary: null,
   focusAddressNonce: 0,
+  sidebar: null,
+  closedTabs: [],
+
+  setSidebar: (sidebar) => {
+    set({ sidebar });
+    void ipc.sidebarSet(sidebar ? SIDEBAR_WIDTH : 0);
+  },
+  toggleSidebar: (s) => get().setSidebar(get().sidebar === s ? null : s),
+  reopenTab: () => {
+    const [last, ...rest] = get().closedTabs;
+    if (!last) return;
+    set({ closedTabs: rest });
+    get().newTab(last.url, { group: last.group, pinned: last.pinned });
+  },
 
   init: async () => {
     const saved = loadSession();
@@ -167,6 +188,10 @@ export const useStore = create<State>((set, get) => ({
   closeTab: (id) => {
     const { tabs, activeId } = get();
     const next = nextActiveAfterClose(tabs, id);
+    const closing = tabs.find((t) => t.id === id);
+    if (closing?.url && !isPrivateWindow()) {
+      set((s) => ({ closedTabs: [{ url: closing.url, title: closing.title, group: closing.group, pinned: closing.pinned }, ...s.closedTabs].slice(0, 20) }));
+    }
     void ipc.tabClose(id);
     if (!next) {
       // Never leave the window without a tab.

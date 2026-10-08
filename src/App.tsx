@@ -6,6 +6,9 @@ import { isPrivateWindow } from "./lib/ipc";
 import { selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
 import { PrivacyCenter } from "./components/PrivacyCenter";
+import { ExtensionsPanel } from "./components/ExtensionsPanel";
+import { Library } from "./components/Library";
+import { Sidebar } from "./components/Sidebar";
 import { QuickActions } from "./components/QuickActions";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SummaryDialog } from "./components/SummaryDialog";
@@ -29,8 +32,9 @@ export default function App() {
         <Toolbar />
       </header>
       {/* Page webviews are positioned natively over this region. */}
-      <div className="min-h-0 flex-1">
-        {showNewTab && (priv ? <PrivateNewTab /> : <NewTabPage />)}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1">{showNewTab && (priv ? <PrivateNewTab /> : <NewTabPage />)}</div>
+        <Sidebar />
       </div>
       <AnimatePresence>
         {overlay === "palette" && <QuickActions key="palette" />}
@@ -38,6 +42,8 @@ export default function App() {
         {overlay === "privacy" && <PrivacyCenter key="privacy" />}
         {overlay === "settings" && <SettingsPanel key="settings" />}
         {overlay === "summary" && <SummaryDialog key="summary" />}
+        {overlay === "extensions" && <ExtensionsPanel key="extensions" />}
+        {overlay === "library" && <Library key="library" />}
       </AnimatePresence>
     </div>
   );

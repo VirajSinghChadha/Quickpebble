@@ -17,6 +17,8 @@
   --color-group-school: #f59e0b;
   --color-group-work: #2563eb;
   --color-group-personal: #10b981;
+  --color-group-entertainment: #ec4899;
+  --color-group-shopping: #8b5cf6;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   --ease-pebble: cubic-bezier(0.2, 0.8, 0.2, 1);

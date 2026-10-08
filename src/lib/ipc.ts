@@ -71,6 +71,31 @@ export interface PrivacyStats {
   block_trackers: boolean;
 }
 
+export interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+export interface PageSnapshot {
+  url: string;
+  title: string;
+  scroll: { y: number; max: number };
+  text: string;
+  elements: { i: number; tag: string; type?: string; label: string; href?: string; value?: string; disabled?: boolean; offscreen?: boolean }[];
+}
+export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press";
+export interface ExtensionInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  enabled: boolean;
+  hosts: string[];
+  permissions: string[];
+  has_content_scripts: boolean;
+  warnings: string[];
+  source: string;
+}
+
 export const defaultMemory: MemoryConfig = { enabled: true, mode: "balanced", timeout_minutes: null };
 
 export const ipc = {
@@ -104,6 +129,18 @@ export const ipc = {
     call<void>("privacy_set_permission", { host, permission, policy }),
   privacyClearData: (history: boolean, siteData: boolean) => call<void>("privacy_clear_data", { history, siteData }),
   windowNewPrivate: () => call<void>("window_new_private"),
+  sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
+  tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
+  tabFind: (id: string) => call<void>("tab_find", { id }),
+  aiChat: (system: string, messages: ChatMsg[], json = false) =>
+    call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
+  agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
+    call<T>("agent_exec", { tabId, op, args }),
+  extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
+  extensionInstallStore: (input: string) => call<ExtensionInfo>("extension_install_store", { input }),
+  extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
+  extensionSetEnabled: (id: string, enabled: boolean) => call<void>("extension_set_enabled", { id, enabled }),
+  extensionRemove: (id: string) => call<void>("extension_remove", { id }),
   windowControl: (action: "minimize" | "maximize" | "close") => call<void>("window_control", { action }),
 };
 

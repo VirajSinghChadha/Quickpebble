@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tab-find"
+description = "Enables the tab_find command without any pre-configured scope."
+commands.allow = ["tab_find"]
+
+[[permission]]
+identifier = "deny-tab-find"
+description = "Denies the tab_find command without any pre-configured scope."
+commands.deny = ["tab_find"]

@@ -12,6 +12,8 @@ const GROUP_COLOR: Record<GroupName, string> = {
   School: "bg-group-school",
   Work: "bg-group-work",
   Personal: "bg-group-personal",
+  Entertainment: "bg-group-entertainment",
+  Shopping: "bg-group-shopping",
 };
 
 interface MenuState {

@@ -23,6 +23,9 @@ A lightweight, privacy-first desktop browser with a calm design, tab memory savi
 |---|---|
 | **Pebble UI** | A compact 92 px chrome, floating "pebble" tabs, 12 px radii, light and dark themes, and 150–180 ms transitions. |
 | **Local AI first** | Page summaries, tab auto-grouping and address-bar completions run through [Ollama](https://ollama.com) on `localhost`. Cloud providers (OpenAI, Anthropic, Gemini) are opt-in. |
+| **AI Assistant side panel** | Chat about the page, or tell it to do things: it can click, type, scroll, open tabs and navigate. Every action is shown, approval is on by default, and a Stop button is always there. |
+| **Chrome extensions** | Add extensions from the Chrome Web Store (link or ID) or a `.crx` file. Content scripts and `chrome.storage` run natively; see [Extensions](#chrome-extensions). |
+| **Tab Therapist (built in)** | Tab health score, duplicate cleanup, auto-organise into groups and saved tabs — ported from the Tab Therapist extension and runs natively. |
 | **Memory Saver** | Idle background tabs are suspended and restored when you return. Never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
 | **Privacy Center** | Tracker blocking, per-site camera / microphone / location / notification rules, private windows, one-click data clearing. |
 | **Quick Actions** | `⌘⇧P` command palette and `⌘⇧A` tab search. |
@@ -75,8 +78,47 @@ Use `⌘` on macOS and `Ctrl` on Windows/Linux.
 | `⌘⇧P` | Quick Actions |
 | `⌘⇧A` | Search tabs |
 | `⌘⇧N` | Private window |
+| `⌘J` | AI Assistant side panel |
+| `⌘F` | Find in page |
+| `⌘+` / `⌘-` / `⌘0` | Zoom in / out / reset |
+| `⌘⇧T` | Reopen closed tab |
+| `⌘Y` | History & bookmarks |
 
 Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal** group (or let the AI choose).
+
+## AI Assistant
+
+Open it with `⌘J` or the robot icon. Two modes:
+
+- **Ask** answers questions about the page you're on.
+- **Do tasks** runs a loop: read the page → the model picks one action → you approve it (by default) → it runs → repeat, up to 15 steps.
+
+The agent controls **browser tabs only**, not the rest of your computer. It uses a text snapshot of the page (visible text plus a numbered list of buttons, links and fields), so it does not "see" images or canvases.
+
+Safety rails:
+
+- **Ask before acting** (default) needs your approval for each click, keystroke and navigation. **Autopilot** only interrupts for sensitive clicks (buy, pay, delete, send, submit…).
+- It never types into password fields; it asks you instead.
+- Page text is passed to the model as untrusted data, and the prompt tells it to ignore instructions found on pages. That reduces prompt-injection risk but cannot eliminate it, so keep approval on when visiting sites you don't trust.
+- It stops on repeated actions, invalid model output, or when you press Stop.
+- With a cloud provider selected, page content is sent to that provider; the panel footer shows which provider is active.
+
+Small local models (e.g. an 8B `llama3`) follow the JSON action format less reliably than larger ones. If the agent keeps failing, pick a bigger model in Settings.
+
+## Chrome extensions
+
+System web engines can't host Chrome's extension runtime, so Quick Pebble ships a small compatibility layer instead:
+
+| Works | Doesn't work |
+|---|---|
+| Content scripts (JS + CSS), URL match patterns, `run_at` | Background / service workers |
+| `chrome.storage.local` / `sync` (per site) | Toolbar popups and options pages |
+| `chrome.runtime.getManifest` / `id` | `chrome.tabs`, `webRequest`, `declarativeNetRequest`, other APIs |
+
+- **Install:** *Extensions* (puzzle icon) → paste a Chrome Web Store link or ID, or pick a `.crx` file. Downloads use Google's public update endpoint, the same one other Chromium-based tools use.
+- **Consent:** extensions install **switched off**. The list shows which sites each one can read and change, plus warnings about unsupported parts. You turn them on yourself.
+- **Scope:** extensions apply to tabs opened after you enable them, and never run in private windows. Content scripts run in the page's own JavaScript world (no isolated world), so a page can see what an extension adds.
+- **Tab Therapist** is built in as a native feature (side panel → *Tab Therapist*), because its original popup relies on `chrome.tabs` / `chrome.tabGroups`.
 
 ## How it works
 
@@ -106,6 +148,7 @@ quick-pebble/
 │   ├── src/daemon.rs         Ollama bridge + OpenAI / Anthropic / Gemini fallbacks
 │   ├── src/memory_saver.rs   suspension policy and exclusion rules
 │   ├── src/database.rs       SQLite: history, bookmarks, settings, site permissions
+│   ├── src/extensions.rs     CRX unpacking, Web Store download, content-script runtime
 │   ├── src/security.rs       URL normalisation, navigation policy, tracker blocklist
 │   ├── src/inject.js         script injected into pages (state reporting, shortcuts, permission blocks)
 │   ├── capabilities/         least-privilege IPC permissions
@@ -137,6 +180,9 @@ These are the honest edges of v1.0:
 - Download tracking isn't wired up yet, so the "don't suspend during a download" rule is implemented in the policy but the flag is never set.
 - Audio detection looks at `<audio>`/`<video>` elements; audio from Web Audio or WebRTC-only pages isn't detected.
 - Web extensions, sync, a password manager and a built-in PDF viewer are not part of v1.0.
+- The agent can't use pages that need pointer drags, canvas games or CAPTCHAs, and it can fail on heavily dynamic sites.
+- Only content-script extensions work; most popular extensions (ad blockers, password managers) rely on background workers and won't function.
+- Built-in Tab Therapist "groups" are labels on tabs (a colour bar), not Chrome-style collapsible groups.
 - Keyboard shortcuts are captured inside pages by an injected script, so they won't fire on pages that block script injection.
 
 ## Development

@@ -47,6 +47,7 @@ pub struct TabInfo {
     pub private: bool,
     pub last_active: Instant,
     pub text: String,
+    pub zoom: f64,
 }
 
 #[derive(Default)]
@@ -56,6 +57,10 @@ pub struct Browser {
     hidden: Mutex<HashSet<String>>,
     pub memory: Mutex<MemoryConfig>,
     private_counter: AtomicU32,
+    /// Width in logical px of the right-hand side panel, per window.
+    sidebar: Mutex<HashMap<String, f64>>,
+    agent_pending: Mutex<HashMap<String, (String, tokio::sync::oneshot::Sender<serde_json::Value>)>>,
+    agent_counter: AtomicU32,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -111,9 +116,13 @@ fn content_rect(window: &Window) -> (LogicalPosition<f64>, LogicalSize<f64>) {
         .inner_size()
         .map(|s| s.to_logical::<f64>(scale))
         .unwrap_or(LogicalSize::new(1280.0, 800.0));
+    let side = window
+        .try_state::<Browser>()
+        .map(|st| lock(&st.sidebar).get(window.label()).copied().unwrap_or(0.0))
+        .unwrap_or(0.0);
     (
         LogicalPosition::new(0.0, CHROME_HEIGHT),
-        LogicalSize::new(size.width, (size.height - CHROME_HEIGHT).max(1.0)),
+        LogicalSize::new((size.width - side).max(1.0), (size.height - CHROME_HEIGHT).max(1.0)),
     )
 }
 
@@ -180,9 +189,18 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
     let (pos, size) = content_rect(window);
     let nav_app = app.clone();
     let load_app = app.clone();
-    let builder = WebviewBuilder::new(label, WebviewUrl::External(url))
+    let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .initialization_script(&script)
-        .incognito(private)
+        .incognito(private);
+    // Content scripts of enabled Chrome extensions (not injected into private windows).
+    if !private {
+        if let Ok(root) = crate::extensions::root_dir(app) {
+            for ext_script in crate::extensions::init_scripts(&root) {
+                builder = builder.initialization_script(&ext_script);
+            }
+        }
+    }
+    let builder = builder
         .on_navigation(move |u| {
             let block = setting(&nav_app, "block_trackers").as_deref() != Some("false");
             security::allow_navigation(u, block)
@@ -265,6 +283,13 @@ const SHORTCUTS: &[&str] = &[
     "palette",
     "tab-search",
     "private",
+    "assistant",
+    "find",
+    "zoom-in",
+    "zoom-out",
+    "zoom-reset",
+    "reopen-tab",
+    "library",
 ];
 
 #[tauri::command]
@@ -305,6 +330,7 @@ pub fn tab_create(window: Window, state: State<Browser>, id: String, pinned: Opt
             private: window.label().starts_with("private-"),
             last_active: Instant::now(),
             text: String::new(),
+            zoom: 1.0,
         },
     );
     Ok(())
@@ -821,4 +847,104 @@ pub fn window_control(window: Window, action: String) -> Result<(), String> {
         _ => return Err("unknown action".into()),
     }
     .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------------------------
+// Side panel, zoom, find
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn sidebar_set(app: AppHandle, window: Window, state: State<Browser>, width: f64) {
+    let w = if width.is_finite() { width.clamp(0.0, 640.0) } else { 0.0 };
+    lock(&state.sidebar).insert(window.label().into(), w);
+    relayout(&app, &window);
+}
+
+#[tauri::command]
+pub fn tab_zoom(app: AppHandle, window: Window, state: State<Browser>, id: String, action: String) -> Option<f64> {
+    let label = tab_label(window.label(), &id);
+    let mut tabs = lock(&state.tabs);
+    let t = tabs.get_mut(&label)?;
+    t.zoom = match action.as_str() {
+        "in" => (t.zoom + 0.1).min(3.0),
+        "out" => (t.zoom - 0.1).max(0.3),
+        _ => 1.0,
+    };
+    t.zoom = (t.zoom * 10.0).round() / 10.0;
+    if let Some(wv) = app.get_webview(&label) {
+        let _ = wv.set_zoom(t.zoom);
+    }
+    Some(t.zoom)
+}
+
+#[tauri::command]
+pub fn tab_find(app: AppHandle, window: Window, id: String) {
+    if let Some(wv) = app.get_webview(&tab_label(window.label(), &id)) {
+        let _ = wv.eval("window.__qpFind && window.__qpFind()");
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// AI chat + page agent
+// ---------------------------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct ChatRequest {
+    system: String,
+    messages: Vec<daemon::ChatMsg>,
+    json: Option<bool>,
+}
+
+#[tauri::command]
+pub async fn ai_chat(db: State<'_, Db>, req: ChatRequest) -> Result<String, String> {
+    if req.messages.len() > 60 || req.system.len() > 20_000 || req.messages.iter().any(|m| m.content.len() > 60_000) {
+        return Err("Conversation is too large".into());
+    }
+    let cfg = ai_config(&db);
+    daemon::chat(&cfg, &req.system, &req.messages, req.json.unwrap_or(false)).await
+}
+
+const AGENT_OPS: &[&str] = &["snapshot", "click", "type", "select", "scroll", "press"];
+
+/// Runs one agent operation inside a tab and waits for the page script to report back.
+#[tauri::command]
+pub async fn agent_exec(
+    app: AppHandle,
+    window: Window,
+    state: State<'_, Browser>,
+    tab_id: String,
+    op: String,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    if !AGENT_OPS.contains(&op.as_str()) {
+        return Err("unknown agent operation".into());
+    }
+    let label = tab_label(window.label(), &tab_id);
+    ensure_live(&app, &window, &label)?;
+    let wv = app.get_webview(&label).ok_or("This tab has no page loaded")?;
+    let id = state.agent_counter.fetch_add(1, Ordering::Relaxed).to_string();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    lock(&state.agent_pending).insert(id.clone(), (label, tx));
+    let args_js = serde_json::to_string(&args).map_err(|e| e.to_string())?;
+    if let Err(e) = wv.eval(format!("window.__qpAgent ? window.__qpAgent.run({id:?}, {op:?}, {args_js}) : null")) {
+        lock(&state.agent_pending).remove(&id);
+        return Err(e.to_string());
+    }
+    let out = tokio::time::timeout(Duration::from_secs(10), rx).await;
+    lock(&state.agent_pending).remove(&id);
+    match out {
+        Ok(Ok(v)) => Ok(v),
+        _ => Err("The page did not respond (it may still be loading or may have navigated).".into()),
+    }
+}
+
+/// Called by the injected page script. The calling webview must be the one the request targeted.
+#[tauri::command]
+pub fn qp_agent_result(webview: Webview, state: State<Browser>, id: String, result: serde_json::Value) {
+    let mut pending = lock(&state.agent_pending);
+    if pending.get(&id).map(|(label, _)| label == webview.label()).unwrap_or(false) {
+        if let Some((_, tx)) = pending.remove(&id) {
+            let _ = tx.send(result);
+        }
+    }
 }

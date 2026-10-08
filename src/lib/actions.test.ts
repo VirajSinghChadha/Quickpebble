@@ -14,6 +14,11 @@ describe("matchShortcut", () => {
     expect(matchShortcut(ev("p", { metaKey: true }), true)).toBeNull();
     expect(matchShortcut(ev("a", { metaKey: true, shiftKey: true }), true)).toBe("tab-search");
   });
+  it("maps the extra shortcuts", () => {
+    expect(matchShortcut(ev("T", { metaKey: true, shiftKey: true }), true)).toBe("reopen-tab");
+    expect(matchShortcut(ev("j", { metaKey: true }), true)).toBe("assistant");
+    expect(matchShortcut(ev("-", { ctrlKey: true }), false)).toBe("zoom-out");
+  });
   it("ignores alt chords", () => {
     expect(matchShortcut(ev("t", { metaKey: true, altKey: true }), true)).toBeNull();
   });

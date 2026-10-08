@@ -96,15 +96,55 @@ pub async fn status(cfg: &AiConfig) -> AiStatus {
     st
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMsg {
+    pub role: String,
+    pub content: String,
+}
+
+/// Providers require alternating user/assistant turns starting with a user turn.
+pub fn normalize_messages(msgs: &[ChatMsg]) -> Vec<ChatMsg> {
+    let mut out: Vec<ChatMsg> = Vec::new();
+    for m in msgs {
+        let role = if m.role == "assistant" { "assistant" } else { "user" };
+        match out.last_mut() {
+            Some(last) if last.role == role => {
+                last.content.push_str("\n\n");
+                last.content.push_str(&m.content);
+            }
+            _ => out.push(ChatMsg { role: role.into(), content: m.content.clone() }),
+        }
+    }
+    if out.first().map(|m| m.role.as_str()) == Some("assistant") {
+        out.insert(0, ChatMsg { role: "user".into(), content: "(conversation start)".into() });
+    }
+    out
+}
+
 /// Single-shot completion against the configured provider.
 pub async fn generate(cfg: &AiConfig, system: &str, prompt: &str) -> Result<String, String> {
+    chat(cfg, system, &[ChatMsg { role: "user".into(), content: prompt.into() }], false).await
+}
+
+/// Multi-turn chat. `json` asks providers that support it to constrain output to JSON.
+pub async fn chat(cfg: &AiConfig, system: &str, msgs: &[ChatMsg], json: bool) -> Result<String, String> {
     let c = client();
+    let msgs = normalize_messages(msgs);
+    let with_system = |sys: &str| -> Vec<Value> {
+        std::iter::once(json!({"role":"system","content":sys}))
+            .chain(msgs.iter().map(|m| json!({"role": m.role, "content": m.content})))
+            .collect()
+    };
     match cfg.provider.as_str() {
         "ollama" => {
+            let mut body = json!({ "model": cfg.model, "messages": with_system(system), "stream": false,
+                                   "options": { "temperature": 0.3 } });
+            if json {
+                body["format"] = json!("json");
+            }
             let r = c
-                .post(format!("{}/api/generate", cfg.ollama_url.trim_end_matches('/')))
-                .json(&json!({ "model": cfg.model, "system": system, "prompt": prompt, "stream": false,
-                               "options": { "temperature": 0.3 } }))
+                .post(format!("{}/api/chat", cfg.ollama_url.trim_end_matches('/')))
+                .json(&body)
                 .send()
                 .await
                 .map_err(|_| "Could not reach Ollama. Start it with `ollama serve`.".to_string())?;
@@ -113,16 +153,15 @@ pub async fn generate(cfg: &AiConfig, system: &str, prompt: &str) -> Result<Stri
             if !status.is_success() {
                 return Err(v["error"].as_str().unwrap_or("Ollama request failed").to_string());
             }
-            Ok(v["response"].as_str().unwrap_or_default().trim().to_string())
+            Ok(v["message"]["content"].as_str().unwrap_or_default().trim().to_string())
         }
         "openai" => {
             let key = get_key("openai").ok_or("No OpenAI API key saved")?;
-            let v = send_json(c.post("https://api.openai.com/v1/chat/completions").bearer_auth(key).json(&json!({
-                "model": cfg.model,
-                "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
-                "temperature": 0.3
-            })))
-            .await?;
+            let mut body = json!({ "model": cfg.model, "messages": with_system(system), "temperature": 0.3 });
+            if json {
+                body["response_format"] = json!({"type":"json_object"});
+            }
+            let v = send_json(c.post("https://api.openai.com/v1/chat/completions").bearer_auth(key).json(&body)).await?;
             Ok(v["choices"][0]["message"]["content"].as_str().unwrap_or_default().trim().to_string())
         }
         "anthropic" => {
@@ -132,8 +171,8 @@ pub async fn generate(cfg: &AiConfig, system: &str, prompt: &str) -> Result<Stri
                     .header("x-api-key", key)
                     .header("anthropic-version", "2023-06-01")
                     .json(&json!({
-                        "model": cfg.model, "max_tokens": 700, "system": system,
-                        "messages": [{"role":"user","content":prompt}]
+                        "model": cfg.model, "max_tokens": 1024, "system": system,
+                        "messages": msgs.iter().map(|m| json!({"role": m.role, "content": m.content})).collect::<Vec<_>>()
                     })),
             )
             .await?;
@@ -141,13 +180,18 @@ pub async fn generate(cfg: &AiConfig, system: &str, prompt: &str) -> Result<Stri
         }
         "gemini" => {
             let key = get_key("gemini").ok_or("No Gemini API key saved")?;
+            let contents: Vec<Value> = msgs
+                .iter()
+                .map(|m| json!({"role": if m.role == "assistant" { "model" } else { "user" }, "parts":[{"text": m.content}]}))
+                .collect();
+            let mut body = json!({ "systemInstruction": {"parts":[{"text": system}]}, "contents": contents });
+            if json {
+                body["generationConfig"] = json!({"responseMimeType":"application/json"});
+            }
             let v = send_json(
                 c.post(format!("https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent", cfg.model))
                     .header("x-goog-api-key", key)
-                    .json(&json!({
-                        "systemInstruction": {"parts":[{"text": system}]},
-                        "contents": [{"role":"user","parts":[{"text": prompt}]}]
-                    })),
+                    .json(&body),
             )
             .await?;
             Ok(v["candidates"][0]["content"]["parts"][0]["text"].as_str().unwrap_or_default().trim().to_string())
@@ -220,6 +264,15 @@ mod tests {
         let g = vec!["School".to_string(), "Work".to_string(), "Personal".to_string()];
         assert_eq!(match_group(" work.\n", &g).as_deref(), Some("Work"));
         assert_eq!(match_group("Probably Work", &g), None);
+    }
+
+    #[test]
+    fn messages_are_normalised() {
+        let m = |r: &str, c: &str| ChatMsg { role: r.into(), content: c.into() };
+        let out = normalize_messages(&[m("assistant", "hi"), m("user", "a"), m("user", "b"), m("assistant", "c")]);
+        let roles: Vec<_> = out.iter().map(|m| m.role.as_str()).collect();
+        assert_eq!(roles, ["user", "assistant", "user", "assistant"]);
+        assert_eq!(out[2].content, "a\n\nb");
     }
 
     #[test]

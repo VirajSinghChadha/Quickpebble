@@ -5,5 +5,5 @@
   "windows": ["main", "private-*"],
   "webviews": ["tab-*"],
   "remote": { "urls": ["https://*", "http://*"] },
-  "permissions": ["allow-qp-report", "allow-qp-shortcut"]
+  "permissions": ["allow-qp-report", "allow-qp-shortcut", "allow-qp-agent-result"]
 }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tab-zoom"
+description = "Enables the tab_zoom command without any pre-configured scope."
+commands.allow = ["tab_zoom"]
+
+[[permission]]
+identifier = "deny-tab-zoom"
+description = "Denies the tab_zoom command without any pre-configured scope."
+commands.deny = ["tab_zoom"]

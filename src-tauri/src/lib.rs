@@ -3,6 +3,7 @@
 mod browser;
 mod daemon;
 mod database;
+mod extensions;
 mod memory_saver;
 mod security;
 
@@ -11,6 +12,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -53,6 +55,17 @@ pub fn run() {
             browser::privacy_clear_data,
             browser::window_new_private,
             browser::window_control,
+            browser::sidebar_set,
+            browser::tab_zoom,
+            browser::tab_find,
+            browser::ai_chat,
+            browser::agent_exec,
+            browser::qp_agent_result,
+            extensions::extension_list,
+            extensions::extension_install_store,
+            extensions::extension_install_file,
+            extensions::extension_set_enabled,
+            extensions::extension_remove,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

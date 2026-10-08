@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-extension-install-file"
+description = "Enables the extension_install_file command without any pre-configured scope."
+commands.allow = ["extension_install_file"]
+
+[[permission]]
+identifier = "deny-extension-install-file"
+description = "Denies the extension_install_file command without any pre-configured scope."
+commands.deny = ["extension_install_file"]

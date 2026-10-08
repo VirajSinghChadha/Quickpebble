@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bookmark, MoonStar, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, Bot, MoonStar, Puzzle, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
 import { selectActive, useStore, type Theme } from "../store/useStore";
@@ -27,6 +27,7 @@ export function Toolbar() {
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const setOverlay = useStore((s) => s.setOverlay);
+  const sidebar = useStore((s) => s.sidebar);
   const hasPage = !!tab.url;
   const ThemeIcon = THEME_ICON[theme];
 
@@ -44,6 +45,8 @@ export function Toolbar() {
         <Bookmark size={16} fill={tab.bookmarked ? "currentColor" : "none"} />
       </IconButton>
       <IconButton label="Summarize page with AI" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
+      <IconButton label={`Assistant (${modKey}J)`} active={sidebar !== null} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
+      <IconButton label="Extensions" onClick={() => setOverlay("extensions")}><Puzzle size={16} /></IconButton>
       <IconButton label="Privacy Center" onClick={() => setOverlay("privacy")}><ShieldCheck size={17} /></IconButton>
       <IconButton label={`Theme: ${theme}`} onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length])}><ThemeIcon size={16} /></IconButton>
       <IconButton label="Settings" onClick={() => setOverlay("settings")}><Settings size={16} /></IconButton>
