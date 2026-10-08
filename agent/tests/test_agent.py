@@ -74,4 +74,12 @@ def test_category_defaults_none_and_validates():
     assert parse_reply(reply(type="wait"), G).action.category == "none"
     assert parse_reply(reply(type="click", cell="A1", category="purchases"), G).action.category == "purchases"
     with pytest.raises(ValueError):
-        parse_reply(reply(type="click", cell="A1", category="nukes"), G)
+        parse_reply(reply(type="click", cell="A1", category="Not Valid!"), G)
+
+
+def test_site_specific_categories_and_unknown_labels():
+    ids = {"submit_quiz_answers", "skip_lessons"}
+    ok = parse_reply(reply(type="click", cell="A1", category="submit_quiz_answers"), G, ids)
+    assert (ok.action.category, ok.action.risk) == ("submit_quiz_answers", "low")
+    odd = parse_reply(reply(type="click", cell="A1", category="make_coffee"), G, ids)
+    assert (odd.action.category, odd.action.risk) == ("none", "high")

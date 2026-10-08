@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultPerms } from "./permissions";
+import { fallbackSite, parseGenerated } from "./permissions";
 import { isRisky, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
@@ -15,7 +15,7 @@ function make(steps: ScreenResponse[], answers: Choice[] = [], startMode: Screen
     act: async (a) => void acted.push(a),
     choose: async (description, risky) => (asked.push({ description, risky }), answers.shift() ?? "allow"),
     mode: () => mode,
-    permissions: () => defaultPerms(),
+    permissions: () => fallbackSite(),
     setMode: (m) => (mode = m),
     sleep: async () => {},
     onEvent: (e) => void events.push(`${e.kind}:${e.text}`),
@@ -42,19 +42,19 @@ describe("runScreenAgent", () => {
   });
 
   it("flags risky wording even if the model said low risk", () => {
-    expect(isRisky(res({ type: "click", cell: "A1", risk: "low" }, "Click Delete account"))).toBe(true);
-    expect(isRisky(res({ type: "click", cell: "A1" }, "Open the search box"))).toBe(false);
-    expect(isRisky(res({ type: "wait", risk: "high" }))).toBe(false);
+    expect(isRisky(res({ type: "click", cell: "A1", risk: "low" }, "Click Delete account"), fallbackSite())).toBe(true);
+    expect(isRisky(res({ type: "click", cell: "A1" }, "Open the search box"), fallbackSite())).toBe(false);
+    expect(isRisky(res({ type: "wait", risk: "high" }), fallbackSite())).toBe(false);
   });
 
-  it("respects the person's per-category permissions", () => {
-    const buy = res({ type: "click", cell: "A1", category: "purchases" });
-    expect(isRisky(buy, { ...defaultPerms(), purchases: false })).toBe(true);
-    expect(isRisky(buy, { ...defaultPerms(), purchases: true })).toBe(false);
-    const submit = res({ type: "click", cell: "A1", category: "submit" });
-    expect(isRisky(submit, { ...defaultPerms(), submit: false })).toBe(true);
-    expect(isRisky(submit)).toBe(false);
-    expect(isRisky(res({ type: "click", cell: "A1", risk: "high", category: "none" }), { ...defaultPerms(), purchases: true })).toBe(true);
+  it("respects the person's per-site permissions", () => {
+    const site = parseGenerated('{"permissions":[{"id":"submit_quiz_answers","label":"Submit quiz answers","allowed":false},{"id":"skip_lessons","label":"Skip lessons","allowed":true},{"id":"buy_credits","label":"Buy credits"}]}')!;
+    const submit = res({ type: "click", cell: "A1", category: "submit_quiz_answers" });
+    expect(isRisky(submit, site)).toBe(true);
+    expect(isRisky(submit, { ...site, allowed: { ...site.allowed, submit_quiz_answers: true } })).toBe(false);
+    expect(isRisky(res({ type: "click", cell: "A1", category: "skip_lessons" }), site)).toBe(false);
+    expect(isRisky(res({ type: "click", cell: "A1", category: "made_up" }), site)).toBe(true);
+    expect(isRisky(res({ type: "click", cell: "A1", risk: "high", category: "none" }), site)).toBe(true);
   });
 
   it("skip tells the model to try another way and keeps going", async () => {

@@ -4,7 +4,7 @@ import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
 import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
-import { defaultPerms, hostOf, loadPerms, savePerms, type Perms, type Scope } from "../lib/permissions";
+import { fallbackSite, hostOf, loadSite, parseGenerated, PERMISSION_PROMPT, saveSite, type Scope, type SitePerms } from "../lib/permissions";
 
 export type ChatKind = "user" | "assistant" | "say" | "step" | "error" | "question";
 export interface ChatItem {
@@ -32,7 +32,9 @@ interface ChatState {
   screenApprovalMode: ScreenMode;
   setScreenApprovalMode: (m: ScreenMode) => void;
   /** Asked before a Screen task: which sensitive things may I do on this site, and for how long? */
-  permissionRequest: { host: string; perms: Perms; resolve: (r: { perms: Perms; scope: Scope } | null) => void } | null;
+  permissionRequest: { host: string; site: SitePerms; resolve: (r: { site: SitePerms; scope: Scope } | null) => void } | null;
+  /** True while Gemini is writing the permission list for a site. */
+  preparingPermissions: boolean;
   editPermissions: () => Promise<void>;
   approval: { description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
   setMode: (m: "ask" | "act" | "screen") => void;
@@ -47,26 +49,42 @@ let signal = { aborted: false };
 /** Actions the screen agent has taken this session; survives across messages, reset by Clear. */
 const screenHistory: string[] = [];
 /** Per-site permissions chosen for this session only. */
-const sessionPerms = new Map<string, Perms>();
-let activePerms: Perms = defaultPerms();
+const sessionPerms = new Map<string, SitePerms>();
+let activePerms: SitePerms = fallbackSite();
 
-async function savedPerms(host: string): Promise<Perms | null> {
+async function savedSite(host: string): Promise<SitePerms | null> {
   const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
-  return loadPerms(s.screen_permissions, host);
+  return loadSite(s.screen_permissions, host);
+}
+
+/** Asks Gemini which sensitive things matter on this website; falls back to a generic list. */
+async function curateSite(host: string): Promise<SitePerms> {
+  try {
+    const tab = selectActive(useStore.getState());
+    let text = "";
+    if (tab.url) {
+      const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot").catch(() => null);
+      text = (snap?.text ?? "").slice(0, 1500);
+    }
+    const reply = await ipc.aiChat(PERMISSION_PROMPT, [{ role: "user", content: `Website: ${host}\nPage title: ${tab.title ?? ""}\nURL: ${tab.url ?? ""}\n<<<PAGE\n${text}\n>>>PAGE` }], true);
+    return parseGenerated(reply) ?? fallbackSite();
+  } catch {
+    return fallbackSite();
+  }
 }
 
 /** Shows the permission dialog; applies and (if asked) saves the result. Null = cancelled. */
-async function askPermissions(host: string, start: Perms): Promise<Perms | null> {
-  const r = await new Promise<{ perms: Perms; scope: Scope } | null>((resolve) => {
-    useChat.setState({ permissionRequest: { host, perms: start, resolve: (v) => { useChat.setState({ permissionRequest: null }); resolve(v); } } });
+async function askPermissions(host: string, start: SitePerms): Promise<SitePerms | null> {
+  const r = await new Promise<{ site: SitePerms; scope: Scope } | null>((resolve) => {
+    useChat.setState({ permissionRequest: { host, site: start, resolve: (v) => { useChat.setState({ permissionRequest: null }); resolve(v); } } });
   });
   if (!r) return null;
-  sessionPerms.set(host, r.perms);
+  sessionPerms.set(host, r.site);
   if (r.scope === "always") {
     const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
-    await ipc.settingsSet("screen_permissions", savePerms(s.screen_permissions, host, r.perms)).catch(() => {});
+    await ipc.settingsSet("screen_permissions", saveSite(s.screen_permissions, host, r.site)).catch(() => {});
   }
-  return r.perms;
+  return r.site;
 }
 
 const add = (kind: ChatKind, text: string, ok?: boolean) =>
@@ -143,10 +161,17 @@ export const useChat = create<ChatState>((set, get) => ({
   setScreenApprovalMode: (screenApprovalMode) => set({ screenApprovalMode }),
   approval: null,
   permissionRequest: null,
+  preparingPermissions: false,
   editPermissions: async () => {
     const host = hostOf(selectActive(useStore.getState()).url);
-    const perms = await askPermissions(host, sessionPerms.get(host) ?? (await savedPerms(host)) ?? defaultPerms());
-    if (perms) activePerms = perms;
+    let start = sessionPerms.get(host) ?? (await savedSite(host));
+    if (!start) {
+      set({ preparingPermissions: true });
+      start = await curateSite(host);
+      set({ preparingPermissions: false });
+    }
+    const site = await askPermissions(host, start);
+    if (site) activePerms = site;
   },
   setMode: (mode) => set({ mode }),
   setApprovalMode: (approvalMode) => set({ approvalMode }),
@@ -200,15 +225,21 @@ export const useChat = create<ChatState>((set, get) => ({
       } else if (mode === "screen") {
         // First time on this site: ask what I may do. Remembered for the session, or saved if the person chose "always".
         const host = hostOf(selectActive(useStore.getState()).url);
-        let perms = sessionPerms.get(host) ?? (await savedPerms(host));
-        if (!perms) perms = await askPermissions(host, defaultPerms());
+        let perms = sessionPerms.get(host) ?? (await savedSite(host));
+        if (!perms) {
+          set({ preparingPermissions: true });
+          const curated = await curateSite(host);
+          set({ preparingPermissions: false });
+          if (runSignal.aborted) return;
+          perms = await askPermissions(host, curated);
+        }
         if (!perms) return void add("say", "Okay, I won't do anything without permissions. Send the task again when you're ready.");
         sessionPerms.set(host, perms);
         activePerms = perms;
         if (runSignal.aborted) return;
         const io = makeIO();
         await runScreenAgent(screenGoal(prior, goal), {
-          propose: ipc.screenPropose,
+          propose: (g, h) => ipc.screenPropose(g, h, activePerms.items),
           act: ipc.screenAct,
           choose: (description, risky) => askChoice(description, risky, get().screenApprovalMode === "ask"),
           mode: () => get().screenApprovalMode,

@@ -5,7 +5,7 @@
  * Routine actions run automatically ("smart" mode); only risky ones, or every step in "ask" mode, wait for the person.
  */
 import type { ScreenAction, ScreenResponse } from "./ipc";
-import { categoryLabel, defaultPerms, type CategoryId, type Perms } from "./permissions";
+import { categoryLabel, isAllowed, type SitePerms } from "./permissions";
 
 export const MAX_SCREEN_STEPS = 40;
 const MAX_WAITS_IN_A_ROW = 8;
@@ -15,7 +15,7 @@ const MAX_ACTION_FAILURES = 3;    // failed actions in a row before giving up
 const PROPOSE_ATTEMPTS = 3;
 const TRANSIENT = /HTTP (408|429|5\d\d)|not responding|invalid response|Could not reach|timed out|overloaded/i;
 /** Backstop when the model says "none" but its own message describes a sensitive step. */
-const WORD_CATEGORY: [RegExp, CategoryId][] = [
+const WORD_CATEGORY: [RegExp, string][] = [
   [/\b(buy|purchase|pay|checkout|check out|place order|donate|transfer)\b/i, "purchases"],
   [/\b(delete|erase|overwrite)\b/i, "deleting"],
   [/\b(sign out|log out|unsubscribe)\b/i, "accounts"],
@@ -31,7 +31,7 @@ export interface ScreenIO {
   choose(description: string, risky: boolean): Promise<Choice>;
   mode(): ScreenMode;
   /** Which sensitive categories the person has allowed without asking (per website, per session or saved). */
-  permissions(): Perms;
+  permissions(): SitePerms;
   setMode(m: ScreenMode): void;
   sleep(ms: number): Promise<void>;
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
@@ -51,21 +51,21 @@ export function describeScreenAction(a: ScreenAction): string {
   }
 }
 
-/** Which sensitive category (if any) does this step fall under? */
-export function categoryOf(res: ScreenResponse): CategoryId | "unknown" | null {
+/** Which of the site's permissions (if any) does this step fall under? "unknown" = risky but unlabeled. */
+export function categoryOf(res: ScreenResponse, site: SitePerms): string | "unknown" | null {
   const { action, user } = res;
   if (action.type === "wait" || action.type === "scroll") return null;
-  if (action.category && action.category !== "none") return action.category;
-  const hit = WORD_CATEGORY.find(([re]) => re.test(user.message ?? ""));
+  if (action.category && action.category !== "none") return site.items.some((i) => i.id === action.category) ? action.category : "unknown";
+  const hit = WORD_CATEGORY.find(([re, id]) => re.test(user.message ?? "") && site.items.some((i) => i.id === id));
   if (hit) return hit[1];
   return action.risk === "high" ? "unknown" : null;
 }
 
-/** Does this step need the person's OK, given what they have allowed? */
-export function isRisky(res: ScreenResponse, perms: Perms = defaultPerms()): boolean {
-  const c = categoryOf(res);
+/** Does this step need the person's OK, given what they have allowed on this site? */
+export function isRisky(res: ScreenResponse, site: SitePerms): boolean {
+  const c = categoryOf(res, site);
   if (c === null) return false;
-  return c === "unknown" ? true : !perms[c];
+  return c === "unknown" ? true : !isAllowed(site, c);
 }
 
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
@@ -104,10 +104,11 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     }
 
     const desc = describeScreenAction(action);
-    const risky = isRisky(res, io.permissions());
-    const cat = categoryOf(res);
+    const site = io.permissions();
+    const risky = isRisky(res, site);
+    const cat = categoryOf(res, site);
     if (risky || io.mode() === "ask") {
-      const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(cat)}] ` : "";
+      const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(site, cat)}] ` : "";
       const choice = await io.choose(`${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });

@@ -7,6 +7,7 @@ GET  /health                                    ->  {"ok": true}
 import hmac
 import json
 import os
+import re
 import secrets
 import sys
 import threading
@@ -63,12 +64,17 @@ class Handler(BaseHTTPRequestHandler):
                 goal, history = str(body.get("goal", "")).strip(), [str(h)[:200] for h in body.get("history", [])][-40:]
                 if not goal or len(goal) > 4000:
                     raise ValueError("invalid goal")
+                cats = [
+                    {"id": str(c["id"]), "label": str(c.get("label", ""))[:80]}
+                    for c in (body.get("categories") or [])[:12]
+                    if isinstance(c, dict) and re.fullmatch(r"[a-z][a-z0-9_]{0,39}", str(c.get("id", "")))
+                ] or None
                 key = os.environ.get("GEMINI_API_KEY", "")
                 if not key:
                     raise gemini.AgentError("No Gemini API key saved. Add one in Settings → AI.")
                 shot = executor.capture_gridded_jpeg_b64(GRID)
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
-                resp = gemini.propose(key, model, GRID, goal, history, shot)
+                resp = gemini.propose(key, model, GRID, goal, history, shot, cats)
                 self._send(200, resp.model_dump(exclude_none=True))
             elif self.path == "/act":
                 action = Action.model_validate(body.get("action"))

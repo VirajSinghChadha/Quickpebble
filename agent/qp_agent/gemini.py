@@ -17,7 +17,7 @@ class AgentError(Exception):
     pass
 
 
-def parse_reply(text: str, grid: Grid) -> AgentResponse:
+def parse_reply(text: str, grid: Grid, category_ids: set[str] | None = None) -> AgentResponse:
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
         raise ValueError("reply contained no JSON object")
@@ -26,6 +26,8 @@ def parse_reply(text: str, grid: Grid) -> AgentResponse:
     except (json.JSONDecodeError, ValidationError) as e:
         raise ValueError(str(e).splitlines()[0] if isinstance(e, json.JSONDecodeError) else _first_error(e)) from e
     resp.action.check_cell(grid)
+    if category_ids is not None and resp.action.category != "none" and resp.action.category not in category_ids:
+        resp.action.category, resp.action.risk = "none", "high"   # unknown label: let the app ask rather than trust it
     return resp
 
 
@@ -34,11 +36,11 @@ def _first_error(e: ValidationError) -> str:
     return f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
 
 
-def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str], jpeg_b64: str, retries: int = 2) -> AgentResponse:
+def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str], jpeg_b64: str, categories: list[dict] | None = None, retries: int = 2) -> AgentResponse:
     error = None
     for _ in range(retries + 1):
         body = {
-            "systemInstruction": {"parts": [{"text": system_prompt(grid)}]},
+            "systemInstruction": {"parts": [{"text": system_prompt(grid, categories)}]},
             "contents": [{"role": "user", "parts": [
                 {"text": user_prompt(goal, history, error)},
                 {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64}},
@@ -60,7 +62,7 @@ def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str],
             error = "empty or blocked response"
             continue
         try:
-            return parse_reply(text, grid)
+            return parse_reply(text, grid, {c['id'] for c in categories} if categories else None)
         except ValueError as e:
             error = str(e)
     raise AgentError(f"Gemini kept returning an invalid response ({error}). Try a larger model.")

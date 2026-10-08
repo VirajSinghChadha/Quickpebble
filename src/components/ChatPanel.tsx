@@ -4,7 +4,7 @@ import { Bot, Check, CircleAlert, MousePointerClick, Send, Square, Trash2, X } f
 import { useOllama } from "../hooks/useOllama";
 import { selectActive, useStore } from "../store/useStore";
 import { useChat } from "../store/useChat";
-import { CATEGORIES, type Perms, type Scope } from "../lib/permissions";
+import type { Scope, SitePerms } from "../lib/permissions";
 
 const SUGGESTIONS = {
   screen: ["Open Notes and write a shopping list", "Find my latest download in Finder", "Turn on dark mode in System Settings"],
@@ -13,7 +13,7 @@ const SUGGESTIONS = {
 };
 
 export function ChatPanel() {
-  const { items, busy, mode, approvalMode, permissionRequest, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
   const [showSources, setShowSources] = useState(false);
@@ -79,7 +79,7 @@ export function ChatPanel() {
           </select>
         )}
         {mode === "screen" && (
-          <button type="button" disabled={busy || !!permissionRequest} onClick={() => void editPermissions()} title="Choose what I may do without asking on this site" className="rounded-lg border border-border bg-surface px-2 py-1 text-[12px] hover:bg-surface-secondary disabled:opacity-40">Permissions</button>
+          <button type="button" disabled={busy || !!permissionRequest || preparingPermissions} onClick={() => void editPermissions()} title="Choose what I may do without asking on this site" className="rounded-lg border border-border bg-surface px-2 py-1 text-[12px] hover:bg-surface-secondary disabled:opacity-40">Permissions</button>
         )}
         {mode === "screen" && (
           <select
@@ -143,6 +143,7 @@ export function ChatPanel() {
             <div key={m.id} className={`mr-4 select-text whitespace-pre-wrap rounded-2xl rounded-bl-md px-3 py-2 ${m.kind === "question" ? "border border-primary/40 bg-surface" : "bg-surface-secondary"}`}>{m.text}</div>
           ),
         )}
+        {preparingPermissions && <div className="flex items-center gap-2 px-1 text-text-secondary" role="status"><span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-primary" /> Working out which permissions matter on this site…</div>}
         <PermissionDialog />
         {approval && (
           <div role="alertdialog" aria-label="Approve action" className={`rounded-2xl border bg-surface p-3 shadow-pebble ${approval.risky ? "border-red-500/60" : "border-primary/50"}`}>
@@ -159,7 +160,7 @@ export function ChatPanel() {
             <p className="mt-2 text-[10.5px] text-text-secondary">Press {approval.options.map((_, i) => i + 1).join(", ")} on your keyboard to choose.</p>
           </div>
         )}
-        {busy && !approval && !permissionRequest && (
+        {busy && !approval && !permissionRequest && !preparingPermissions && (
           <div className="flex items-center gap-2 px-1 text-text-secondary" role="status">
             <span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-primary" /> Working…
           </div>
@@ -202,31 +203,31 @@ export function ChatPanel() {
 
 function PermissionDialog() {
   const req = useChat((s) => s.permissionRequest);
-  const [perms, setPerms] = useState<Perms | null>(null);
+  const [site, setSite] = useState<SitePerms | null>(null);
   const [scope, setScope] = useState<Scope>("session");
-  useEffect(() => { if (req) { setPerms(req.perms); setScope("session"); } }, [req]);
-  if (!req || !perms) return null;
-  const site = req.host === "this computer" ? "this computer" : req.host;
+  useEffect(() => { if (req) { setSite(req.site); setScope("session"); } }, [req]);
+  if (!req || !site) return null;
+  const name = req.host === "this computer" ? "this computer" : req.host;
   return (
     <div role="dialog" aria-label="Permissions" className="rounded-2xl border border-primary/50 bg-surface p-3 shadow-pebble">
       <p className="mb-1 font-semibold">What permissions would you like to give me?</p>
-      <p className="mb-2 text-[12px] text-text-secondary">These are the sensitive things I normally ask about before doing them on <b>{site}</b>. Switch on the ones I may do without asking.</p>
+      <p className="mb-2 text-[12px] text-text-secondary">These are the sensitive things I would normally ask about before doing them on <b>{name}</b>. Switch on the ones I may do without asking.</p>
       <div className="mb-2 space-y-1">
-        {CATEGORIES.map((c) => (
+        {site.items.map((c) => (
           <label key={c.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-secondary">
             <span className="text-[12.5px]">{c.label}</span>
-            <input type="checkbox" role="switch" checked={perms[c.id]} onChange={(e) => setPerms({ ...perms, [c.id]: e.target.checked })} aria-label={c.label} />
+            <input type="checkbox" role="switch" checked={site.allowed[c.id] === true} onChange={(e) => setSite({ ...site, allowed: { ...site.allowed, [c.id]: e.target.checked } })} aria-label={c.label} />
           </label>
         ))}
       </div>
       <p className="mb-2 text-[11px] text-text-secondary">Off means I ask you first. I never type passwords, card numbers or one-time codes: you always do that yourself.</p>
       <div className="mb-3 flex rounded-lg bg-surface-secondary p-0.5" role="radiogroup" aria-label="How long">
-        {([["session", "Just this session"], ["always", `Always for ${site}`]] as const).map(([v, label]) => (
+        {([["session", "Just this session"], ["always", `Always for ${name}`]] as const).map(([v, label]) => (
           <button key={v} type="button" role="radio" aria-checked={scope === v} onClick={() => setScope(v)} className={`flex-1 truncate rounded-md px-2 py-1 text-[12px] font-medium ${scope === v ? "bg-surface text-text-primary shadow-pebble" : "text-text-secondary"}`}>{label}</button>
         ))}
       </div>
       <div className="flex gap-2">
-        <button type="button" autoFocus onClick={() => req.resolve({ perms, scope })} className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white dark:text-bg">Save and continue</button>
+        <button type="button" autoFocus onClick={() => req.resolve({ site, scope })} className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white dark:text-bg">Save and continue</button>
         <button type="button" onClick={() => req.resolve(null)} className="rounded-lg border border-border px-3 py-1.5">Cancel</button>
       </div>
     </div>

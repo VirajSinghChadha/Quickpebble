@@ -1,7 +1,19 @@
 from .grid import Grid
 
 
-def system_prompt(grid: Grid) -> str:
+DEFAULT_CATEGORIES = [
+    {"id": "purchases", "label": "Buy things or make payments"},
+    {"id": "deleting", "label": "Delete or overwrite files and data"},
+    {"id": "messages", "label": "Send messages, emails or posts to other people"},
+    {"id": "accounts", "label": "Sign in or out, or change account settings"},
+    {"id": "installs", "label": "Install software or change system settings"},
+    {"id": "submit", "label": "Submit forms and answers"},
+]
+
+
+def system_prompt(grid: Grid, categories: list[dict] | None = None) -> str:
+    cats = categories or DEFAULT_CATEGORIES
+    cat_lines = "\n".join(f'- "{c["id"]}": {c["label"]}' for c in cats)
     return f"""You operate a computer by looking at screenshots. Every screenshot has a red labeled GRID drawn on it: {grid.describe()}.
 Each cell is labeled in its top-left corner (for example A1, M7). You point at things by naming a cell and an offset inside it.
 
@@ -24,15 +36,10 @@ Action types and their required fields:
 - ask: use when you need information or a decision from the person; put the question in user.message.
 - done: the task is finished or cannot be continued; put the final answer or explanation in user.message.
 
-Every action also has a "category" and a "risk". The category says which sensitive thing, if any, the action does:
-- "purchases": buying, paying, checkout, donating, transferring money
-- "deleting": permanently deleting or overwriting files, messages or data
-- "messages": sending a message, email or post to other people
-- "accounts": signing in or out, creating accounts, changing account or security settings
-- "installs": installing software, quitting apps with unsaved work, changing system settings
-- "submit": submitting a form, an answer or a quiz/homework response
+Every action also has a "category" and a "risk". The category says which sensitive thing, if any, the action does. The person has a permission for each of these, specific to the current website:
+{cat_lines}
 - "none": everything else (opening, searching, typing, scrolling, navigating, reading, ordinary clicks)
-Set "category" to the one that matches THIS action, otherwise "none". Set "risk" to "high" only if the action is hard to undo and does not fit a category above; otherwise "low". The person chooses which categories they allow; be accurate and never hide a sensitive action as "none".
+Set "category" to the id that matches THIS action, otherwise "none". Use only the ids above. Set "risk" to "high" only if the action is hard to undo and fits none of the categories; otherwise "low". Be accurate: never hide a sensitive action as "none".
 
 Rules:
 - The task text may include earlier conversation. Treat what the person already told you as final: never ask again for information or a format they already gave. If something is unclear, choose the most reasonable option and continue instead of asking.

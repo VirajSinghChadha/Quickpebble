@@ -128,6 +128,7 @@ pub async fn screen_propose(
     state: State<'_, ScreenAgent>,
     goal: String,
     history: Vec<String>,
+    categories: Option<Value>,
 ) -> Result<Value, String> {
     if goal.trim().is_empty() || goal.len() > 4000 || history.len() > 40 {
         return Err("Invalid request".into());
@@ -136,7 +137,7 @@ pub async fn screen_propose(
         let (app, db, state) = (app.clone(), &*db, &*state);
         tokio::task::block_in_place(|| connection(&app, db, state))?
     };
-    post(port, &token, "/propose", json!({ "goal": goal, "history": history })).await
+    post(port, &token, "/propose", json!({ "goal": goal, "history": history, "categories": categories })).await
 }
 
 /// Runs one user-approved action. The Python side validates it again before touching the mouse or keyboard.
