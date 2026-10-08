@@ -5,15 +5,44 @@ use url::Url;
 
 /// Host suffixes of well-known ad / tracking networks. Matched on label boundaries.
 pub const TRACKER_HOSTS: &[&str] = &[
+    // Google / Meta / Microsoft / big-tech ad and analytics endpoints
     "doubleclick.net", "googlesyndication.com", "googleadservices.com", "google-analytics.com",
-    "googletagmanager.com", "googletagservices.com", "adservice.google.com", "facebook.net",
-    "connect.facebook.net", "analytics.twitter.com", "ads-twitter.com", "ads.linkedin.com",
-    "px.ads.linkedin.com", "scorecardresearch.com", "quantserve.com", "hotjar.com", "mixpanel.com",
-    "segment.io", "segment.com", "amplitude.com", "fullstory.com", "mouseflow.com", "crazyegg.com",
-    "criteo.com", "criteo.net", "taboola.com", "outbrain.com", "adnxs.com", "rubiconproject.com",
-    "pubmatic.com", "openx.net", "advertising.com", "moatads.com", "chartbeat.com", "newrelic.com",
-    "bat.bing.com", "clarity.ms", "ads.yahoo.com", "adsrvr.org", "casalemedia.com", "zedo.com",
+    "googletagmanager.com", "googletagservices.com", "adservice.google.com", "pagead2.googlesyndication.com",
+    "2mdn.net", "admob.com", "app-measurement.com", "facebook.net", "connect.facebook.net",
+    "an.facebook.com", "analytics.twitter.com", "ads-twitter.com", "ads-api.twitter.com", "static.ads-twitter.com",
+    "ads.linkedin.com", "px.ads.linkedin.com", "snap.licdn.com", "bat.bing.com", "clarity.ms", "ads.yahoo.com",
+    "analytics.yahoo.com", "ads.tiktok.com", "analytics.tiktok.com", "business-api.tiktok.com", "ads.pinterest.com",
+    "ct.pinterest.com", "log.pinterest.com", "analytics.snapchat.com", "sc-static.net", "tr.snapchat.com",
+    "amazon-adsystem.com", "aax.amazon-adsystem.com", "advertising.amazon.com",
+    // Ad exchanges and networks
+    "criteo.com", "criteo.net", "taboola.com", "outbrain.com", "adnxs.com", "adnxs-simple.com",
+    "rubiconproject.com", "pubmatic.com", "openx.net", "openx.com", "advertising.com", "adsrvr.org",
+    "casalemedia.com", "indexww.com", "zedo.com", "adform.net", "smartadserver.com", "contextweb.com",
+    "lijit.com", "sovrn.com", "sharethrough.com", "triplelift.com", "33across.com", "media.net",
+    "revcontent.com", "mgid.com", "adroll.com", "perfectaudience.com", "bidswitch.net", "sitescout.com",
+    "yieldmo.com", "gumgum.com", "teads.tv", "moatads.com", "adsafeprotected.com", "doubleverify.com",
+    "serving-sys.com", "flashtalking.com", "mathtag.com", "turn.com", "demdex.net", "everesttech.net",
+    "krxd.net", "bluekai.com", "exelator.com", "eyeota.net", "tapad.com", "agkn.com", "rlcdn.com",
+    "liadm.com", "id5-sync.com", "pippio.com", "adgrx.com", "adtechus.com", "adtech.de", "innovid.com",
+    "spotxchange.com", "springserve.com", "freewheel.tv", "tremorhub.com", "undertone.com", "inmobi.com",
+    "applovin.com", "unityads.unity3d.com", "supersonicads.com", "ironsrc.com", "vungle.com",
+    "chartboost.com", "adcolony.com", "mopub.com", "smaato.net", "tapjoy.com",
+    // Analytics, session replay, tag managers
+    "scorecardresearch.com", "quantserve.com", "quantcount.com", "hotjar.com", "hotjar.io", "mixpanel.com",
+    "segment.io", "segment.com", "amplitude.com", "heap.io", "heapanalytics.com", "fullstory.com", "logrocket.com",
+    "mouseflow.com", "crazyegg.com", "luckyorange.com", "inspectlet.com", "smartlook.com", "chartbeat.com",
+    "chartbeat.net", "newrelic.com", "nr-data.net", "optimizely.com", "vwo.com", "branch.io", "adjust.com",
+    "appsflyer.com", "kochava.com", "singular.net", "tealiumiq.com", "tiqcdn.com", "ensighten.com", "omtrdc.net",
+    "2o7.net", "adobedtm.com", "demandbase.com", "6sc.co", "bounceexchange.com", "bouncex.net", "yotpo.com",
+    "kissmetrics.com", "getclicky.com", "statcounter.com", "hs-analytics.net",     "pardot.com", "marketo.net", "mktoresp.com", "munchkin.marketo.net",
 ];
+
+/// Sites that trust the real browser string and flag a spoofed one as a bot (e.g. Google's "are you a robot" page).
+pub fn skip_ua_spoof(host: &str) -> bool {
+    let h = host.trim_end_matches('.').to_ascii_lowercase();
+    ["google.com", "youtube.com", "gstatic.com", "apple.com", "icloud.com"].iter().any(|d| h == *d || h.ends_with(&format!(".{d}")))
+        || h.split('.').any(|part| part == "google")
+}
 
 pub static BLOCKED_COUNT: AtomicU64 = AtomicU64::new(0);
 
@@ -125,6 +154,24 @@ pub const POLICIES: &[&str] = &["ask", "allow", "block"];
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn google_and_apple_never_get_a_spoofed_browser_string() {
+        assert!(skip_ua_spoof("www.google.com"));
+        assert!(skip_ua_spoof("accounts.google.co.uk"));
+        assert!(skip_ua_spoof("youtube.com"));
+        assert!(!skip_ua_spoof("example.com"));
+        assert!(!skip_ua_spoof("notgoogle.com"));
+    }
+
+    #[test]
+    fn tracker_list_is_clean_and_matches_subdomains() {
+        assert!(TRACKER_HOSTS.iter().all(|h| !h.contains('/') && !h.contains(' ') && h.contains('.')));
+        assert!(is_tracker_host("securepubads.g.doubleclick.net"));
+        assert!(is_tracker_host("tr.snapchat.com"));
+        assert!(!is_tracker_host("notdoubleclick.net"));
+        assert!(!is_tracker_host("example.com"));
+    }
 
     fn n(s: &str) -> String {
         normalize_input(s, "duckduckgo").unwrap().to_string()

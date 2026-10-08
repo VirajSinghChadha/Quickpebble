@@ -67,14 +67,18 @@
   // APIs pages use to load them. Resources the HTML parser fetches before this runs cannot be stopped.
   const TRACKERS = __QP_TRACKERS__;
   const BLOCK = __QP_BLOCK__;
+  const STRICT = __QP_STRICT__;
   let blockedSince = 0;
   setInterval(() => { if (blockedSince) { const n = blockedSince; blockedSince = 0; invoke("qp_blocked", { count: n }); } }, 3000);
   const pageHost = location.hostname.toLowerCase();
+  const AD_PATH = /(^|\/)(ads?|adserver|adframe|adview|adsense|pagead|banners?|sponsored|prebid|popunder)(\/|\.|-|_|$)/i;
   const trackerUrl = (u) => {
     try {
       const h = new URL(String(u && u.url ? u.url : u), location.href).hostname.toLowerCase();
       if (h === pageHost || h.endsWith("." + pageHost) || pageHost.endsWith("." + h)) return false; // first party
-      return TRACKERS.some((t) => h === t || h.endsWith("." + t));
+      if (TRACKERS.some((t) => h === t || h.endsWith("." + t))) return true;
+      // Strict mode: third-party requests whose path looks like an ad call (/ads/, /adserver/, /pagead/, /banner…).
+      return STRICT && AD_PATH.test(new URL(String(u && u.url ? u.url : u), location.href).pathname);
     } catch (_) { return false; }
   };
   if (BLOCK) {
@@ -107,7 +111,10 @@
       }
     }).observe(document, { childList: true, subtree: true });
     const css = document.createElement("style");
-    css.textContent = "ins.adsbygoogle,.adsbygoogle,[id^='google_ads_'],[id^='div-gpt-ad'],.OUTBRAIN,#taboola-below-article-thumbnails,iframe[src*='doubleclick.net']{display:none!important}";
+    const BASE_HIDE = "ins.adsbygoogle,.adsbygoogle,[id^='google_ads_'],[id^='div-gpt-ad'],.OUTBRAIN,#taboola-below-article-thumbnails,iframe[src*='doubleclick.net'],iframe[src*='googlesyndication.com'],[id^='taboola-'],[class*='taboola'],[data-ad-slot],[data-google-query-id]";
+    // Strict mode also hides common ad containers by name. Patterns are specific to avoid hiding real content.
+    const STRICT_HIDE = "[id^='ad-'],[id^='ads-'],[id$='-ad'],[id$='_ad'],[id*='advert'],[class~='ad'],[class~='ads'],[class~='advert'],[class~='advertisement'],[class*='ad-banner'],[class*='ad-container'],[class*='ad-slot'],[class*='ad-wrapper'],[class*='adsbox'],[class*='sponsored-'],[class*='sponsor-'],[class*='-promoted'],[aria-label='advertisement' i],[aria-label='Advertisement'],[data-testid*='ad-'],[data-ad],[data-ad-unit],[data-adunit],[data-ad-client],.ad-unit,.ad-block,.ad-box,.banner-ad,.top-ad,.sidebar-ad,.sticky-ad,.leaderboard,.native-ad,.mrec,.interstitial-ad,.popup-ad,.cookie-ad,#ad,#ads,#advert,#adbox,#banner-ad";
+    css.textContent = (BASE_HIDE + (STRICT ? "," + STRICT_HIDE : "")) + "{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important}";
     const addCss = () => (document.head || document.documentElement).appendChild(css);
     document.head || document.documentElement ? addCss() : document.addEventListener("DOMContentLoaded", addCss, { once: true });
   }

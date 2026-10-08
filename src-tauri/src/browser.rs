@@ -198,12 +198,14 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .filter(|p| p.policy == "block")
         .map(|p| p.permission)
         .collect();
+    let host = url.host_str().unwrap_or_default().to_string();
     let profile = url.host_str().map(|h| site_profile(app, h)).unwrap_or_default();
     let block_trackers = profile.trackers.unwrap_or_else(|| setting(app, "block_trackers").as_deref() != Some("false"));
     let script = INJECT
         .replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()))
         .replace("__QP_TRACKERS__", &serde_json::to_string(security::TRACKER_HOSTS).unwrap_or_else(|_| "[]".into()))
-        .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" });
+        .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" })
+        .replace("__QP_STRICT__", if setting(app, "block_level").as_deref() == Some("strict") { "true" } else { "false" });
     let (pos, size) = content_rect(window);
     let nav_app = app.clone();
     let nav_label = label.to_string();
@@ -213,7 +215,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .incognito(private);
     // macOS renders with WebKit, and some sites refuse anything that doesn't say it's Chrome.
     #[cfg(target_os = "macos")]
-    {
+    if setting(app, "chrome_ua").as_deref() != Some("false") && !security::skip_ua_spoof(&host) {
         builder = builder.user_agent(CHROME_UA);
     }
     // Content scripts of enabled Chrome extensions (not injected into private windows).
@@ -702,6 +704,8 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "chrome_ua",
+    "block_level",
     "site_profiles",
     "screen_permissions",
     "screen_model",

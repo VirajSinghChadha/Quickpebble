@@ -24,13 +24,15 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
-  const { theme, themePreset, setThemePreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
+  const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [engine, setEngine] = useState("google");
+  const [blockLevel, setBlockLevel] = useState("standard");
+  const [chromeUa, setChromeUa] = useState(true);
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -49,6 +51,8 @@ export function SettingsPanel() {
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
       setEngine(s.search_engine ?? "google");
+      setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
+      setChromeUa(s.chrome_ua !== "false");
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
@@ -82,10 +86,17 @@ export function SettingsPanel() {
               <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
             </select>
           </Row>
-          <Row label="Color theme">
-            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Color theme">
+          <Row label="Light mode theme" hint="Each mode keeps its own colors. Switch Theme above to see them.">
+            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Light mode color theme">
               {PRESETS.map((p) => (
-                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={themePreset === p.id} aria-label={p.label} title={p.label} onClick={() => setThemePreset(p.id)} />
+                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetLight === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("light", p.id)} />
+              ))}
+            </div>
+          </Row>
+          <Row label="Dark mode theme">
+            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Dark mode color theme">
+              {PRESETS.map((p) => (
+                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetDark === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("dark", p.id)} />
               ))}
             </div>
           </Row>
@@ -103,6 +114,14 @@ export function SettingsPanel() {
 
         <div className="py-2">
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Browsing</h3>
+          <Row label="Ad &amp; tracker blocking" hint="Standard blocks known ad and tracking servers. Strict also blocks ad-looking requests and hides ad boxes, which can occasionally break a page. Per-site exceptions: This site panel.">
+            <select className={selectCls} value={blockLevel} onChange={(e) => { setBlockLevel(e.target.value); void save("block_level", e.target.value); void save("block_trackers", String(e.target.value !== "off")); }} aria-label="Ad and tracker blocking">
+              <option value="off">Off</option><option value="standard">Standard</option><option value="strict">Strict</option>
+            </select>
+          </Row>
+          <Row label="Identify as Chrome" hint="Helps sites that refuse other browsers. Google, YouTube and Apple always see the real browser, because they treat a fake one as a bot and show &quot;are you a robot&quot; checks. Applies to new tabs.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={chromeUa} onChange={(e) => { setChromeUa(e.target.checked); void save("chrome_ua", String(e.target.checked)); }} aria-label="Identify as Chrome" />
+          </Row>
           <Row label="Bookmarks bar" hint="Shortcut: ⌘⇧B">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={bookmarksBar} onChange={toggleBookmarksBar} aria-label="Bookmarks bar" />
           </Row>

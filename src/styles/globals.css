@@ -135,3 +135,12 @@ input[type="checkbox"][role="switch"] { cursor: pointer; }
 .swatch:hover { transform: scale(1.1); }
 .swatch[aria-pressed="true"] { border-color: var(--color-text-primary); box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { [role="dialog"], [role="alertdialog"], .answer-card, [role="alert"] { animation: none; } .swatch:hover { transform: none; } }
+
+/* Duotone themes: two accent colors and a soft gradient behind the new-tab page. */
+html[data-preset="aurora"] { --color-primary: #0d9488; --color-bg: #f0fdfa; --color-surface: #ffffff; --color-surface-secondary: #ccfbf1; --color-border: #99f6e4; --color-accent: #7c3aed; --qp-gradient: linear-gradient(135deg,#ccfbf1 0%,#ede9fe 100%); }
+html.dark[data-preset="aurora"] { --color-primary: #2dd4bf; --color-bg: #0a1a1a; --color-surface: #102626; --color-surface-secondary: #173534; --color-border: #245250; --color-accent: #a78bfa; --qp-gradient: linear-gradient(135deg,#0f2f2c 0%,#1c1538 100%); }
+html[data-preset="sunrise"] { --color-primary: #f97316; --color-bg: #fff7ed; --color-surface: #ffffff; --color-surface-secondary: #ffedd5; --color-border: #fed7aa; --color-accent: #ec4899; --qp-gradient: linear-gradient(135deg,#ffedd5 0%,#fce7f3 100%); }
+html.dark[data-preset="sunrise"] { --color-primary: #fb923c; --color-bg: #1d130d; --color-surface: #2b1c12; --color-surface-secondary: #3a2618; --color-border: #5c3b25; --color-accent: #f472b6; --qp-gradient: linear-gradient(135deg,#34190e 0%,#3a1329 100%); }
+html[data-preset="twilight"] { --color-primary: #4f46e5; --color-bg: #eef2ff; --color-surface: #ffffff; --color-surface-secondary: #e0e7ff; --color-border: #c7d2fe; --color-accent: #06b6d4; --qp-gradient: linear-gradient(135deg,#e0e7ff 0%,#cffafe 100%); }
+html.dark[data-preset="twilight"] { --color-primary: #818cf8; --color-bg: #0f1020; --color-surface: #171a33; --color-surface-secondary: #20254a; --color-border: #323a6b; --color-accent: #22d3ee; --qp-gradient: linear-gradient(135deg,#181a3d 0%,#0b2a35 100%); }
+.newtab { background-image: var(--qp-gradient, radial-gradient(ellipse at 50% 15%, color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 65%)); }

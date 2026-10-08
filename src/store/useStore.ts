@@ -68,8 +68,9 @@ interface State {
   menuOpen: boolean;
   suggestOpen: boolean;
   theme: Theme;
-  themePreset: string;
-  setThemePreset: (p: string) => void;
+  presetLight: string;
+  presetDark: string;
+  setPreset: (mode: "light" | "dark", p: string) => void;
   layout: Layout;
   aiAutocomplete: boolean;
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
@@ -152,10 +153,11 @@ export const useStore = create<State>((set, get) => ({
   menuOpen: false,
   suggestOpen: false,
   theme: (safeGet("qp.theme") as Theme) || "system",
-  themePreset: safeGet("qp.preset") || "pebble",
-  setThemePreset: (themePreset) => {
-    safeSet("qp.preset", themePreset);
-    set({ themePreset });
+  presetLight: safeGet("qp.presetLight") || safeGet("qp.preset") || "pebble",
+  presetDark: safeGet("qp.presetDark") || safeGet("qp.preset") || "pebble",
+  setPreset: (mode, preset) => {
+    safeSet(mode === "light" ? "qp.presetLight" : "qp.presetDark", preset);
+    set(mode === "light" ? { presetLight: preset } : { presetDark: preset });
   },
   layout: (safeGet("qp.layout") as Layout) || "classic",
   aiAutocomplete: safeGet("qp.aiAutocomplete") === "1",
