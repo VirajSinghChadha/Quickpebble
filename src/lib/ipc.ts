@@ -83,7 +83,7 @@ export interface PageSnapshot {
   text: string;
   elements: { i: number; tag: string; type?: string; label: string; href?: string; value?: string; disabled?: boolean; offscreen?: boolean }[];
 }
-export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press";
+export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text";
 export interface ExtensionInfo {
   id: string;
   name: string;

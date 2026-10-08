@@ -217,6 +217,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()))
         .replace("__QP_TRACKERS__", &serde_json::to_string(security::TRACKER_HOSTS).unwrap_or_else(|_| "[]".into()))
         .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" })
+        .replace("__QP_COOKIES__", if setting(app, "cookie_banners").as_deref() == Some("false") { "false" } else { "true" })
         .replace("__QP_STRICT__", if setting(app, "block_level").as_deref() == Some("strict") { "true" } else { "false" });
     let (pos, size) = content_rect(window);
     let nav_app = app.clone();
@@ -716,6 +717,7 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "cookie_banners",
     "chrome_ua",
     "block_level",
     "site_profiles",
@@ -1114,7 +1116,7 @@ pub async fn ai_chat(db: State<'_, Db>, req: ChatRequest) -> Result<String, Stri
     daemon::chat(&cfg, &req.system, &req.messages, req.json.unwrap_or(false)).await
 }
 
-const AGENT_OPS: &[&str] = &["snapshot", "click", "type", "select", "scroll", "press"];
+const AGENT_OPS: &[&str] = &["snapshot", "click", "type", "select", "scroll", "press", "collect_text", "apply_text", "restore_text"];
 
 /// Runs one agent operation inside a tab and waits for the page script to report back.
 #[tauri::command]

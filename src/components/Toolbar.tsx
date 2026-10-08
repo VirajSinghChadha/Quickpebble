@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, KeyRound, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, KeyRound, Languages, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
 import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
@@ -42,6 +42,7 @@ export function Toolbar() {
         <Bookmark size={16} fill={tab.bookmarked ? "currentColor" : "none"} />
       </IconButton>
       <IconButton label={`Reader mode (${modKey}⇧R)`} disabled={!hasPage} onClick={() => void ipc.tabReader(tab.id)}><BookOpen size={16} /></IconButton>
+      <IconButton label="Translate this page" disabled={!hasPage} active={sidebar === "site"} onClick={() => useStore.getState().toggleSidebar("site")}><Languages size={16} /></IconButton>
       <IconButton label="Summarize this page" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
 
       <span aria-hidden className="mx-1 h-5 w-px bg-border" />

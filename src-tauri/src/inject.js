@@ -143,6 +143,42 @@
     if (f && f.querySelector("input[type=password]")) setTimeout(() => seenLogin(f), 0); // sites that log in with JS and skip "submit"
   }, true);
 
+  // ---- cookie banners ----------------------------------------------------------
+  // Clicks "Reject / Decline / Necessary only" on consent banners. It never clicks "Accept", and only touches
+  // buttons that sit inside something that looks like a consent banner.
+  const COOKIES = __QP_COOKIES__;
+  // <cookie-matchers>
+  const REJECT_RE = /^(reject( all| additional| non-?essential| optional)?( cookies)?|decline( all| optional)?( cookies)?|deny( all)?( cookies)?|refuse( all)?( cookies)?|disagree|i do not accept|do not accept|no,? thanks|no thank you|(use |allow |accept |continue with )?(only )?(strictly )?(necessary|essential|required)( cookies)?( only)?|continue without (accepting|agreeing)|(save|confirm) (my )?(choices|preferences) ?(only necessary)?)$/i;
+  const ACCEPT_ALL_RE = /(accept|allow|agree( to)?|consent( to)?) (all|everything)|^(accept|agree|ok|okay|got it|i agree|i accept)( cookies)?$/i;
+  const CONSENT_RE = /cookie|consent|gdpr|ccpa|cmp|onetrust|cookiebot|didomi|usercentrics|osano|truste|qc-cmp|sp_message|cookieyes|cky-|cc-window|cookieconsent|privacy-?(banner|notice|center)/i;
+  const normLabel = (t) => String(t || "").replace(/\s+/g, " ").replace(/[.!:\u2192>\u203a]+$/g, "").trim().toLowerCase();
+  const isRejectLabel = (t) => { const n = normLabel(t); return n.length > 0 && n.length <= 60 && REJECT_RE.test(n) && !ACCEPT_ALL_RE.test(n); };
+  const isConsentAttr = (v) => CONSENT_RE.test(String(v || ""));
+  // </cookie-matchers>
+  if (COOKIES) {
+    const KNOWN = ["#onetrust-reject-all-handler", ".ot-pc-refuse-all-handler", "#CybotCookiebotDialogBodyButtonDecline", "#didomi-notice-disagree-button", ".didomi-continue-without-agreeing", "button.osano-cm-denyAll", "[data-testid='uc-deny-all-button']", ".cky-btn-reject", "button#cookie-reject", ".cc-deny"];
+    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden"; };
+    const inConsent = (el) => {
+      for (let n = el, d = 0; n && n.nodeType === 1 && d < 9; n = n.parentElement, d++) {
+        if (isConsentAttr(n.id) || isConsentAttr(typeof n.className === "string" ? n.className : "") || isConsentAttr(n.getAttribute("aria-label"))) return true;
+        if ((n.getAttribute("role") === "dialog" || n.getAttribute("role") === "alertdialog") && /cookie/i.test(n.textContent || "")) return true;
+      }
+      return false;
+    };
+    let clicks = 0, tries = 0;
+    const sweep = () => {
+      if (clicks >= 3) return;
+      try {
+        for (const sel of KNOWN) { const el = document.querySelector(sel); if (el && shown(el)) { el.click(); clicks++; return; } }
+        for (const el of document.querySelectorAll("button, a[role=button], [role=button], input[type=button], input[type=submit]")) {
+          if (!shown(el)) continue;
+          if (isRejectLabel(el.value || el.getAttribute("aria-label") || el.textContent) && inConsent(el)) { el.click(); clicks++; return; }
+        }
+      } catch (_) { /* never break the page */ }
+    };
+    const timer = setInterval(() => { sweep(); if (++tries > 24 || clicks >= 3) clearInterval(timer); }, 500); // first 12 seconds
+  }
+
   // ---- reader mode ---------------------------------------------------------
   const READER_BAD = "script,style,noscript,nav,aside,footer,form,iframe,button,svg,canvas,video,audio,object,embed,select,input,textarea,[role=navigation],[role=banner],[aria-hidden=true]";
   const READER_OK = new Set("h1 h2 h3 h4 h5 h6 p ul ol li blockquote pre code em strong b i a img figure figcaption br hr table thead tbody tr th td sup sub".split(" "));
@@ -297,6 +333,37 @@
       const o = Array.from(el.options).find((o) => o.value === value || clean(o.text) === value);
       if (!o) return { error: "Option not found. Options: " + Array.from(el.options).map((o) => clean(o.text)).join(" | ").slice(0, 300) };
       el.value = o.value; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); return { ok: true };
+    },
+    // Translate: collect visible text nodes, apply translated text by index, restore the original.
+    collect_text() {
+      const SKIP = "script,style,noscript,code,pre,textarea,input,select,svg,canvas,[contenteditable],[translate=no],.notranslate,[aria-hidden=true]";
+      const nodes = [], items = []; let total = 0;
+      const w = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n && items.length < 700 && total < 26000; n = w.nextNode()) {
+        const t = n.nodeValue.replace(/\s+/g, " ").trim();
+        const el = n.parentElement;
+        if (t.length < 2 || !/\p{L}/u.test(t) || !el || el.closest(SKIP) || !(el.offsetWidth || el.offsetHeight || el.getClientRects().length)) continue;
+        nodes.push(n); items.push([items.length, t.slice(0, 1200)]); total += t.length;
+      }
+      window.__qpTx = { nodes, orig: new Map(window.__qpTx ? window.__qpTx.orig : []) };
+      return { items, total, lang: document.documentElement.lang || "" };
+    },
+    apply_text({ pairs }) {
+      const tx = window.__qpTx; if (!tx || !Array.isArray(pairs)) return { error: "Nothing collected" };
+      let n = 0;
+      for (const p of pairs) {
+        const node = tx.nodes[p[0]]; const text = p[1];
+        if (!node || !node.isConnected || typeof text !== "string" || text.length > 2400) continue;
+        if (!tx.orig.has(node)) tx.orig.set(node, node.nodeValue);
+        const lead = (node.nodeValue.match(/^\s*/) || [""])[0], trail = (node.nodeValue.match(/\s*$/) || [""])[0];
+        node.nodeValue = lead + text + trail; n++;
+      }
+      return { applied: n };
+    },
+    restore_text() {
+      const tx = window.__qpTx; if (!tx) return { restored: 0 };
+      let n = 0; for (const [node, v] of tx.orig) { if (node.isConnected) { node.nodeValue = v; n++; } }
+      tx.orig.clear(); return { restored: n };
     },
     scroll({ direction }) {
       const d = direction === "up" ? -1 : 1; scrollBy({ top: d * innerHeight * 0.8, behavior: "instant" }); return { ok: true, y: Math.round(scrollY) };
