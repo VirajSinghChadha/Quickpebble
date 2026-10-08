@@ -41,6 +41,7 @@ export interface Bookmark {
   url: string;
   title: string;
   created_at: number;
+  folder: string;
 }
 export interface SitePermission {
   host: string;
@@ -82,7 +83,7 @@ export interface PageSnapshot {
   text: string;
   elements: { i: number; tag: string; type?: string; label: string; href?: string; value?: string; disabled?: boolean; offscreen?: boolean }[];
 }
-export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press";
+export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text";
 export interface ExtensionInfo {
   id: string;
   name: string;
@@ -122,6 +123,9 @@ export const ipc = {
   historySearch: (query: string, limit = 50) => call<HistoryEntry[]>("history_search", { query, limit }, []),
   historyClear: () => call<void>("history_clear"),
   bookmarkToggle: (url: string, title: string) => call<boolean>("bookmark_toggle", { url, title }, false),
+  bookmarkSetFolder: (url: string, folder: string) => call<void>("bookmark_set_folder", { url, folder }),
+  bookmarksImportChrome: () => call<number>("bookmarks_import_chrome", undefined, 0),
+  bookmarksImportFile: () => call<number | null>("bookmarks_import_file", undefined, null),
   bookmarkList: (query = "") => call<Bookmark[]>("bookmark_list", { query }, []),
   suggest: (query: string) => call<Suggestion[]>("suggest", { query }, []),
   settingsGet: () => call<Record<string, string>>("settings_get", undefined, {}),
@@ -154,7 +158,7 @@ export const ipc = {
     return call<void>("update_install", { progress });
   },
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
-  tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
+  tabZoom: (id: string, action: "in" | "out" | "reset" | `set:${number}`) => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),
   researchStatus: () => call<boolean>("research_status", undefined, false),
   researchKeySet: async (key: string) => {
@@ -169,12 +173,42 @@ export const ipc = {
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
     call<T>("agent_exec", { tabId, op, args }),
+  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string) => {
+    if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
+    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText });
+  },
+  screenVerify: async (goal: string, history: string[], pending: string, pageText?: string) => {
+    if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
+    return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
+  },
+  weatherSearch: (query: string) => call<Place[]>("weather_search", { query }),
+  weatherFetch: (lat: number, lon: number, fahrenheit: boolean) => call<Weather>("weather_fetch", { lat, lon, fahrenheit }),
+  newsFetch: (source: string, count = 5) => call<Headline[]>("news_fetch", { source, count }),
+  downloadsList: () => call<DownloadItem[]>("downloads_list", undefined, []),
+  downloadOpen: (id: number) => call<void>("download_open", { id }),
+  downloadReveal: (id: number) => call<void>("download_reveal", { id }),
+  downloadRemove: (id: number) => call<void>("download_remove", { id }),
+  downloadsClearFinished: () => call<void>("downloads_clear_finished"),
+  vaultStatus: () => call<{ exists: boolean; unlocked: boolean }>("vault_status", undefined, { exists: false, unlocked: false }),
+  vaultCreate: (master: string) => call<void>("vault_create", { master }),
+  vaultUnlock: (master: string) => call<void>("vault_unlock", { master }),
+  vaultLock: () => call<void>("vault_lock"),
+  vaultList: (query = "") => call<VaultEntry[]>("vault_list", { query }, []),
+  vaultReveal: (id: number) => call<string>("vault_reveal", { id }),
+  vaultSave: (host: string, username: string, password: string) => call<number>("vault_save", { host, username, password }),
+  vaultImportFile: () => call<{ added: number; updated: number; unchanged: number; skipped: number } | null>("vault_import_file", undefined, null),
+  vaultDelete: (id: number) => call<void>("vault_delete", { id }),
+  vaultFill: (tabId: string, id: number) => call<void>("vault_fill", { tabId, id }),
+  vaultSavePending: (tabId: string) => call<number>("vault_save_pending", { tabId }),
+  vaultDismissPending: (tabId: string, never: boolean) => call<void>("vault_dismiss_pending", { tabId, never }),
+  geminiModels: () => call<string[]>("gemini_models", undefined, []),
+  screenAct: (action: ScreenAction) => call<{ ok: boolean; changed: boolean | null }>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
   extensionInstallStore: (input: string) => call<ExtensionInfo>("extension_install_store", { input }),
   extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
   extensionSetEnabled: (id: string, enabled: boolean) => call<void>("extension_set_enabled", { id, enabled }),
   extensionRemove: (id: string) => call<void>("extension_remove", { id }),
-  windowControl: (action: "minimize" | "maximize" | "close") => call<void>("window_control", { action }),
+  windowControl: (action: "minimize" | "maximize" | "close" | "restore") => call<void>("window_control", { action }),
 };
 
 export async function onTabEvent(cb: (e: TabEvent) => void): Promise<UnlistenFn> {
@@ -198,4 +232,85 @@ export async function onHttpsFallback(cb: (e: { id: string; url: string }) => vo
 export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   return listen<UpdateInfo>("qp://update", (e) => cb(e.payload));
+}
+
+/** Backend half of the agent's reply: executed exactly as given. `cell` is a grid label such as "M7". */
+export interface ScreenAction {
+  type: "click" | "double_click" | "right_click" | "type" | "key" | "scroll" | "wait" | "ask" | "done";
+  cell?: string;
+  fx?: number;
+  fy?: number;
+  text?: string;
+  key?: string;
+  direction?: "up" | "down";
+  amount?: number;
+  category?: string; // id of one of the site's permissions, or "none"
+  ax?: number; // exact point (fraction of the screen) found by the zoomed second look; sent back unchanged
+  ay?: number;
+  risk?: "low" | "high";
+}
+
+/** User half of the agent's reply: how it got there, and the message or final answer. Never executed. */
+export interface ScreenUser {
+  thinking: string;
+  message: string;
+}
+
+export interface ScreenResponse {
+  user: ScreenUser;
+  action: ScreenAction;
+}
+
+export interface VaultEntry {
+  id: number;
+  host: string;
+  username: string;
+  created_at: number;
+}
+
+/** A login form was submitted in a tab. The password stays in the browser until the person agrees to save it. */
+export async function onLoginSeen(cb: (e: { id: string; host: string; username: string }) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  const label = windowLabel();
+  return listen<{ window: string; id: string; host: string; username: string }>("qp://login-seen", (e) => e.payload.window === label && cb(e.payload));
+}
+
+export interface DownloadItem {
+  id: number;
+  name: string;
+  url: string;
+  host: string;
+  path: string;
+  state: "active" | "done" | "failed";
+  started: number;
+  finished: number | null;
+  size: number | null;
+  can_open: boolean;
+}
+
+export async function onDownloads(cb: (items: DownloadItem[]) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<DownloadItem[]>("qp://downloads", (e) => cb(e.payload));
+}
+
+export interface Place {
+  name: string;
+  region: string;
+  country: string;
+  lat: number;
+  lon: number;
+}
+export interface Weather {
+  temp: number;
+  feels: number;
+  code: number;
+  is_day: boolean;
+  high: number;
+  low: number;
+  rain_chance: number | null;
+  wind: number;
+}
+export interface Headline {
+  title: string;
+  url: string;
 }

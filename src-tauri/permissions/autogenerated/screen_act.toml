@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-screen-act"
+description = "Enables the screen_act command without any pre-configured scope."
+commands.allow = ["screen_act"]
+
+[[permission]]
+identifier = "deny-screen-act"
+description = "Denies the screen_act command without any pre-configured scope."
+commands.deny = ["screen_act"]

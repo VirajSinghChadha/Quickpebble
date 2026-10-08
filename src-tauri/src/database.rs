@@ -17,6 +17,7 @@ pub struct Bookmark {
     pub url: String,
     pub title: String,
     pub created_at: i64,
+    pub folder: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -62,11 +63,21 @@ impl Db {
              CREATE INDEX IF NOT EXISTS idx_history_visited ON history(visited_at DESC);
              CREATE TABLE IF NOT EXISTS bookmarks (
                url TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS vault_meta (k TEXT PRIMARY KEY, v BLOB NOT NULL);
+             CREATE TABLE IF NOT EXISTS vault_items (
+               id INTEGER PRIMARY KEY AUTOINCREMENT, host TEXT NOT NULL, username TEXT NOT NULL,
+               blob BLOB NOT NULL, created_at INTEGER NOT NULL, UNIQUE(host, username));
+             CREATE TABLE IF NOT EXISTS downloads (
+               id INTEGER PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, path TEXT NOT NULL,
+               ok INTEGER NOT NULL, started INTEGER NOT NULL, finished INTEGER NOT NULL, size INTEGER);
+             CREATE TABLE IF NOT EXISTS vault_never (host TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_permissions (
                host TEXT NOT NULL, permission TEXT NOT NULL, policy TEXT NOT NULL,
                PRIMARY KEY (host, permission));",
         )?;
+        // Bookmarks gained folders after v1; add the column to existing databases (error = already there).
+        let _ = conn.execute("ALTER TABLE bookmarks ADD COLUMN folder TEXT NOT NULL DEFAULT ''", []);
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -124,15 +135,112 @@ impl Db {
         Ok(true)
     }
 
+    pub fn vault_meta_get(&self, k: &str) -> Option<Vec<u8>> {
+        self.lock().query_row("SELECT v FROM vault_meta WHERE k = ?1", params![k], |r| r.get(0)).ok()
+    }
+
+    pub fn vault_meta_set(&self, k: &str, v: &[u8]) -> rusqlite::Result<()> {
+        self.lock().execute("INSERT INTO vault_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v", params![k, v])?;
+        Ok(())
+    }
+
+    /// Adds a login, or replaces the password of an existing (host, username) pair.
+    pub fn vault_put(&self, host: &str, username: &str, blob: &[u8]) -> rusqlite::Result<i64> {
+        let conn = self.lock();
+        conn.execute(
+            "INSERT INTO vault_items (host, username, blob, created_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(host, username) DO UPDATE SET blob = excluded.blob",
+            params![host, username, blob, now()],
+        )?;
+        conn.query_row("SELECT id FROM vault_items WHERE host = ?1 AND username = ?2", params![host, username], |r| r.get(0))
+    }
+
+    pub fn vault_list(&self, q: &str) -> rusqlite::Result<Vec<(i64, String, String, i64)>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, host, username, created_at FROM vault_items
+             WHERE host LIKE ?1 ESCAPE '\\' OR username LIKE ?1 ESCAPE '\\' ORDER BY host, username",
+        )?;
+        let rows = stmt.query_map(params![like_pattern(q)], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        rows.collect()
+    }
+
+    pub fn vault_item(&self, id: i64) -> Option<(String, String, Vec<u8>)> {
+        self.lock().query_row("SELECT host, username, blob FROM vault_items WHERE id = ?1", params![id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).ok()
+    }
+
+    pub fn vault_delete(&self, id: i64) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM vault_items WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn downloads_put(&self, id: u64, name: &str, url: &str, path: &str, ok: bool, started: i64, finished: i64, size: Option<u64>) -> rusqlite::Result<()> {
+        self.lock().execute(
+            "INSERT OR REPLACE INTO downloads (id, name, url, path, ok, started, finished, size) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![id as i64, name, url, path, ok as i64, started, finished, size.map(|s| s as i64)],
+        )?;
+        Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn downloads_recent(&self, limit: usize) -> Vec<(u64, String, String, String, bool, i64, i64, Option<u64>)> {
+        let conn = self.lock();
+        let Ok(mut stmt) = conn.prepare("SELECT id, name, url, path, ok, started, finished, size FROM downloads ORDER BY id DESC LIMIT ?1") else { return vec![] };
+        let rows = stmt.query_map(params![limit as i64], |r| {
+            Ok((r.get::<_, i64>(0)? as u64, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, i64>(4)? != 0, r.get(5)?, r.get(6)?, r.get::<_, Option<i64>>(7)?.map(|s| s as u64)))
+        });
+        rows.map(|r| r.flatten().collect()).unwrap_or_default()
+    }
+
+    pub fn downloads_delete(&self, id: u64) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM downloads WHERE id = ?1", params![id as i64])?;
+        Ok(())
+    }
+
+    pub fn downloads_clear(&self) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM downloads", [])?;
+        Ok(())
+    }
+
+    pub fn vault_never_add(&self, host: &str) -> rusqlite::Result<()> {
+        self.lock().execute("INSERT OR IGNORE INTO vault_never (host) VALUES (?1)", params![host])?;
+        Ok(())
+    }
+
+    pub fn vault_never_has(&self, host: &str) -> bool {
+        self.lock().query_row("SELECT 1 FROM vault_never WHERE host = ?1", params![host], |_| Ok(())).is_ok()
+    }
+
+    pub fn set_bookmark_folder(&self, url: &str, folder: &str) -> rusqlite::Result<()> {
+        self.lock().execute("UPDATE bookmarks SET folder = ?2 WHERE url = ?1", params![url, folder])?;
+        Ok(())
+    }
+
+    /// Adds bookmarks that are not already saved; returns how many were new.
+    pub fn import_bookmarks(&self, items: &[(String, String, String)]) -> rusqlite::Result<usize> {
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        let mut added = 0;
+        for (url, title, folder) in items {
+            added += tx.execute(
+                "INSERT OR IGNORE INTO bookmarks (url, title, created_at, folder) VALUES (?1, ?2, ?3, ?4)",
+                params![url, title, now(), folder],
+            )?;
+        }
+        tx.commit()?;
+        Ok(added)
+    }
+
     pub fn bookmarks(&self, q: &str, limit: usize) -> rusqlite::Result<Vec<Bookmark>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT url, title, created_at FROM bookmarks
+            "SELECT url, title, created_at, folder FROM bookmarks
              WHERE url LIKE ?1 ESCAPE '\\' OR title LIKE ?1 ESCAPE '\\'
              ORDER BY created_at DESC LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![like_pattern(q), limit as i64], |r| {
-            Ok(Bookmark { url: r.get(0)?, title: r.get(1)?, created_at: r.get(2)? })
+            Ok(Bookmark { url: r.get(0)?, title: r.get(1)?, created_at: r.get(2)?, folder: r.get(3)? })
         })?;
         rows.collect()
     }
@@ -208,6 +316,35 @@ mod tests {
         let db = Db::memory().unwrap();
         db.record_visit("https://a.com/", "A").unwrap();
         assert!(db.search_history("%", 5).unwrap().is_empty());
+    }
+
+    #[test]
+    fn bookmark_folders_and_import_dedupe() {
+        let db = Db::memory().unwrap();
+        let items = vec![
+            ("https://a.com/".to_string(), "A".to_string(), "Work".to_string()),
+            ("https://b.com/".to_string(), "B".to_string(), String::new()),
+        ];
+        assert_eq!(db.import_bookmarks(&items).unwrap(), 2);
+        assert_eq!(db.import_bookmarks(&items).unwrap(), 0);
+        db.set_bookmark_folder("https://b.com/", "School").unwrap();
+        let all = db.bookmarks("", 10).unwrap();
+        assert_eq!(all.iter().find(|b| b.url == "https://b.com/").unwrap().folder, "School");
+    }
+
+    #[test]
+    fn downloads_persist_and_clear() {
+        let db = Db::memory().unwrap();
+        db.downloads_put(1, "a.pdf", "https://x.com/a.pdf", "/d/a.pdf", true, 10, 12, Some(99)).unwrap();
+        db.downloads_put(2, "b.zip", "https://x.com/b.zip", "/d/b.zip", false, 11, 13, None).unwrap();
+        let rows = db.downloads_recent(10);
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].0, rows[0].4), (2, false));
+        assert_eq!(rows[1].7, Some(99));
+        db.downloads_delete(2).unwrap();
+        assert_eq!(db.downloads_recent(10).len(), 1);
+        db.downloads_clear().unwrap();
+        assert!(db.downloads_recent(10).is_empty());
     }
 
     #[test]

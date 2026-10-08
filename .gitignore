@@ -7,3 +7,7 @@ src-tauri/gen/schemas
 .env
 .env.*
 !.env.example
+
+# Python agent
+__pycache__/
+.pytest_cache/

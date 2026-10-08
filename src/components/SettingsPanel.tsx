@@ -4,8 +4,10 @@ import { useUpdater } from "../store/useUpdater";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
+import { PRESETS } from "../hooks/useTheme";
+import { HomeOptions } from "./home/HomeOptions";
 
-const ENGINES = ["duckduckgo", "google", "bing", "brave"];
+const ENGINES = ["google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const PROVIDERS = ["ollama", "openai", "anthropic", "gemini"];
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -23,13 +25,17 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
-  const { theme, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
+  const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [engine, setEngine] = useState("duckduckgo");
+  const [engine, setEngine] = useState("google");
+  const [blockLevel, setBlockLevel] = useState("standard");
+  const [chromeUa, setChromeUa] = useState(true);
+  const [cookies, setCookies] = useState(true);
+  const [precision, setPrecision] = useState("high");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -42,12 +48,17 @@ export function SettingsPanel() {
   const { status, refresh } = useOllama(5000);
   const close = () => useStore.getState().setOverlay(null);
 
+  useEffect(() => void useStore.getState().loadHome(), []);
   useEffect(() => {
     void ipc.researchStatus().then(setResearchReady);
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
-      setEngine(s.search_engine ?? "duckduckgo");
+      setEngine(s.search_engine ?? "google");
+      setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
+      setChromeUa(s.chrome_ua !== "false");
+      setCookies(s.cookie_banners !== "false");
+      setPrecision(s.screen_precision === "standard" ? "standard" : "high");
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
@@ -81,6 +92,20 @@ export function SettingsPanel() {
               <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
             </select>
           </Row>
+          <Row label="Light mode theme" hint="Each mode keeps its own colors. Switch Theme above to see them.">
+            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Light mode color theme">
+              {PRESETS.map((p) => (
+                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetLight === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("light", p.id)} />
+              ))}
+            </div>
+          </Row>
+          <Row label="Dark mode theme">
+            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Dark mode color theme">
+              {PRESETS.map((p) => (
+                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetDark === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("dark", p.id)} />
+              ))}
+            </div>
+          </Row>
           <Row label="New tab layout">
             <select className={selectCls} value={layout} onChange={(e) => setLayout(e.target.value as Layout)} aria-label="New tab layout">
               <option value="classic">Classic</option><option value="minimal">Minimal</option><option value="productivity">Productivity</option>
@@ -94,7 +119,24 @@ export function SettingsPanel() {
         </div>
 
         <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Home page</h3>
+          <div className="py-2"><HomeOptions /></div>
+          <p className="pb-1 text-[11.5px] text-text-secondary">You can also change these from the small wrench icon at the bottom left of the home page.</p>
+        </div>
+
+        <div className="py-2">
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Browsing</h3>
+          <Row label="Ad &amp; tracker blocking" hint="Standard blocks known ad and tracking servers. Strict also blocks ad-looking requests and hides ad boxes, which can occasionally break a page. Per-site exceptions: This site panel.">
+            <select className={selectCls} value={blockLevel} onChange={(e) => { setBlockLevel(e.target.value); void save("block_level", e.target.value); void save("block_trackers", String(e.target.value !== "off")); }} aria-label="Ad and tracker blocking">
+              <option value="off">Off</option><option value="standard">Standard</option><option value="strict">Strict</option>
+            </select>
+          </Row>
+          <Row label="Decline cookie banners" hint="Clicks “Reject all” or “Necessary only” on cookie pop-ups for you, and never clicks Accept. Works on the common banner types; a few sites use unusual ones. Applies to pages loaded after you change it.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={cookies} onChange={(e) => { setCookies(e.target.checked); void save("cookie_banners", String(e.target.checked)); }} aria-label="Decline cookie banners" />
+          </Row>
+          <Row label="Identify as Chrome" hint="Helps sites that refuse other browsers. Google, YouTube and Apple always see the real browser, because they treat a fake one as a bot and show &quot;are you a robot&quot; checks. Applies to new tabs.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={chromeUa} onChange={(e) => { setChromeUa(e.target.checked); void save("chrome_ua", String(e.target.checked)); }} aria-label="Identify as Chrome" />
+          </Row>
           <Row label="Bookmarks bar" hint="Shortcut: ⌘⇧B">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={bookmarksBar} onChange={toggleBookmarksBar} aria-label="Bookmarks bar" />
           </Row>
@@ -147,6 +189,11 @@ export function SettingsPanel() {
           </Row>
           <Row label="Model" hint={status?.models.length ? `Installed: ${status.models.slice(0, 4).join(", ")}` : undefined}>
             <input className={`${selectCls} w-44`} value={model} placeholder={provider === "ollama" ? "llama3" : "default"} onChange={(e) => setModel(e.target.value)} onBlur={() => void save("ai_model", model)} aria-label="Model" />
+          </Row>
+          <Row label="Screen control precision" hint="High adds a second, much tighter zoom with a crosshair before each click. It clicks the exact center far more reliably but takes one extra AI call (a second or two) per click.">
+            <select className={selectCls} value={precision} onChange={(e) => { setPrecision(e.target.value); void save("screen_precision", e.target.value); }} aria-label="Screen control precision">
+              <option value="high">High (most precise)</option><option value="standard">Standard (faster)</option>
+            </select>
           </Row>
           {provider === "ollama" ? (
             <Row label="Ollama address">

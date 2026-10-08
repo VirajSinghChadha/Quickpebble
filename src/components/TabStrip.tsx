@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, Pin, PinOff, Plus, Search, Volume2, VolumeX, X, Camera, Moon, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Pin, PinOff, Plus, Search, Volume2, VolumeX, X, Camera, Moon, Sparkles } from "lucide-react";
 import { GROUPS, useStore, type GroupName, type Tab } from "../store/useStore";
 import { tabLabel } from "../lib/url";
+import { orderForStrip, toggled } from "../lib/tabGroups";
 import { isMac, modKey } from "../lib/actions";
 import { Favicon } from "./Favicon";
 import { IconButton } from "./IconButton";
@@ -26,8 +27,18 @@ export function TabStrip() {
   const tabs = useStore((s) => s.tabs);
   const activeId = useStore((s) => s.activeId);
   const { activate, closeTab, newTab, setOverlay, setMenuOpen } = useStore.getState();
-  const [collapsed, setCollapsed] = useState<Set<GroupName>>(new Set());
-  const groups = GROUPS.filter(g => tabs.some(t => !t.pinned && t.group === g));
+  const [collapsed, setCollapsed] = useState<Set<GroupName>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("qp.collapsedGroups") ?? "[]") as string[];
+      return new Set(GROUPS.filter((g) => saved.includes(g)));
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("qp.collapsedGroups", JSON.stringify([...collapsed])); } catch { /* storage unavailable */ }
+  }, [collapsed]);
+  const items = orderForStrip(tabs, GROUPS, collapsed, activeId);
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   useEffect(() => setMenuOpen(menu !== null), [menu, setMenuOpen]);
@@ -41,18 +52,38 @@ export function TabStrip() {
       aria-label="Tabs"
     >
       <div className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden" data-tauri-drag-region>
-        {groups.map(g => <button type="button" key={g} aria-expanded={!collapsed.has(g)} title={`Toggle ${g} tabs`} className="mb-1 shrink-0 rounded-lg bg-surface px-2 py-1 text-xs" onClick={() => setCollapsed(prev => { const next = new Set(prev); if (next.has(g)) next.delete(g); else next.add(g); return next; })}>{g} ({tabs.filter(t => t.group === g && !t.pinned).length})</button>)}
         <AnimatePresence initial={false}>
-          {tabs.filter(tab => tab.pinned || !tab.group || !collapsed.has(tab.group) || tab.id === activeId).map((tab) => (
-            <PebbleTab
-              key={tab.id}
-              tab={tab}
-              active={tab.id === activeId}
-              onSelect={() => activate(tab.id)}
-              onClose={() => closeTab(tab.id)}
-              onMenu={(x, y) => setMenu({ tab, x, y })}
-            />
-          ))}
+          {items.map((item) =>
+            item.kind === "group" ? (
+              <motion.button
+                layout
+                key={`group-${item.group}`}
+                type="button"
+                aria-expanded={!item.collapsed}
+                title={`${item.collapsed ? "Expand" : "Collapse"} the ${item.group} group`}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
+                onClick={() => setCollapsed((prev) => toggled(prev, item.group))}
+                className="mb-0.5 flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-semibold text-white shadow-pebble transition-[filter] duration-150 hover:brightness-110"
+                style={{ backgroundColor: `var(--color-group-${item.group.toLowerCase()})`, opacity: item.collapsed ? 0.85 : 1 }}
+              >
+                {item.collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                {item.group}
+                <span className="rounded-full bg-white/25 px-1.5 text-[10.5px] tabular-nums">{item.count}</span>
+              </motion.button>
+            ) : (
+              <PebbleTab
+                key={item.tab.id}
+                tab={item.tab}
+                active={item.tab.id === activeId}
+                onSelect={() => activate(item.tab.id)}
+                onClose={() => closeTab(item.tab.id)}
+                onMenu={(x, y) => setMenu({ tab: item.tab, x, y })}
+              />
+            ),
+          )}
         </AnimatePresence>
         <IconButton label={`New tab (${modKey}T)`} onClick={() => newTab()} className="mb-0 size-7">
           <Plus size={16} />

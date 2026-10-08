@@ -1,13 +1,19 @@
 //! Quick Pebble — browse quicker.
 
+mod bookmarks;
 mod browser;
 mod daemon;
+mod downloads;
 mod database;
 mod extensions;
+mod home;
 mod memory_saver;
 mod security;
+mod vault;
+mod vault_import;
 mod updater;
 mod research;
+mod screen;
 
 use tauri::Manager;
 
@@ -22,9 +28,12 @@ pub fn run() {
             let db = database::Db::open(&dir.join("pebble.db"))?;
             let state = browser::Browser::default();
             *state.memory.lock().unwrap() = browser::load_memory_config(&db);
+            app.manage(downloads::Downloads::load(&db));
             app.manage(db);
             app.manage(state);
             app.manage(updater::PendingUpdate::default());
+            app.manage(screen::ScreenAgent::default());
+            app.manage(vault::Vault::default());
             browser::open_window(app.handle(), "main")?;
             browser::spawn_memory_saver(app.handle().clone());
             updater::spawn_startup_check(app.handle().clone());
@@ -45,6 +54,9 @@ pub fn run() {
             browser::history_clear,
             browser::bookmark_toggle,
             browser::bookmark_list,
+            browser::bookmark_set_folder,
+            browser::bookmarks_import_chrome,
+            browser::bookmarks_import_file,
             browser::suggest,
             browser::settings_get,
             browser::settings_set,
@@ -79,6 +91,31 @@ pub fn run() {
             extensions::extension_install_file,
             extensions::extension_set_enabled,
             extensions::extension_remove,
+            screen::screen_propose,
+            screen::screen_act,
+            screen::screen_verify,
+            screen::gemini_models,
+            home::weather_search,
+            home::weather_fetch,
+            home::news_fetch,
+            downloads::downloads_list,
+            downloads::download_open,
+            downloads::download_reveal,
+            downloads::download_remove,
+            downloads::downloads_clear_finished,
+            vault::vault_status,
+            vault::vault_create,
+            vault::vault_unlock,
+            vault::vault_lock,
+            vault::vault_list,
+            vault::vault_reveal,
+            vault::vault_save,
+            vault::vault_delete,
+            vault::vault_import_file,
+            vault::vault_fill,
+            vault::qp_login_seen,
+            vault::vault_save_pending,
+            vault::vault_dismiss_pending,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

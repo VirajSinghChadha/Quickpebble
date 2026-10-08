@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-qp-login-seen"
+description = "Enables the qp_login_seen command without any pre-configured scope."
+commands.allow = ["qp_login_seen"]
+
+[[permission]]
+identifier = "deny-qp-login-seen"
+description = "Denies the qp_login_seen command without any pre-configured scope."
+commands.deny = ["qp_login_seen"]

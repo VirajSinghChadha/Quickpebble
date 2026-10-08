@@ -1,0 +1,156 @@
+name: Preview builds
+
+# Builds the Windows installer (and, on request, the Intel-Mac disk image) for the preview pre-release (no updater key needed), tests the Windows
+# one by really installing and launching it, and attaches everything to the pre-release.
+# Run it by pushing a tag like `preview-build-2026-10-08`, or from Actions → Run workflow.
+# Pre-releases are not "latest", so the in-app updater and Homebrew are unaffected.
+on:
+  push:
+    tags: ["preview-build-*", "preview-win-*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing pre-release to attach the installers to
+        required: true
+        default: preview-2026-10-08
+      include_intel_mac:
+        description: Also build the Intel-Mac disk image (off by default)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || 'preview-2026-10-08' }}
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: npm ci
+      - name: Build installer
+        run: npx tauri build --bundles nsis --config scripts/tauri.preview.conf.json
+      - name: Find the installer
+        id: find
+        shell: bash
+        run: |
+          f=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          test -n "$f" || { echo "No installer produced"; exit 1; }
+          cp "$f" Quick.Pebble_preview_x64-setup.exe
+          echo "sha=$(sha256sum Quick.Pebble_preview_x64-setup.exe | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Smoke test - install silently and launch
+        shell: pwsh
+        run: |
+          Start-Process -FilePath .\Quick.Pebble_preview_x64-setup.exe -ArgumentList '/S' -Wait
+          $dir = Join-Path $env:LOCALAPPDATA 'Quick Pebble'
+          Write-Host "Installed files:"; Get-ChildItem $dir -Recurse -Depth 2 | ForEach-Object { $_.FullName.Substring($dir.Length) } | Select-Object -First 60
+          foreach ($f in 'agent\qp_agent\server.py', 'agent\requirements.txt') { if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing from the install: $f" } }
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { throw "The app exited by itself with code $($p.ExitCode)" }
+          Write-Host "The app is running (pid $($p.Id)) after 15 seconds."
+          Stop-Process -Id $p.Id -Force
+      - name: Smoke test - the screen agent starts from the installed files
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:LOCALAPPDATA 'Quick Pebble'
+          python -m pip install -r "$dir\agent\requirements.txt"
+          $out = Join-Path $env:RUNNER_TEMP 'agent-out.txt'
+          $p = Start-Process python -ArgumentList '-m','qp_agent.server' -WorkingDirectory "$dir\agent" -RedirectStandardOutput $out -PassThru -NoNewWindow
+          Start-Sleep -Seconds 6
+          $line = Get-Content $out -ErrorAction SilentlyContinue | Select-Object -First 1
+          Write-Host ($line -replace 'token=\S+', 'token=***')
+          if ($line -match 'QP_AGENT_READY port=(\d+) token=(\S+)') { $port = $Matches[1]; $token = $Matches[2] } else { throw "The agent did not report ready" }
+          $r = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -Headers @{ 'X-QP-Token' = $token }
+          if (-not $r.ok) { throw "Health check failed" }
+          Write-Host "Health check with the token: ok."
+          $refused = $false
+          try { Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" | Out-Null } catch { $refused = $true }
+          if (-not $refused) { throw "A request without the token was accepted" }
+          Write-Host "A request without the token was refused, as it should be."
+          Stop-Process -Id $p.Id -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quick-Pebble-Windows-preview
+          path: |
+            Quick.Pebble_preview_x64-setup.exe
+            docs/READ-ME-FIRST-Windows.html
+      - name: Attach to the pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease' | grep -qx true \
+            || { echo "$RELEASE_TAG must be an existing PRE-release (so it can't replace the stable one)"; exit 1; }
+          gh release upload "$RELEASE_TAG" Quick.Pebble_preview_x64-setup.exe docs/READ-ME-FIRST-Windows.html --clobber --repo "$GITHUB_REPOSITORY"
+          echo "SHA-256: ${{ steps.find.outputs.sha }}"
+
+  macos-intel:
+    name: macOS Intel disk image
+    # Only on request (Actions → Run workflow → tick "Also build the Intel-Mac disk image"); tag pushes build Windows only.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_intel_mac }}
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - run: npm ci
+      # Sign and notarize automatically once the Apple secrets exist; without them the build stays unsigned.
+      - name: Enable Apple signing when its secrets are set
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "Apple signing secrets found: the app will be signed."
+            for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+              printf '%s<<QP_EOF\n%s\nQP_EOF\n' "$v" "${!v}" >> "$GITHUB_ENV"
+            done
+          else
+            echo "No Apple signing secrets: building unsigned (people use Open Anyway)."
+          fi
+      - name: Build disk image
+        run: npx tauri build --bundles dmg --config scripts/tauri.preview.conf.json
+      - name: Put the read-me-first guide inside the disk image
+        run: |
+          src=$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -1)
+          hdiutil convert "$src" -format UDRW -o "$RUNNER_TEMP/rw.dmg" -quiet
+          mkdir -p "$RUNNER_TEMP/mnt"
+          hdiutil attach "$RUNNER_TEMP/rw.dmg" -readwrite -noverify -nobrowse -mountpoint "$RUNNER_TEMP/mnt" -quiet
+          cp docs/READ-ME-FIRST.html "$RUNNER_TEMP/mnt/READ ME FIRST.html"
+          ls "$RUNNER_TEMP/mnt"
+          test -d "$RUNNER_TEMP/mnt/Quick Pebble.app/Contents/Resources/agent/qp_agent"
+          sync
+          hdiutil detach "$RUNNER_TEMP/mnt" -quiet
+          hdiutil convert "$RUNNER_TEMP/rw.dmg" -format UDZO -imagekey zlib-level=9 -o Quick.Pebble_preview_x64.dmg -quiet
+          hdiutil verify Quick.Pebble_preview_x64.dmg
+          shasum -a 256 Quick.Pebble_preview_x64.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quick-Pebble-macOS-Intel-preview
+          path: Quick.Pebble_preview_x64.dmg
+      - name: Attach to the pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease' | grep -qx true \
+            || { echo "$RELEASE_TAG must be an existing PRE-release"; exit 1; }
+          gh release upload "$RELEASE_TAG" Quick.Pebble_preview_x64.dmg --clobber --repo "$GITHUB_REPOSITORY"

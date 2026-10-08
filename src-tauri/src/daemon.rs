@@ -48,22 +48,49 @@ pub fn default_model(provider: &str) -> &'static str {
     match provider {
         "openai" => "gpt-4o-mini",
         "anthropic" => "claude-haiku-5-5",
-        "gemini" => "gemini-2.0-flash",
+        "gemini" => "gemini-3.5-flash-lite",
         _ => DEFAULT_LOCAL_MODEL,
     }
 }
 
+fn key_cache() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(Default::default)
+}
+
+/// API key for a provider. Order: environment variable (no keychain prompt), in-memory cache, OS keychain.
+/// Caching means macOS asks for keychain access at most once per launch instead of on every status check.
 pub fn get_key(provider: &str) -> Option<String> {
-    keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty())
+    let env_name = format!("QP_{}_API_KEY", provider.to_uppercase());
+    if let Some(k) = std::env::var(&env_name).ok().or_else(|| (provider == "gemini").then(|| std::env::var("GEMINI_API_KEY").ok()).flatten()).filter(|k| !k.trim().is_empty()) {
+        return Some(k.trim().to_string());
+    }
+    if let Some(k) = key_cache().lock().ok()?.get(provider).filter(|k| !k.is_empty()) {
+        return Some(k.clone());
+    }
+    // An empty entry in the cache means "already asked and got nothing / was denied": don't prompt again this launch.
+    if key_cache().lock().ok()?.get(provider).is_some() {
+        return None;
+    }
+    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty());
+    key_cache().lock().ok()?.insert(provider.to_string(), k.clone().unwrap_or_default());
+    k
 }
 
 pub fn set_key(provider: &str, key: &str) -> Result<(), String> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| e.to_string())?;
+    if let Ok(mut c) = key_cache().lock() {
+        c.remove(provider);
+    }
     if key.is_empty() {
         let _ = entry.delete_credential();
         return Ok(());
     }
-    entry.set_password(key).map_err(|e| e.to_string())
+    entry.set_password(key).map_err(|e| e.to_string())?;
+    if let Ok(mut c) = key_cache().lock() {
+        c.insert(provider.to_string(), key.to_string());
+    }
+    Ok(())
 }
 
 pub async fn status(cfg: &AiConfig) -> AiStatus {

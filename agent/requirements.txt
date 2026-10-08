@@ -1,0 +1,4 @@
+pillow>=10
+pyautogui>=0.9.54
+requests>=2.31
+pydantic>=2.6

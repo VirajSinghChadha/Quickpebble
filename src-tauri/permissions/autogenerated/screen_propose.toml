@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-screen-propose"
+description = "Enables the screen_propose command without any pre-configured scope."
+commands.allow = ["screen_propose"]
+
+[[permission]]
+identifier = "deny-screen-propose"
+description = "Denies the screen_propose command without any pre-configured scope."
+commands.deny = ["screen_propose"]

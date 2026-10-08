@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
+import { ipc, isPrivateWindow, type DownloadItem, type TabEvent } from "../lib/ipc";
+import { defaultHome, homeToSettings, parseHome, type HomeSettings } from "../lib/home";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
-export type Sidebar = null | "assistant" | "therapist";
+export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site" | "passwords" | "downloads";
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
 export const BOOKMARKS_BAR = 34;
@@ -68,11 +69,22 @@ interface State {
   menuOpen: boolean;
   suggestOpen: boolean;
   theme: Theme;
+  presetLight: string;
+  presetDark: string;
+  setPreset: (mode: "light" | "dark", p: string) => void;
   layout: Layout;
   aiAutocomplete: boolean;
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
+  home: HomeSettings;
+  loadHome: () => Promise<void>;
+  setHome: (patch: Partial<HomeSettings>) => Promise<void>;
+  downloads: DownloadItem[];
+  setDownloads: (d: DownloadItem[]) => void;
+  /** A login the person was just seen submitting; waiting for Save / Not now / Never. */
+  loginPrompt: { tabId: string; host: string; username: string } | null;
+  setLoginPrompt: (p: { tabId: string; host: string; username: string } | null) => void;
   bookmarksBar: boolean;
   bookmarksVersion: number;
   httpsPrompt: { id: string; url: string } | null;
@@ -150,12 +162,31 @@ export const useStore = create<State>((set, get) => ({
   menuOpen: false,
   suggestOpen: false,
   theme: (safeGet("qp.theme") as Theme) || "system",
+  presetLight: safeGet("qp.presetLight") || safeGet("qp.preset") || "pebble",
+  presetDark: safeGet("qp.presetDark") || safeGet("qp.preset") || "pebble",
+  setPreset: (mode, preset) => {
+    safeSet(mode === "light" ? "qp.presetLight" : "qp.presetDark", preset);
+    set(mode === "light" ? { presetLight: preset } : { presetDark: preset });
+  },
   layout: (safeGet("qp.layout") as Layout) || "classic",
   aiAutocomplete: safeGet("qp.aiAutocomplete") === "1",
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
-  bookmarksBar: safeGet("qp.bookmarksBar") === "1",
+  home: defaultHome,
+  loadHome: async () => {
+    const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+    set({ home: parseHome(s) });
+  },
+  setHome: async (patch) => {
+    set((st) => ({ home: { ...st.home, ...patch, loaded: true } }));
+    for (const [k, v] of Object.entries(homeToSettings(patch))) await ipc.settingsSet(k, v).catch(() => {});
+  },
+  downloads: [],
+  setDownloads: (downloads) => set({ downloads }),
+  loginPrompt: null,
+  setLoginPrompt: (loginPrompt) => set({ loginPrompt }),
+  bookmarksBar: safeGet("qp.bookmarksBar") !== "0", // on by default, like most browsers
   bookmarksVersion: 0,
   httpsPrompt: null,
   closedTabs: [],
@@ -332,14 +363,15 @@ export const useStore = create<State>((set, get) => ({
   },
   focusAddress: () => set((s) => ({ focusAddressNonce: s.focusAddressNonce + 1 })),
 
+  // Runs in the side panel: pop-up overlays hide the page (they sit beneath page webviews), the panel does not.
   summarize: async (id) => {
-    set({ overlay: "summary", summary: { tabId: id, text: null, error: null, loading: true } });
-    try {
-      const text = await ipc.aiRun({ task: "summarize", tab_id: id });
-      set({ summary: { tabId: id, text, error: null, loading: false } });
-    } catch (e) {
-      set({ summary: { tabId: id, text: null, error: String(e), loading: false } });
-    }
+    if (id !== get().activeId) get().activate(id);
+    get().setSidebar("assistant");
+    const { useChat } = await import("./useChat");
+    const chat = useChat.getState();
+    if (chat.busy) return;
+    chat.setMode("ask");
+    await chat.send("Summarize this page");
   },
 
   classify: async (id) => {

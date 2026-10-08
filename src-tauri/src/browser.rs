@@ -50,6 +50,25 @@ pub struct TabInfo {
     pub zoom: f64,
 }
 
+impl Browser {
+    /// (current url, is private) for a tab, looked up by webview label.
+    pub fn tab_url(&self, label: &str) -> Option<(String, bool)> {
+        lock(&self.tabs).get(label).map(|t| (t.url.clone(), t.private))
+    }
+
+    /// Marks a tab as downloading so Memory Saver never suspends it mid-download.
+    pub fn set_downloading(&self, label: &str, on: bool) {
+        if let Some(t) = lock(&self.tabs).get_mut(label) {
+            t.downloading = on;
+        }
+    }
+
+    /// (window label, tab id) for a tab, looked up by webview label.
+    pub fn tab_window_id(&self, label: &str) -> Option<(String, String)> {
+        lock(&self.tabs).get(label).map(|t| (t.window.clone(), t.id.clone()))
+    }
+}
+
 #[derive(Default)]
 pub struct Browser {
     tabs: Mutex<HashMap<String, TabInfo>>,
@@ -185,6 +204,10 @@ pub fn ai_config(db: &Db) -> AiConfig {
     }
 }
 
+#[cfg(target_os = "macos")]
+const CHROME_UA: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+
 fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, private: bool) -> Result<Webview, String> {
     let blocked: Vec<String> = url
         .host_str()
@@ -194,18 +217,29 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .filter(|p| p.policy == "block")
         .map(|p| p.permission)
         .collect();
-    let block_trackers = setting(app, "block_trackers").as_deref() != Some("false");
+    #[cfg(target_os = "macos")]
+    let host = url.host_str().unwrap_or_default().to_string();
+    let profile = url.host_str().map(|h| site_profile(app, h)).unwrap_or_default();
+    let block_trackers = profile.trackers.unwrap_or_else(|| setting(app, "block_trackers").as_deref() != Some("false"));
     let script = INJECT
         .replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()))
         .replace("__QP_TRACKERS__", &serde_json::to_string(security::TRACKER_HOSTS).unwrap_or_else(|_| "[]".into()))
-        .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" });
+        .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" })
+        .replace("__QP_COOKIES__", if setting(app, "cookie_banners").as_deref() == Some("false") { "false" } else { "true" })
+        .replace("__QP_STRICT__", if setting(app, "block_level").as_deref() == Some("strict") { "true" } else { "false" });
     let (pos, size) = content_rect(window);
     let nav_app = app.clone();
     let nav_label = label.to_string();
     let load_app = app.clone();
+    let dl_app = app.clone();
     let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .initialization_script(&script)
         .incognito(private);
+    // macOS renders with WebKit, and some sites refuse anything that doesn't say it's Chrome.
+    #[cfg(target_os = "macos")]
+    if setting(app, "chrome_ua").as_deref() != Some("false") && !security::skip_ua_spoof(&host) {
+        builder = builder.user_agent(CHROME_UA);
+    }
     // Content scripts of enabled Chrome extensions (not injected into private windows).
     if !private {
         if let Ok(root) = crate::extensions::root_dir(app) {
@@ -215,6 +249,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         }
     }
     let builder = builder
+        .on_download(move |wv, event| crate::downloads::handle(&dl_app, &wv, event))
         .on_navigation(move |u| {
             let block = setting(&nav_app, "block_trackers").as_deref() != Some("false");
             if !security::allow_navigation(u, block) {
@@ -235,7 +270,21 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
                         t.loading = true;
                         t.url = payload.url().to_string();
                     }
-                    PageLoadEvent::Finished => t.loading = false,
+                    PageLoadEvent::Finished => {
+                        t.loading = false;
+                        // Apply this site's saved zoom and mute choice once the page has loaded.
+                        if let Some(host) = Url::parse(payload.url().as_str()).ok().and_then(|u| u.host_str().map(String::from)) {
+                            let p = site_profile(&load_app, &host);
+                            if let Some(z) = p.zoom {
+                                t.zoom = z;
+                                let _ = wv.set_zoom(z);
+                            }
+                            if let Some(m) = p.muted {
+                                t.muted = m;
+                                let _ = wv.eval(format!("window.__qpSetMuted && window.__qpSetMuted({m})"));
+                            }
+                        }
+                    }
                 }
                 emit_tab(&load_app, t);
             }
@@ -243,8 +292,28 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
     window.add_child(builder, pos, size).map_err(|e| e.to_string())
 }
 
+/// Per-site preferences the person chose in the Site panel. Missing fields mean "use the default".
+#[derive(Default, Clone)]
+struct SiteProfile {
+    zoom: Option<f64>,
+    trackers: Option<bool>,
+    muted: Option<bool>,
+}
+
+fn site_profile(app: &AppHandle, host: &str) -> SiteProfile {
+    let host = host.strip_prefix("www.").unwrap_or(host);
+    let Some(json) = setting(app, "site_profiles") else { return SiteProfile::default() };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else { return SiteProfile::default() };
+    let p = &v[host];
+    SiteProfile {
+        zoom: p["zoom"].as_f64().filter(|z| z.is_finite()).map(|z| (z.clamp(0.3, 3.0) * 100.0).round() / 100.0),
+        trackers: p["trackers"].as_bool(),
+        muted: p["muted"].as_bool(),
+    }
+}
+
 fn engine(db: &Db) -> String {
-    db.get_setting("search_engine").unwrap_or_else(|| "duckduckgo".into())
+    db.get_setting("search_engine").unwrap_or_else(|| "google".into())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -585,6 +654,47 @@ pub fn bookmark_list(db: State<Db>, query: Option<String>) -> Result<Vec<Bookmar
     db.bookmarks(&query.unwrap_or_default(), 200).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn bookmark_set_folder(db: State<Db>, url: String, folder: String) -> Result<(), String> {
+    let folder: String = folder.trim().chars().take(80).collect();
+    db.set_bookmark_folder(&url, &folder).map_err(|e| e.to_string())
+}
+
+fn save_imported(db: &Db, items: Vec<crate::bookmarks::Imported>) -> Result<usize, String> {
+    let rows: Vec<(String, String, String)> = items.into_iter().take(5000).map(|i| (i.url, i.title, i.folder)).collect();
+    db.import_bookmarks(&rows).map_err(|e| e.to_string())
+}
+
+/// Reads Chrome's own bookmarks file. Returns how many new bookmarks were added.
+#[tauri::command]
+pub fn bookmarks_import_chrome(db: State<Db>) -> Result<usize, String> {
+    let path = crate::bookmarks::chrome_bookmarks_path().filter(|p| p.exists()).ok_or("Chrome's bookmarks were not found on this computer.")?;
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    save_imported(&db, crate::bookmarks::parse_chrome_json(&text))
+}
+
+/// Imports a bookmarks HTML file exported from Safari, Firefox, Edge, Brave or Chrome.
+#[tauri::command]
+pub async fn bookmarks_import_file(app: AppHandle) -> Result<Option<usize>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let handle = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || handle.dialog().file().add_filter("Bookmarks", &["html", "htm"]).blocking_pick_file())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(file) = picked else { return Ok(None) };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 20_000_000 {
+        return Err("That file is too large to be a bookmarks export.".into());
+    }
+    let text = std::fs::read_to_string(&path).map_err(|_| "Could not read that file as text.".to_string())?;
+    let items = crate::bookmarks::parse_netscape_html(&text);
+    if items.is_empty() {
+        return Err("No bookmarks found in that file.".into());
+    }
+    let db = app.state::<Db>();
+    save_imported(&db, items).map(Some)
+}
+
 #[derive(Serialize)]
 pub struct Suggestion {
     kind: &'static str,
@@ -617,6 +727,21 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "screen_precision",
+    "home_weather",
+    "home_weather_place",
+    "home_weather_unit",
+    "home_news",
+    "home_news_source",
+    "home_tiles",
+    "home_cards",
+    "home_onboarded",
+    "cookie_banners",
+    "chrome_ua",
+    "block_level",
+    "site_profiles",
+    "screen_permissions",
+    "screen_model",
     "https_only",
     "auto_update_check",
     "theme",
@@ -643,6 +768,24 @@ pub fn settings_set(db: State<Db>, key: String, value: String) -> Result<(), Str
     }
     if key == "search_engine" && !security::SEARCH_ENGINES.iter().any(|(n, _)| *n == value) {
         return Err("unknown search engine".into());
+    }
+    if key == "screen_precision" && value != "standard" && value != "high" {
+        return Err("unknown precision".into());
+    }
+    if key == "home_weather_place" && (value.len() > 512 || (!value.is_empty() && serde_json::from_str::<serde_json::Value>(&value).is_err())) {
+        return Err("invalid place".into());
+    }
+    if key == "home_news_source" && !crate::home::NEWS_SOURCES.iter().any(|(id, _)| *id == value) {
+        return Err("unknown news source".into());
+    }
+    if key.starts_with("home_") && key != "home_weather_place" && value.len() > 64 {
+        return Err("value too long".into());
+    }
+    if key == "site_profiles" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
+        return Err("invalid site profiles".into());
+    }
+    if key == "screen_permissions" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
+        return Err("invalid screen permissions".into());
     }
     if key == "ollama_url" && !Url::parse(&value).map(|u| matches!(u.scheme(), "http" | "https")).unwrap_or(false) {
         return Err("Ollama URL must be http(s)".into());
@@ -935,6 +1078,14 @@ pub fn window_control(window: Window, action: String) -> Result<(), String> {
             }
         }
         "close" => window.close(),
+        // For the screen agent: bring a minimized window back so its clicks can land.
+        "restore" => {
+            if window.is_minimized().unwrap_or(false) {
+                window.unminimize().and_then(|_| window.show()).and_then(|_| window.set_focus())
+            } else {
+                Ok(())
+            }
+        }
         _ => return Err("unknown action".into()),
     }
     .map_err(|e| e.to_string())
@@ -959,9 +1110,10 @@ pub fn tab_zoom(app: AppHandle, window: Window, state: State<Browser>, id: Strin
     t.zoom = match action.as_str() {
         "in" => (t.zoom + 0.1).min(3.0),
         "out" => (t.zoom - 0.1).max(0.3),
+        a if a.starts_with("set:") => a[4..].parse::<f64>().ok().filter(|z| z.is_finite()).map_or(t.zoom, |z| z.clamp(0.3, 3.0)),
         _ => 1.0,
     };
-    t.zoom = (t.zoom * 10.0).round() / 10.0;
+    t.zoom = (t.zoom * 100.0).round() / 100.0;
     if let Some(wv) = app.get_webview(&label) {
         let _ = wv.set_zoom(t.zoom);
     }
@@ -995,7 +1147,7 @@ pub async fn ai_chat(db: State<'_, Db>, req: ChatRequest) -> Result<String, Stri
     daemon::chat(&cfg, &req.system, &req.messages, req.json.unwrap_or(false)).await
 }
 
-const AGENT_OPS: &[&str] = &["snapshot", "click", "type", "select", "scroll", "press"];
+const AGENT_OPS: &[&str] = &["snapshot", "click", "type", "select", "scroll", "press", "collect_text", "apply_text", "restore_text"];
 
 /// Runs one agent operation inside a tab and waits for the page script to report back.
 #[tauri::command]

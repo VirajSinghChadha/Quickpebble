@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-dismiss-pending"
+description = "Enables the vault_dismiss_pending command without any pre-configured scope."
+commands.allow = ["vault_dismiss_pending"]
+
+[[permission]]
+identifier = "deny-vault-dismiss-pending"
+description = "Denies the vault_dismiss_pending command without any pre-configured scope."
+commands.deny = ["vault_dismiss_pending"]
