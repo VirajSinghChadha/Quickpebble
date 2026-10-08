@@ -71,10 +71,14 @@ jobs:
           Start-Sleep -Seconds 6
           $line = Get-Content $out -ErrorAction SilentlyContinue | Select-Object -First 1
           Write-Host ($line -replace 'token=\S+', 'token=***')
-          if ($line -notmatch 'QP_AGENT_READY port=(\d+) token=(\S+)') { throw "The agent did not report ready" }
-          $r = Invoke-RestMethod -Uri "http://127.0.0.1:$($Matches[1])/health" -Headers @{ 'X-QP-Token' = $Matches[2] }
+          if ($line -match 'QP_AGENT_READY port=(\d+) token=(\S+)') { $port = $Matches[1]; $token = $Matches[2] } else { throw "The agent did not report ready" }
+          $r = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -Headers @{ 'X-QP-Token' = $token }
           if (-not $r.ok) { throw "Health check failed" }
-          try { Invoke-RestMethod -Uri "http://127.0.0.1:$($Matches[1])/health" ; throw "Unauthenticated request was accepted" } catch { Write-Host "Unauthenticated request correctly refused." }
+          Write-Host "Health check with the token: ok."
+          $refused = $false
+          try { Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" | Out-Null } catch { $refused = $true }
+          if (-not $refused) { throw "A request without the token was accepted" }
+          Write-Host "A request without the token was refused, as it should be."
           Stop-Process -Id $p.Id -Force
       - uses: actions/upload-artifact@v4
         with:
