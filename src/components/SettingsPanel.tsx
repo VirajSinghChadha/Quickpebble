@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ipc, defaultMemory, type MemoryConfig, type MemoryStats, type UpdateInfo } from "../lib/ipc";
+import { ipc, defaultMemory, type MemoryConfig, type MemoryStats } from "../lib/ipc";
+import { useUpdater } from "../store/useUpdater";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
@@ -25,7 +26,7 @@ export function SettingsPanel() {
   const { theme, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
-  const [upd, setUpd] = useState<{ state: "idle" | "checking" | "none" | "found" | "installing" | "error"; info?: UpdateInfo; text?: string }>({ state: "idle" });
+  const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [engine, setEngine] = useState("duckduckgo");
@@ -102,30 +103,21 @@ export function SettingsPanel() {
           <Row label="Check for updates automatically" hint="Contacts GitHub Releases shortly after launch. Updates are signature-checked and never installed without your click.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={autoUpdate} onChange={(e) => { setAutoUpdate(e.target.checked); void save("auto_update_check", String(e.target.checked)); }} aria-label="Automatic update checks" />
           </Row>
+          <p className="pb-2 text-[12px] text-text-secondary">Install updates here without downloading a new installer. Your saved tabs and settings stay on this device.</p>
           <div className="flex flex-wrap items-center gap-3 pb-1">
-            {upd.state !== "found" && upd.state !== "installing" && (
-              <button type="button" disabled={upd.state === "checking"} className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary disabled:opacity-40" onClick={async () => {
-                setUpd({ state: "checking" });
-                try {
-                  const info = await ipc.updateCheck();
-                  setUpd(info ? { state: "found", info } : { state: "none" });
-                } catch (e) {
-                  setUpd({ state: "error", text: String(e) });
-                }
-              }}>{upd.state === "checking" ? "Checking…" : "Check now"}</button>
-            )}
+            {!upd.info && <button type="button" disabled={upd.state === "checking"} className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary disabled:opacity-40" onClick={() => void upd.check()}>{upd.state === "checking" ? "Checking…" : "Check now"}</button>}
             {upd.state === "none" && <span role="status" className="text-text-secondary">You&apos;re up to date.</span>}
-            {upd.state === "error" && <span role="alert" className="text-[12px] text-red-500">{upd.text}</span>}
-            {(upd.state === "found" || upd.state === "installing") && upd.info && (
-              <>
-                <span role="status">Version {upd.info.version} is available (you have {upd.info.current}).</span>
-                <button type="button" disabled={upd.state === "installing"} className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white disabled:opacity-40 dark:text-bg" onClick={async () => {
-                  setUpd({ ...upd, state: "installing" });
-                  try { await ipc.updateInstall(); } catch (e) { setUpd({ state: "error", text: String(e) }); }
-                }}>{upd.state === "installing" ? "Installing…" : "Install & restart"}</button>
-              </>
-            )}
+            {upd.error && <span role="alert" className="text-[12px] text-red-500">{upd.error}</span>}
+            {upd.info && <>
+              <span role="status">Version {upd.info.version} is available (you have {upd.info.current}).</span>
+              <button type="button" disabled={upd.state === "installing" || upd.state === "checking"} className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white disabled:opacity-40 dark:text-bg" onClick={() => void upd.install()}>{upd.state === "installing" ? "Updating…" : "Install & restart"}</button>
+            </>}
           </div>
+          {upd.info?.notes && <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap py-2 font-sans text-[12px] text-text-secondary">{upd.info.notes}</pre>}
+          {upd.state === "installing" && <div className="space-y-2 py-2" role="status" aria-live="polite">
+            <p>{upd.progress?.phase === "installing" ? "Verifying and installing… Quick Pebble will restart." : `Downloading update${upd.percent === null ? "…" : `… ${upd.percent}%`}`}</p>
+            {upd.progress?.phase !== "installing" && <progress className="h-2 w-full accent-primary" max={100} value={upd.percent ?? undefined} aria-label="Update download progress" />}
+          </div>}
         </div>
 
         <div className="py-2">

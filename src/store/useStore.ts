@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ipc, isPrivateWindow, type TabEvent, type UpdateInfo } from "../lib/ipc";
+import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
@@ -76,10 +76,8 @@ interface State {
   bookmarksBar: boolean;
   bookmarksVersion: number;
   httpsPrompt: { id: string; url: string } | null;
-  update: UpdateInfo | null;
   toggleBookmarksBar: () => void;
   setHttpsPrompt: (p: { id: string; url: string } | null) => void;
-  setUpdate: (u: UpdateInfo | null) => void;
   closedTabs: { url: string; title: string; group: GroupName | null; pinned: boolean }[];
 
   setSidebar: (s: Sidebar) => void;
@@ -87,6 +85,7 @@ interface State {
   reopenTab: () => void;
   init: () => Promise<void>;
   newTab: (url?: string, opts?: Partial<Tab>) => string;
+  restoreTabs: (pages: Pick<Tab, "url" | "title" | "favicon" | "pinned" | "group">[]) => Promise<number>;
   closeTab: (id: string) => void;
   activate: (id: string) => void;
   navigate: (id: string, input: string, allowHttp?: boolean) => Promise<void>;
@@ -159,7 +158,6 @@ export const useStore = create<State>((set, get) => ({
   bookmarksBar: safeGet("qp.bookmarksBar") === "1",
   bookmarksVersion: 0,
   httpsPrompt: null,
-  update: null,
   closedTabs: [],
 
   toggleBookmarksBar: () => {
@@ -169,7 +167,6 @@ export const useStore = create<State>((set, get) => ({
     void ipc.chromeSet(BASE_CHROME + (on ? BOOKMARKS_BAR : 0));
   },
   setHttpsPrompt: (httpsPrompt) => set({ httpsPrompt, overlay: httpsPrompt ? "https" : get().overlay === "https" ? null : get().overlay }),
-  setUpdate: (update) => set({ update }),
 
   setSidebar: (sidebar) => {
     set({ sidebar });
@@ -198,7 +195,7 @@ export const useStore = create<State>((set, get) => ({
 
   newTab: (url = NEW_TAB_URL, opts = {}) => {
     const tab = makeTab(opts);
-    set((s) => ({ tabs: [...s.tabs, tab] }));
+    set((s) => ({ tabs: sortTabs([...s.tabs, tab]) }));
     void ipc.tabCreate(tab.id, tab.pinned).then(() => {
       get().activate(tab.id);
       if (url) void get().navigate(tab.id, url);
@@ -206,6 +203,28 @@ export const useStore = create<State>((set, get) => ({
     });
     set({ activeId: tab.id });
     return tab.id;
+  },
+
+  restoreTabs: async (pages) => {
+    // Create unloaded webviews first; only the selected tab navigates.
+    const restored: Tab[] = [];
+    try {
+      for (const page of pages) {
+        let valid = false;
+        try { valid = ["http:", "https:"].includes(new URL(page.url).protocol); } catch { /* invalid URL */ }
+        if (!valid) continue;
+        const tab = makeTab({ ...page, needsLoad: true });
+        await ipc.tabCreate(tab.id, tab.pinned);
+        restored.push(tab);
+      }
+    } catch (error) {
+      await Promise.allSettled(restored.map((t) => ipc.tabClose(t.id)));
+      throw error;
+    }
+    if (!restored.length) return 0;
+    set((s) => ({ tabs: sortTabs([...s.tabs, ...restored]) }));
+    get().activate(restored[0].id);
+    return restored.length;
   },
 
   closeTab: (id) => {

@@ -5,6 +5,14 @@ import { addSaved, analyze, categorize, findDuplicates, organize } from "./thera
 const t = (url: string) => makeTab({ url });
 
 describe("tab therapist", () => {
+  it("protects active and pinned duplicates regardless of their position", () => {
+    const a = t("https://a.com/");
+    const active = t(a.url);
+    const pinned = makeTab({ url: a.url, pinned: true });
+    const other = t(a.url);
+    expect(findDuplicates([a, active, pinned, other], active.id).map((x) => x.id)).toEqual([a.id, other.id]);
+    expect(findDuplicates([pinned, active, a, other], active.id).map((x) => x.id)).toEqual([a.id, other.id]);
+  });
   it("keeps the first copy and flags later duplicates", () => {
     const [a, b, c] = [t("https://a.com/"), t("https://a.com/"), t("https://b.com/")];
     expect(findDuplicates([a, b, c]).map((x) => x.id)).toEqual([b.id]);

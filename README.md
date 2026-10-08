@@ -69,6 +69,8 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 | **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
 | **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
 | **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
+| **Tab workspaces** | Name and save sets of tabs in Tab Therapist, preserving groups and pins. Restore alongside current tabs; pages load only when selected. Search workspaces by name or page. |
+| **Saved-tab search** | Filter saved pages and open all matches together. Duplicate cleanup protects active and pinned tabs. Saved tabs and workspaces are unavailable in private windows. |
 | **Memory Saver** | Suspends idle background tabs; never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
 | **Privacy Center** | Tracker blocking, per-site camera / mic / location / notification rules, private windows, one-click data clearing. |
 | **HTTPS-only mode** | Upgrades `http://` to `https://` and warns before opening a site insecurely. |
@@ -130,7 +132,7 @@ Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / P
 
 ## Updates
 
-Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off.
+Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off. Settings displays release notes and download progress, keeps progress when you close and reopen the panel, and lets you retry a failed update. Installing an update preserves your saved tabs, workspaces and settings; there is no need to download another installer.
 
 Every update is verified against an Ed25519 public key embedded in the app before it is installed, so a tampered download is rejected. Nothing installs without your click.
 
@@ -233,7 +235,7 @@ Releases are tag-driven. One-time setup (repository admin):
 3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 4. Settings → Actions → General → Workflow permissions → **Read and write**.
 
-To ship a version:
+To ship a version, bump the version files and either run **Actions → Release → Run workflow** on `main` with that version (for example `1.1.0`), or push a matching tag:
 
 ```bash
 # 1. bump the version in package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json
@@ -243,9 +245,11 @@ git tag v1.1.0 && git push origin v1.1.0
 
 The **Release** workflow then:
 
-1. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and publishes the GitHub release together with `latest.json`;
-2. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
-3. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
+1. validates that the tag matches every app version and a signing key is configured;
+2. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and uploads them with `latest.json` to a draft release;
+3. publishes the release only after all platform builds succeed;
+4. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
+5. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
 
 If the private key is lost, existing installs can't receive updates and users must reinstall.
 

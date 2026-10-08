@@ -2626,7 +2626,7 @@ dependencies = [
 
 [[package]]
 name = "quick-pebble"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "keyring",
  "reqwest 0.12.28",
