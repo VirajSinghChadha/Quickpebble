@@ -69,6 +69,8 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 | **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
 | **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
 | **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
+| **Tab workspaces** | Name and save sets of tabs in Tab Therapist, preserving groups and pins. Restore alongside current tabs; pages load only when selected. Search workspaces by name or page. |
+| **Saved-tab search** | Filter saved pages and open all matches together. Duplicate cleanup protects active and pinned tabs. Saved tabs and workspaces are unavailable in private windows. |
 | **Memory Saver** | Suspends idle background tabs; never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
 | **Privacy Center** | Tracker blocking, per-site camera / mic / location / notification rules, private windows, one-click data clearing. |
 | **HTTPS-only mode** | Upgrades `http://` to `https://` and warns before opening a site insecurely. |
