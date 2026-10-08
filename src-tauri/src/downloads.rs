@@ -262,12 +262,12 @@ mod tests {
 
     #[test]
     fn names_never_overwrite_existing_files() {
-        let dir = Path::new("/d");
-        let taken = ["/d/a.pdf", "/d/a (1).pdf"];
-        let exists = |p: &Path| taken.contains(&p.to_str().unwrap());
-        assert_eq!(unique_path(dir, "b.pdf", exists), Path::new("/d/b.pdf"));
-        assert_eq!(unique_path(dir, "a.pdf", exists), Path::new("/d/a (2).pdf"));
-        assert_eq!(unique_path(dir, "noext", |p| p == Path::new("/d/noext")), Path::new("/d/noext (1)"));
+        let dir = Path::new("d");
+        let taken: Vec<PathBuf> = ["a.pdf", "a (1).pdf"].iter().map(|n| dir.join(n)).collect();
+        let exists = |p: &Path| taken.iter().any(|t| t == p);
+        assert_eq!(unique_path(dir, "b.pdf", exists), dir.join("b.pdf"));
+        assert_eq!(unique_path(dir, "a.pdf", exists), dir.join("a (2).pdf"));
+        assert_eq!(unique_path(dir, "noext", |p| p == dir.join("noext")), dir.join("noext (1)"));
     }
 
     #[test]
