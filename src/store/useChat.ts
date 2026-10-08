@@ -282,6 +282,8 @@ export const useChat = create<ChatState>((set, get) => ({
           propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText()),
           verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),
           act: ipc.screenAct,
+          // Bring the browser back if it was minimized while the task is about the page it shows.
+          prepare: async () => { if (selectActive(useStore.getState()).url) await ipc.windowControl("restore"); },
           choose: (description, risky) => askChoice(description, risky, get().screenApprovalMode === "ask"),
           mode: () => get().screenApprovalMode,
           permissions: () => activePerms,

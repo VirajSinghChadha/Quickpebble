@@ -178,13 +178,13 @@ export const ipc = {
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
   geminiModels: () => call<string[]>("gemini_models", undefined, []),
-  screenAct: (action: ScreenAction) => call<void>("screen_act", { action }),
+  screenAct: (action: ScreenAction) => call<{ ok: boolean; changed: boolean | null }>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),
   extensionInstallStore: (input: string) => call<ExtensionInfo>("extension_install_store", { input }),
   extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
   extensionSetEnabled: (id: string, enabled: boolean) => call<void>("extension_set_enabled", { id, enabled }),
   extensionRemove: (id: string) => call<void>("extension_remove", { id }),
-  windowControl: (action: "minimize" | "maximize" | "close") => call<void>("window_control", { action }),
+  windowControl: (action: "minimize" | "maximize" | "close" | "restore") => call<void>("window_control", { action }),
 };
 
 export async function onTabEvent(cb: (e: TabEvent) => void): Promise<UnlistenFn> {

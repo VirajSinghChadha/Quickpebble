@@ -28,7 +28,9 @@ export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = con
 
 export interface ScreenIO {
   propose(goal: string, history: string[]): Promise<ScreenResponse>;
-  act(action: ScreenAction): Promise<void>;
+  act(action: ScreenAction): Promise<{ changed?: boolean | null } | void>;
+  /** Runs before each look at the screen, e.g. bring a minimized browser window back. */
+  prepare?(): Promise<void>;
   /** Independent second look before a submit-type step. */
   verify(goal: string, history: string[], pending: string): Promise<{ ok: boolean; problems: string }>;
   /** Numbered choice dialog. `risky` steps never offer "auto". */
@@ -86,8 +88,10 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
   let repeats = 0;
   let failures = 0;
   let verifyFails = 0;
+  let unchanged = 0;
   for (let n = 0; n < maxSteps; n++) {
     if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+    await io.prepare?.().catch(() => {});
     let res: ScreenResponse | undefined;
     for (let attempt = 1; attempt <= PROPOSE_ATTEMPTS && !res; attempt++) {
       try {
@@ -163,10 +167,16 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       if (choice === "auto") io.setMode("auto");
     }
     try {
-      await io.act(action);
+      const result = await io.act(action);
       failures = 0;
-      io.onEvent({ kind: "step", text: desc, ok: true });
-      history.push(`${history.length + 1}. ${desc}`);
+      const missed = !!result && result.changed === false && /^(click|double_click|right_click)$/.test(action.type);
+      unchanged = missed ? unchanged + 1 : 0;
+      io.onEvent({ kind: "step", text: missed ? `${desc} — nothing changed on screen` : desc, ok: !missed });
+      history.push(
+        missed
+          ? `${history.length + 1}. ${desc} (WARNING: the screen did not change after this click. The target was probably missed or is covered${unchanged >= 2 ? ", or the window may be hidden or minimized" : ""}. Try a different position or offset, or scroll it into view.)`
+          : `${history.length + 1}. ${desc}`,
+      );
       if (action.type !== "wait") await io.sleep(500);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });

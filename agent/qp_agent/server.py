@@ -90,8 +90,14 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/act":
                 action = Action.model_validate(body.get("action"))
                 action.check_cell(GRID)
+                pointer = action.type in ("click", "double_click", "right_click")
+                before = executor.screen_signature() if pointer else None
                 executor.perform(action, GRID)
-                self._send(200, {"ok": True})
+                changed = None
+                if pointer:
+                    time.sleep(0.6)
+                    changed = executor.screen_changed(before, executor.screen_signature())
+                self._send(200, {"ok": True, "changed": changed})
             else:
                 self._send(404, {"error": "not found"})
         except ValidationError as e:  # must precede ValueError: pydantic's error subclasses it

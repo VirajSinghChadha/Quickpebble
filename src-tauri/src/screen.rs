@@ -143,13 +143,13 @@ pub async fn screen_propose(
 
 /// Runs one user-approved action. The Python side validates it again before touching the mouse or keyboard.
 #[tauri::command]
-pub async fn screen_act(state: State<'_, ScreenAgent>, action: Value) -> Result<(), String> {
+pub async fn screen_act(state: State<'_, ScreenAgent>, action: Value) -> Result<Value, String> {
     let (port, token) = {
         let guard = state.0.lock().map_err(|_| "screen agent lock poisoned")?;
         let r = guard.as_ref().ok_or("The screen agent is not running. Start a new task.")?;
         (r.port, r.token.clone())
     };
-    post(port, &token, "/act", json!({ "action": action })).await.map(|_| ())
+    post(port, &token, "/act", json!({ "action": action })).await
 }
 
 /// Independent second look before a submit-type action. Returns `{ ok, problems }`.

@@ -4,8 +4,9 @@ import { useUpdater } from "../store/useUpdater";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
+import { PRESETS } from "../hooks/useTheme";
 
-const ENGINES = ["duckduckgo", "google", "bing", "brave"];
+const ENGINES = ["google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const PROVIDERS = ["ollama", "openai", "anthropic", "gemini"];
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -23,13 +24,13 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
-  const { theme, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
+  const { theme, themePreset, setThemePreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [engine, setEngine] = useState("duckduckgo");
+  const [engine, setEngine] = useState("google");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -47,7 +48,7 @@ export function SettingsPanel() {
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
-      setEngine(s.search_engine ?? "duckduckgo");
+      setEngine(s.search_engine ?? "google");
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
@@ -80,6 +81,13 @@ export function SettingsPanel() {
             <select className={selectCls} value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label="Theme">
               <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
             </select>
+          </Row>
+          <Row label="Color theme">
+            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Color theme">
+              {PRESETS.map((p) => (
+                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={themePreset === p.id} aria-label={p.label} title={p.label} onClick={() => setThemePreset(p.id)} />
+              ))}
+            </div>
           </Row>
           <Row label="New tab layout">
             <select className={selectCls} value={layout} onChange={(e) => setLayout(e.target.value as Layout)} aria-label="New tab layout">

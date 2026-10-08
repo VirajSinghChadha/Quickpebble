@@ -151,6 +151,26 @@ describe("runScreenAgent", () => {
     expect(needsDoubleCheck(res({ type: "click", cell: "A1", category: "submit_quiz_answers" }))).toBe(true);
   });
 
+  it("warns the model when a click changed nothing and keeps going", async () => {
+    const t = make([res({ type: "click", cell: "A1" }), res({ type: "click", cell: "B1" }), res({ type: "done" }, "ok")]);
+    const seen: string[][] = [];
+    const real = t.io.propose;
+    t.io.propose = async (g, h) => (seen.push([...h]), real(g, h));
+    t.io.act = async () => ({ changed: false });
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(seen.at(-1)?.some((l) => l.includes("did not change"))).toBe(true);
+    expect(seen.at(-1)?.some((l) => l.includes("minimized"))).toBe(true);
+    expect(t.events.some((e) => e.includes("nothing changed on screen"))).toBe(true);
+  });
+
+  it("runs prepare before each step", async () => {
+    const t = make([res({ type: "wait" }), res({ type: "done" })]);
+    let n = 0;
+    t.io.prepare = async () => void n++;
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(n).toBe(2);
+  });
+
   it("honours abort", async () => {
     const { io, acted } = make([res({ type: "click", cell: "A1" })]);
     await runScreenAgent("g", io, { aborted: true });

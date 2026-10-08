@@ -64,6 +64,20 @@ def _type_text(text: str) -> None:
         _paste(text)
 
 
+def screen_signature() -> list[int] | None:
+    """Tiny grayscale fingerprint of the screen, used to tell whether a click changed anything."""
+    try:
+        return list(pyautogui.screenshot().convert("L").resize((96, 60)).getdata())
+    except Exception:
+        return None
+
+
+def screen_changed(before: list[int] | None, after: list[int] | None) -> bool | None:
+    if not before or not after or len(before) != len(after):
+        return None
+    return sum(abs(a - b) for a, b in zip(before, after)) / (len(before) * 255) > 0.004
+
+
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
     if action.type in ("click", "double_click", "right_click", "scroll"):

@@ -75,10 +75,12 @@ pub fn https_upgrade(url: &Url) -> Option<Url> {
 }
 
 pub const SEARCH_ENGINES: &[(&str, &str)] = &[
-    ("duckduckgo", "https://duckduckgo.com/?q="),
     ("google", "https://www.google.com/search?q="),
-    ("bing", "https://www.bing.com/search?q="),
     ("brave", "https://search.brave.com/search?q="),
+    ("duckduckgo", "https://duckduckgo.com/?q="),
+    ("bing", "https://www.bing.com/search?q="),
+    ("startpage", "https://www.startpage.com/do/search?q="),
+    ("ecosia", "https://www.ecosia.org/search?q="),
 ];
 
 fn encode_query(q: &str) -> String {

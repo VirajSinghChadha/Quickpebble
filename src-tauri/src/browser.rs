@@ -253,7 +253,7 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
 }
 
 fn engine(db: &Db) -> String {
-    db.get_setting("search_engine").unwrap_or_else(|| "duckduckgo".into())
+    db.get_setting("search_engine").unwrap_or_else(|| "google".into())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -949,6 +949,14 @@ pub fn window_control(window: Window, action: String) -> Result<(), String> {
             }
         }
         "close" => window.close(),
+        // For the screen agent: bring a minimized window back so its clicks can land.
+        "restore" => {
+            if window.is_minimized().unwrap_or(false) {
+                window.unminimize().and_then(|_| window.show()).and_then(|_| window.set_focus())
+            } else {
+                Ok(())
+            }
+        }
         _ => return Err("unknown action".into()),
     }
     .map_err(|e| e.to_string())
