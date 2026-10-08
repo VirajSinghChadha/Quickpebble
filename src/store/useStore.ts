@@ -3,7 +3,7 @@ import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
-export type Sidebar = null | "assistant" | "therapist";
+export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site";
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
 export const BOOKMARKS_BAR = 34;
@@ -162,7 +162,7 @@ export const useStore = create<State>((set, get) => ({
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
-  bookmarksBar: safeGet("qp.bookmarksBar") === "1",
+  bookmarksBar: safeGet("qp.bookmarksBar") !== "0", // on by default, like most browsers
   bookmarksVersion: 0,
   httpsPrompt: null,
   closedTabs: [],

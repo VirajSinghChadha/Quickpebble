@@ -41,6 +41,7 @@ export interface Bookmark {
   url: string;
   title: string;
   created_at: number;
+  folder: string;
 }
 export interface SitePermission {
   host: string;
@@ -122,6 +123,9 @@ export const ipc = {
   historySearch: (query: string, limit = 50) => call<HistoryEntry[]>("history_search", { query, limit }, []),
   historyClear: () => call<void>("history_clear"),
   bookmarkToggle: (url: string, title: string) => call<boolean>("bookmark_toggle", { url, title }, false),
+  bookmarkSetFolder: (url: string, folder: string) => call<void>("bookmark_set_folder", { url, folder }),
+  bookmarksImportChrome: () => call<number>("bookmarks_import_chrome", undefined, 0),
+  bookmarksImportFile: () => call<number | null>("bookmarks_import_file", undefined, null),
   bookmarkList: (query = "") => call<Bookmark[]>("bookmark_list", { query }, []),
   suggest: (query: string) => call<Suggestion[]>("suggest", { query }, []),
   settingsGet: () => call<Record<string, string>>("settings_get", undefined, {}),
@@ -154,7 +158,7 @@ export const ipc = {
     return call<void>("update_install", { progress });
   },
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
-  tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
+  tabZoom: (id: string, action: "in" | "out" | "reset" | `set:${number}`) => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),
   researchStatus: () => call<boolean>("research_status", undefined, false),
   researchKeySet: async (key: string) => {

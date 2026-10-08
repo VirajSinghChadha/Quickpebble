@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-bookmarks-import-chrome"
+description = "Enables the bookmarks_import_chrome command without any pre-configured scope."
+commands.allow = ["bookmarks_import_chrome"]
+
+[[permission]]
+identifier = "deny-bookmarks-import-chrome"
+description = "Denies the bookmarks_import_chrome command without any pre-configured scope."
+commands.deny = ["bookmarks_import_chrome"]

@@ -6,7 +6,7 @@ permissions = [
   "allow-tab-create", "allow-tab-activate", "allow-tab-close", "allow-tab-navigate",
   "allow-tab-nav", "allow-tab-set-pinned", "allow-tab-set-muted",
   "allow-content-visible",
-  "allow-history-search", "allow-history-clear", "allow-bookmark-toggle", "allow-bookmark-list",
+  "allow-history-search", "allow-history-clear", "allow-bookmark-toggle", "allow-bookmark-list", "allow-bookmark-set-folder", "allow-bookmarks-import-chrome", "allow-bookmarks-import-file",
   "allow-suggest", "allow-settings-get", "allow-settings-set",
   "allow-memory-saver-get", "allow-memory-saver-set", "allow-memory-stats",
   "allow-ai-status", "allow-ai-run", "allow-ai-set-key",

@@ -17,6 +17,7 @@ pub struct Bookmark {
     pub url: String,
     pub title: String,
     pub created_at: i64,
+    pub folder: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -67,6 +68,8 @@ impl Db {
                host TEXT NOT NULL, permission TEXT NOT NULL, policy TEXT NOT NULL,
                PRIMARY KEY (host, permission));",
         )?;
+        // Bookmarks gained folders after v1; add the column to existing databases (error = already there).
+        let _ = conn.execute("ALTER TABLE bookmarks ADD COLUMN folder TEXT NOT NULL DEFAULT ''", []);
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -124,15 +127,35 @@ impl Db {
         Ok(true)
     }
 
+    pub fn set_bookmark_folder(&self, url: &str, folder: &str) -> rusqlite::Result<()> {
+        self.lock().execute("UPDATE bookmarks SET folder = ?2 WHERE url = ?1", params![url, folder])?;
+        Ok(())
+    }
+
+    /// Adds bookmarks that are not already saved; returns how many were new.
+    pub fn import_bookmarks(&self, items: &[(String, String, String)]) -> rusqlite::Result<usize> {
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        let mut added = 0;
+        for (url, title, folder) in items {
+            added += tx.execute(
+                "INSERT OR IGNORE INTO bookmarks (url, title, created_at, folder) VALUES (?1, ?2, ?3, ?4)",
+                params![url, title, now(), folder],
+            )?;
+        }
+        tx.commit()?;
+        Ok(added)
+    }
+
     pub fn bookmarks(&self, q: &str, limit: usize) -> rusqlite::Result<Vec<Bookmark>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT url, title, created_at FROM bookmarks
+            "SELECT url, title, created_at, folder FROM bookmarks
              WHERE url LIKE ?1 ESCAPE '\\' OR title LIKE ?1 ESCAPE '\\'
              ORDER BY created_at DESC LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![like_pattern(q), limit as i64], |r| {
-            Ok(Bookmark { url: r.get(0)?, title: r.get(1)?, created_at: r.get(2)? })
+            Ok(Bookmark { url: r.get(0)?, title: r.get(1)?, created_at: r.get(2)?, folder: r.get(3)? })
         })?;
         rows.collect()
     }
@@ -208,6 +231,20 @@ mod tests {
         let db = Db::memory().unwrap();
         db.record_visit("https://a.com/", "A").unwrap();
         assert!(db.search_history("%", 5).unwrap().is_empty());
+    }
+
+    #[test]
+    fn bookmark_folders_and_import_dedupe() {
+        let db = Db::memory().unwrap();
+        let items = vec![
+            ("https://a.com/".to_string(), "A".to_string(), "Work".to_string()),
+            ("https://b.com/".to_string(), "B".to_string(), String::new()),
+        ];
+        assert_eq!(db.import_bookmarks(&items).unwrap(), 2);
+        assert_eq!(db.import_bookmarks(&items).unwrap(), 0);
+        db.set_bookmark_folder("https://b.com/", "School").unwrap();
+        let all = db.bookmarks("", 10).unwrap();
+        assert_eq!(all.iter().find(|b| b.url == "https://b.com/").unwrap().folder, "School");
     }
 
     #[test]

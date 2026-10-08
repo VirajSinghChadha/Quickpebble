@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Bot, Download, RotateCw, Settings, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, BookMarked, Bot, Download, RotateCw, Settings, SlidersHorizontal, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
 import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
@@ -37,13 +37,23 @@ export function Toolbar() {
         <AddressBar />
       </div>
 
-      <IconButton label={`Bookmark (${modKey}D)`} disabled={!hasPage} active={tab.bookmarked} onClick={() => void useStore.getState().toggleBookmark(tab.id)}>
+      {/* Page actions */}
+      <IconButton label={`Bookmark this page (${modKey}D)`} disabled={!hasPage} active={tab.bookmarked} onClick={() => void useStore.getState().toggleBookmark(tab.id)}>
         <Bookmark size={16} fill={tab.bookmarked ? "currentColor" : "none"} />
       </IconButton>
       <IconButton label={`Reader mode (${modKey}⇧R)`} disabled={!hasPage} onClick={() => void ipc.tabReader(tab.id)}><BookOpen size={16} /></IconButton>
-      <IconButton label="Summarize page with AI" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
+      <IconButton label="Summarize this page" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
+
+      <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+
+      {/* Side panels: they sit next to the page instead of covering it */}
       <IconButton label={`Assistant (${modKey}J)`} active={sidebar === "assistant"} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
-      <IconButton label="More tools · extensions, privacy and theme" onClick={() => setOverlay("palette")}><MoreHorizontal size={18}/></IconButton>
+      <IconButton label="Bookmarks" active={sidebar === "bookmarks"} onClick={() => useStore.getState().toggleSidebar("bookmarks")}><BookMarked size={16} /></IconButton>
+      <IconButton label="This site's settings" disabled={!hasPage} active={sidebar === "site"} onClick={() => useStore.getState().toggleSidebar("site")}><SlidersHorizontal size={16} /></IconButton>
+
+      <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+
+      <IconButton label="Command palette and more" onClick={() => setOverlay("palette")}><MoreHorizontal size={18} /></IconButton>
       {update && (
         <button type="button" onClick={() => setOverlay("settings")} className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-[12px] font-medium text-white dark:text-bg" title={`Version ${update.version} is available`}>
           <Download size={13} /> Update

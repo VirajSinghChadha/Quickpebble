@@ -1,5 +1,6 @@
 //! Quick Pebble — browse quicker.
 
+mod bookmarks;
 mod browser;
 mod daemon;
 mod database;
@@ -47,6 +48,9 @@ pub fn run() {
             browser::history_clear,
             browser::bookmark_toggle,
             browser::bookmark_list,
+            browser::bookmark_set_folder,
+            browser::bookmarks_import_chrome,
+            browser::bookmarks_import_file,
             browser::suggest,
             browser::settings_get,
             browser::settings_set,

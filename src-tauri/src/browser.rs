@@ -198,7 +198,8 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .filter(|p| p.policy == "block")
         .map(|p| p.permission)
         .collect();
-    let block_trackers = setting(app, "block_trackers").as_deref() != Some("false");
+    let profile = url.host_str().map(|h| site_profile(app, h)).unwrap_or_default();
+    let block_trackers = profile.trackers.unwrap_or_else(|| setting(app, "block_trackers").as_deref() != Some("false"));
     let script = INJECT
         .replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()))
         .replace("__QP_TRACKERS__", &serde_json::to_string(security::TRACKER_HOSTS).unwrap_or_else(|_| "[]".into()))
@@ -244,12 +245,46 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
                         t.loading = true;
                         t.url = payload.url().to_string();
                     }
-                    PageLoadEvent::Finished => t.loading = false,
+                    PageLoadEvent::Finished => {
+                        t.loading = false;
+                        // Apply this site's saved zoom and mute choice once the page has loaded.
+                        if let Some(host) = Url::parse(payload.url().as_str()).ok().and_then(|u| u.host_str().map(String::from)) {
+                            let p = site_profile(&load_app, &host);
+                            if let Some(z) = p.zoom {
+                                t.zoom = z;
+                                let _ = wv.set_zoom(z);
+                            }
+                            if let Some(m) = p.muted {
+                                t.muted = m;
+                                let _ = wv.eval(format!("window.__qpSetMuted && window.__qpSetMuted({m})"));
+                            }
+                        }
+                    }
                 }
                 emit_tab(&load_app, t);
             }
         });
     window.add_child(builder, pos, size).map_err(|e| e.to_string())
+}
+
+/// Per-site preferences the person chose in the Site panel. Missing fields mean "use the default".
+#[derive(Default, Clone)]
+struct SiteProfile {
+    zoom: Option<f64>,
+    trackers: Option<bool>,
+    muted: Option<bool>,
+}
+
+fn site_profile(app: &AppHandle, host: &str) -> SiteProfile {
+    let host = host.strip_prefix("www.").unwrap_or(host);
+    let Some(json) = setting(app, "site_profiles") else { return SiteProfile::default() };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else { return SiteProfile::default() };
+    let p = &v[host];
+    SiteProfile {
+        zoom: p["zoom"].as_f64().filter(|z| z.is_finite()).map(|z| (z.clamp(0.3, 3.0) * 100.0).round() / 100.0),
+        trackers: p["trackers"].as_bool(),
+        muted: p["muted"].as_bool(),
+    }
 }
 
 fn engine(db: &Db) -> String {
@@ -594,6 +629,47 @@ pub fn bookmark_list(db: State<Db>, query: Option<String>) -> Result<Vec<Bookmar
     db.bookmarks(&query.unwrap_or_default(), 200).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn bookmark_set_folder(db: State<Db>, url: String, folder: String) -> Result<(), String> {
+    let folder: String = folder.trim().chars().take(80).collect();
+    db.set_bookmark_folder(&url, &folder).map_err(|e| e.to_string())
+}
+
+fn save_imported(db: &Db, items: Vec<crate::bookmarks::Imported>) -> Result<usize, String> {
+    let rows: Vec<(String, String, String)> = items.into_iter().take(5000).map(|i| (i.url, i.title, i.folder)).collect();
+    db.import_bookmarks(&rows).map_err(|e| e.to_string())
+}
+
+/// Reads Chrome's own bookmarks file. Returns how many new bookmarks were added.
+#[tauri::command]
+pub fn bookmarks_import_chrome(db: State<Db>) -> Result<usize, String> {
+    let path = crate::bookmarks::chrome_bookmarks_path().filter(|p| p.exists()).ok_or("Chrome's bookmarks were not found on this computer.")?;
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    save_imported(&db, crate::bookmarks::parse_chrome_json(&text))
+}
+
+/// Imports a bookmarks HTML file exported from Safari, Firefox, Edge, Brave or Chrome.
+#[tauri::command]
+pub async fn bookmarks_import_file(app: AppHandle) -> Result<Option<usize>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let handle = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || handle.dialog().file().add_filter("Bookmarks", &["html", "htm"]).blocking_pick_file())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(file) = picked else { return Ok(None) };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    if std::fs::metadata(&path).map_err(|e| e.to_string())?.len() > 20_000_000 {
+        return Err("That file is too large to be a bookmarks export.".into());
+    }
+    let text = std::fs::read_to_string(&path).map_err(|_| "Could not read that file as text.".to_string())?;
+    let items = crate::bookmarks::parse_netscape_html(&text);
+    if items.is_empty() {
+        return Err("No bookmarks found in that file.".into());
+    }
+    let db = app.state::<Db>();
+    save_imported(&db, items).map(Some)
+}
+
 #[derive(Serialize)]
 pub struct Suggestion {
     kind: &'static str,
@@ -626,6 +702,7 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "site_profiles",
     "screen_permissions",
     "screen_model",
     "https_only",
@@ -654,6 +731,9 @@ pub fn settings_set(db: State<Db>, key: String, value: String) -> Result<(), Str
     }
     if key == "search_engine" && !security::SEARCH_ENGINES.iter().any(|(n, _)| *n == value) {
         return Err("unknown search engine".into());
+    }
+    if key == "site_profiles" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
+        return Err("invalid site profiles".into());
     }
     if key == "screen_permissions" && (value.len() > 65_536 || serde_json::from_str::<serde_json::Value>(&value).is_err()) {
         return Err("invalid screen permissions".into());
@@ -981,9 +1061,10 @@ pub fn tab_zoom(app: AppHandle, window: Window, state: State<Browser>, id: Strin
     t.zoom = match action.as_str() {
         "in" => (t.zoom + 0.1).min(3.0),
         "out" => (t.zoom - 0.1).max(0.3),
+        a if a.starts_with("set:") => a[4..].parse::<f64>().ok().filter(|z| z.is_finite()).map_or(t.zoom, |z| z.clamp(0.3, 3.0)),
         _ => 1.0,
     };
-    t.zoom = (t.zoom * 10.0).round() / 10.0;
+    t.zoom = (t.zoom * 100.0).round() / 100.0;
     if let Some(wv) = app.get_webview(&label) {
         let _ = wv.set_zoom(t.zoom);
     }
