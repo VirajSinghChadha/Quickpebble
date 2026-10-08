@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { ASK_PROMPT, runAgent, type AgentIO, type Mode } from "../lib/agent";
+import { runAgent, type AgentIO, type Mode } from "../lib/agent";
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
+import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
 
 export type ChatKind = "user" | "assistant" | "say" | "step" | "error" | "question";
@@ -9,6 +10,8 @@ export interface ChatItem {
   kind: ChatKind;
   text: string;
   ok?: boolean;
+  sources?: AnswerSource[];
+  blocks?: AnswerBlock[];
 }
 
 interface ChatState {
@@ -17,6 +20,12 @@ interface ChatState {
   /** "ask" answers questions about the page; "act" operates the browser. */
   mode: "ask" | "act";
   approvalMode: Mode;
+  sourceTabIds: string[];
+  webResearch: boolean;
+  includeCurrentPage: boolean;
+  setIncludeCurrentPage: (value: boolean) => void;
+  setWebResearch: (value: boolean) => void;
+  setSourceTabIds: (ids: string[]) => void;
   approval: { description: string; resolve: (ok: boolean) => void } | null;
   setMode: (m: "ask" | "act") => void;
   setApprovalMode: (m: Mode) => void;
@@ -77,7 +86,13 @@ function makeIO(): AgentIO {
 export const useChat = create<ChatState>((set, get) => ({
   items: [],
   busy: false,
-  mode: "act",
+  mode: "ask",
+  sourceTabIds: [],
+  webResearch: false,
+  includeCurrentPage: true,
+  setIncludeCurrentPage: (includeCurrentPage) => set({ includeCurrentPage }),
+  setWebResearch: (webResearch) => set({ webResearch }),
+  setSourceTabIds: (sourceTabIds) => set({ sourceTabIds: sourceTabIds.slice(0, 4) }),
   approvalMode: "ask",
   approval: null,
   setMode: (mode) => set({ mode }),
@@ -95,26 +110,40 @@ export const useChat = create<ChatState>((set, get) => ({
     const prior = history(get().items);
     add("user", goal);
     signal = { aborted: false };
+    const runSignal = signal;
+    const mode = get().mode;
+    const sourceIds = [...get().sourceTabIds];
+    const webResearch = get().webResearch;
+    const includeCurrentPage = get().includeCurrentPage;
     set({ busy: true });
     try {
-      if (get().mode === "ask") {
+      if (mode === "ask") {
         const tab = selectActive(useStore.getState());
-        let page = "";
-        if (tab.url) {
-          try {
-            const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot");
-            page = `\n\n<<<PAGE\nurl: ${snap.url}\ntitle: ${snap.title}\n${snap.text}\n>>>PAGE`;
-          } catch {
-            /* answer without page context */
+        const ids = sourceIds.length ? sourceIds : tab.url && includeCurrentPage ? [tab.id] : [];
+        const results = await Promise.allSettled(ids.map(async (id, index) => {
+          const snapshot = await ipc.agentExec<PageSnapshot>(id, "snapshot");
+          return sourceFromSnapshot(snapshot, index + 1);
+        }));
+        if (runSignal.aborted) return;
+        const sources = results.flatMap(r => r.status === "fulfilled" && r.value ? [r.value] : []);
+        if (webResearch) {
+          const results = await ipc.researchSearch(goal);
+          for (const result of results) {
+            const source = sourceFromSnapshot({ ...result } as PageSnapshot, Math.max(0, ...sources.map(s => s.id)) + 1);
+            if (source && !sources.some(s => s.url === source.url)) sources.push({ ...source, kind: "search" });
           }
+          if (runSignal.aborted) return;
         }
-        const reply = await ipc.aiChat(ASK_PROMPT + page, [...prior.slice(-10), { role: "user", content: goal }]);
-        add("assistant", reply || "(no answer)");
+        if (ids.length && !sources.length) throw new Error("Couldn't read your selected page sources. Reload the pages and try again, or remove them to ask without sources.");
+        const reply = await ipc.aiChat(answerPrompt(sources), [...prior.slice(-10), { role: "user", content: goal }], true);
+        if (runSignal.aborted) return;
+        const answer = parseAnswer(reply, sources);
+        set(s => ({ items: [...s.items, { id: nextId++, kind: "assistant", ...answer }] }));
       } else {
         await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
       }
     } catch (e) {
-      add("error", String(e));
+      if (!runSignal.aborted) add("error", String(e));
     } finally {
       get().approval?.resolve(false);
       set({ busy: false });
