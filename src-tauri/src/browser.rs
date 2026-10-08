@@ -726,6 +726,7 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "screen_precision",
     "home_weather",
     "home_weather_place",
     "home_weather_unit",
@@ -766,6 +767,9 @@ pub fn settings_set(db: State<Db>, key: String, value: String) -> Result<(), Str
     }
     if key == "search_engine" && !security::SEARCH_ENGINES.iter().any(|(n, _)| *n == value) {
         return Err("unknown search engine".into());
+    }
+    if key == "screen_precision" && value != "standard" && value != "high" {
+        return Err("unknown precision".into());
     }
     if key == "home_weather_place" && (value.len() > 512 || (!value.is_empty() && serde_json::from_str::<serde_json::Value>(&value).is_err())) {
         return Err("invalid place".into());

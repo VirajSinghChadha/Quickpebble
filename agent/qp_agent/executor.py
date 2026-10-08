@@ -27,9 +27,9 @@ def capture(grid: Grid) -> tuple[Image.Image, str]:
     except Exception as e:  # macOS raises when Screen Recording is denied
         raise RuntimeError("Could not capture the screen. Allow your terminal/Quick Pebble under System Settings → Privacy & Security → Screen Recording.") from e
     scale = MAX_EDGE / max(img.size)
-    if scale < 1:
-        img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
-    return img, jpeg_b64(draw_grid(img, grid))
+    small = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS) if scale < 1 else img
+    # The model sees the reduced, gridded copy; the zoomed second looks are cut from the full-resolution original.
+    return img, jpeg_b64(draw_grid(small, grid))
 
 
 def jpeg_b64(img: Image.Image, quality: int = 82) -> str:

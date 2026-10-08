@@ -114,3 +114,33 @@ def test_action_accepts_refined_point_and_rejects_out_of_range():
     assert (a.ax, a.ay) == (0.5, 0.25)
     with pytest.raises(ValueError):
         Action(type="click", cell="A1", ax=1.5, ay=0.1)
+
+
+def test_tight_crop_is_centred_on_the_point_and_stays_on_screen():
+    from qp_agent.refine import FINE2, crop_square_around, tight_crop, to_screen
+    g = Grid(cols=26, rows=16)
+    raw = Image.new("RGB", (3000, 1800), "white")
+    img, b = tight_crop(raw, g, 0.5, 0.5)
+    assert img.width >= 880 and abs((b[0] + b[2]) / 2 - 0.5) < 1e-6 and abs((b[1] + b[3]) / 2 - 0.5) < 1e-6
+    # about one coarse cell wide: far tighter than the 3x3-cell first look
+    assert 0.9 / 26 < b[2] - b[0] < 1.5 / 26
+    _, edge = crop_square_around(raw, g, 0.0, 1.0)
+    assert edge[0] == 0.0 and abs(edge[3] - 1.0) < 1e-9
+    # the middle of the tight crop is the point we asked about
+    x, y = to_screen(FINE2, "F6", 0.0, 0.0, b)
+    assert abs(x - 0.5) < (b[2] - b[0]) / 10 and abs(y - 0.5) < (b[3] - b[1]) / 10
+
+
+def test_corrections_may_nudge_but_not_leap():
+    from qp_agent.refine import accept_correction
+    g = Grid(cols=26, rows=16)
+    assert accept_correction((0.5, 0.5), (0.5 + 0.3 / 26, 0.5), g)
+    assert not accept_correction((0.5, 0.5), (0.5 + 2 / 26, 0.5), g)
+    assert not accept_correction((0.5, 0.5), (0.5, 0.5 + 1 / 16), g)
+
+
+def test_crosshair_keeps_size_and_marks_the_spot():
+    from qp_agent.refine import draw_crosshair
+    im = draw_crosshair(Image.new("RGB", (400, 300), "black"), 0.5, 0.5)
+    assert im.size == (400, 300)
+    assert im.getpixel((200, 150))[0] > 200   # yellow/white at the crosshair centre

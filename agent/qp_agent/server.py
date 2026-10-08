@@ -52,15 +52,25 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}")
 
     def _refine(self, resp, raw, key: str, model: str) -> None:
-        """Zoom in on the chosen cell and let Gemini pinpoint the target, replacing the coarse position."""
+        """Zoom in on the chosen cell and let Gemini pinpoint the target; in "high" precision, zoom in again with a crosshair."""
         try:
-            crop, bounds = refine.gridded_crop(raw, GRID, resp.action.cell)
             intent = f"{resp.action.type.replace('_', ' ')}: {resp.user.message}"
+            crop, bounds = refine.gridded_crop(raw, GRID, resp.action.cell)
             fine = gemini.refine(key, model, intent, executor.jpeg_b64(crop), refine.FINE)
-            if fine:
-                resp.action.ax, resp.action.ay = refine.fine_to_screen(fine["cell"], fine["fx"], fine["fy"], bounds)
+            if not fine:
+                return
+            p1 = refine.fine_to_screen(fine["cell"], fine["fx"], fine["fy"], bounds)
+            resp.action.ax, resp.action.ay = p1
+            if os.environ.get("QP_AGENT_PRECISION", "high") != "high":
+                return
+            tight, tbounds = refine.tight_crop(raw, GRID, *p1)
+            second = gemini.refine(key, model, intent, executor.jpeg_b64(tight, 88), refine.FINE2, crosshair=True)
+            if second:
+                p2 = refine.to_screen(refine.FINE2, second["cell"], second["fx"], second["fy"], tbounds)
+                if refine.accept_correction(p1, p2, GRID):
+                    resp.action.ax, resp.action.ay = p2
         except Exception:
-            pass   # keep the coarse position
+            pass   # keep whatever position was found so far
 
     def do_GET(self):
         if not self._authorised():

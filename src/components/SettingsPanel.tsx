@@ -35,6 +35,7 @@ export function SettingsPanel() {
   const [blockLevel, setBlockLevel] = useState("standard");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
+  const [precision, setPrecision] = useState("high");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -57,6 +58,7 @@ export function SettingsPanel() {
       setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
       setChromeUa(s.chrome_ua !== "false");
       setCookies(s.cookie_banners !== "false");
+      setPrecision(s.screen_precision === "standard" ? "standard" : "high");
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
@@ -187,6 +189,11 @@ export function SettingsPanel() {
           </Row>
           <Row label="Model" hint={status?.models.length ? `Installed: ${status.models.slice(0, 4).join(", ")}` : undefined}>
             <input className={`${selectCls} w-44`} value={model} placeholder={provider === "ollama" ? "llama3" : "default"} onChange={(e) => setModel(e.target.value)} onBlur={() => void save("ai_model", model)} aria-label="Model" />
+          </Row>
+          <Row label="Screen control precision" hint="High adds a second, much tighter zoom with a crosshair before each click. It clicks the exact center far more reliably but takes one extra AI call (a second or two) per click.">
+            <select className={selectCls} value={precision} onChange={(e) => { setPrecision(e.target.value); void save("screen_precision", e.target.value); }} aria-label="Screen control precision">
+              <option value="high">High (most precise)</option><option value="standard">Standard (faster)</option>
+            </select>
           </Row>
           {provider === "ollama" ? (
             <Row label="Ollama address">

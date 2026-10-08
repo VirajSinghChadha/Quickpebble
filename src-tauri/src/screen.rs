@@ -19,6 +19,7 @@ struct Running {
     port: u16,
     token: String,
     model: String,
+    precision: String,
 }
 
 impl Drop for Running {
@@ -46,7 +47,7 @@ fn agent_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .ok_or_else(|| "The screen agent files were not found (expected an `agent` folder).".to_string())
 }
 
-fn start(app: &AppHandle, model: &str) -> Result<Running, String> {
+fn start(app: &AppHandle, model: &str, precision: &str) -> Result<Running, String> {
     let key = daemon::get_key("gemini").ok_or("Screen mode needs a Gemini API key. Add one in Settings → AI.")?;
     let dir = agent_dir(app)?;
     let python = std::env::var("QP_PYTHON").unwrap_or_else(|_| "python3".into());
@@ -55,6 +56,7 @@ fn start(app: &AppHandle, model: &str) -> Result<Running, String> {
         .current_dir(&dir)
         .env("GEMINI_API_KEY", key)
         .env("QP_AGENT_MODEL", model)
+        .env("QP_AGENT_PRECISION", precision)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -70,7 +72,7 @@ fn start(app: &AppHandle, model: &str) -> Result<Running, String> {
     let field = |name: &str| line.split_whitespace().find_map(|p| p.strip_prefix(name)).map(str::to_string);
     match (line.starts_with("QP_AGENT_READY"), field("port="), field("token=")) {
         (true, Some(port), Some(token)) if port.parse::<u16>().is_ok() => {
-            Ok(Running { child, port: port.parse().unwrap(), token, model: model.to_string() })
+            Ok(Running { child, port: port.parse().unwrap(), token, model: model.to_string(), precision: precision.to_string() })
         }
         _ => {
             let _ = child.kill();
@@ -93,14 +95,15 @@ fn connection(app: &AppHandle, db: &Db, state: &ScreenAgent) -> Result<(u16, Str
     let model = db.get_setting("screen_model").filter(|m| !m.is_empty()).unwrap_or_else(|| {
         if cfg.provider == "gemini" { cfg.model.clone() } else { String::new() }
     });
+    let precision = if db.get_setting("screen_precision").as_deref() == Some("standard") { "standard" } else { "high" };
     let mut guard = state.0.lock().map_err(|_| "screen agent lock poisoned")?;
     let alive = match guard.as_mut() {
-        Some(r) => r.model == model && matches!(r.child.try_wait(), Ok(None)),
+        Some(r) => r.model == model && r.precision == precision && matches!(r.child.try_wait(), Ok(None)),
         None => false,
     };
     if !alive {
         *guard = None; // drops (kills) a stale process
-        *guard = Some(start(app, &model)?);
+        *guard = Some(start(app, &model, precision)?);
     }
     let r = guard.as_ref().ok_or("screen agent not running")?;
     Ok((r.port, r.token.clone()))
