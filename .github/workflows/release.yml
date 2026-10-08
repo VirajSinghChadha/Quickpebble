@@ -66,12 +66,21 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1 || \
               gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
           fi
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          # A draft release is listed under a temporary "untagged-…" tag until it is published, so look it up
+          # by its title as well as by tag. Reuse an existing draft instead of creating a duplicate.
+          find_id() {
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+              --jq ".[] | select(.tag_name == \"$TAG\" or .name == \"Quick Pebble $TAG\") | .id" | head -1
+          }
+          release_id=$(find_id)
+          if [ -z "$release_id" ]; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
               --draft --title "Quick Pebble $TAG" \
               --notes-file CHANGELOG.md
+            sleep 3
+            release_id=$(find_id)
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          release_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id")
           test -n "$release_id" || { echo "Could not resolve draft release ID"; exit 1; }
           echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
 
