@@ -1,6 +1,6 @@
 name: Preview builds
 
-# Builds Windows and Intel-Mac installers for the preview pre-release (no updater key needed), tests the Windows
+# Builds the Windows installer (and, on request, the Intel-Mac disk image) for the preview pre-release (no updater key needed), tests the Windows
 # one by really installing and launching it, and attaches everything to the pre-release.
 # Run it by pushing a tag like `preview-build-2026-10-08`, or from Actions → Run workflow.
 # Pre-releases are not "latest", so the in-app updater and Homebrew are unaffected.
@@ -13,6 +13,10 @@ on:
         description: Existing pre-release to attach the installers to
         required: true
         default: preview-2026-10-08
+      include_intel_mac:
+        description: Also build the Intel-Mac disk image (off by default)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -90,6 +94,8 @@ jobs:
 
   macos-intel:
     name: macOS Intel disk image
+    # Only on request (Actions → Run workflow → tick "Also build the Intel-Mac disk image"); tag pushes build Windows only.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_intel_mac }}
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
