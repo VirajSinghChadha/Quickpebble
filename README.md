@@ -235,7 +235,7 @@ Releases are tag-driven. One-time setup (repository admin):
 3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 4. Settings → Actions → General → Workflow permissions → **Read and write**.
 
-To ship a version:
+To ship a version, bump the version files and either run **Actions → Release → Run workflow** on `main` with that version (for example `1.1.0`), or push a matching tag:
 
 ```bash
 # 1. bump the version in package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json
