@@ -18,12 +18,12 @@ export function NewsCard({ count = 5 }: { count?: number }) {
 
   const load = useCallback(
     async (force = false) => {
-      const key = `news.${source}.${count}`;
+      const key = `news.${source}`;
       const hit = force ? null : cacheGet<Headline[]>(key, TTL);
       if (hit) return setItems(hit), setErr(null);
       setLoading(true);
       try {
-        const fresh = await ipc.newsFetch(source, count);
+        const fresh = await ipc.newsFetch(source, 5);
         cacheSet(key, fresh);
         setItems(fresh);
         setErr(null);
@@ -33,7 +33,7 @@ export function NewsCard({ count = 5 }: { count?: number }) {
         setLoading(false);
       }
     },
-    [source, count],
+    [source],
   );
   useEffect(() => void load(), [load]);
 
@@ -45,7 +45,7 @@ export function NewsCard({ count = 5 }: { count?: number }) {
       </div>
       {items ? (
         <ul className="mt-2 space-y-0.5">
-          {items.map((h) => (
+          {items.slice(0, count).map((h) => (
             <li key={h.url}>
               <button type="button" title={h.url} onClick={() => void useStore.getState().navigate(tab.id, h.url)} className="group block w-full rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-secondary">
                 <span className="line-clamp-2 text-[13px] leading-snug">{h.title}</span>

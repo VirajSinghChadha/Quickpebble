@@ -101,7 +101,6 @@ textarea {
 button { touch-action: manipulation; }
 button:not(:disabled) { cursor: pointer; }
 button:active:not(:disabled) { filter: brightness(.97); }
-@media (max-height: 680px) { .newtab-content { padding-top: 24px; } .newtab-content > div:first-child { margin-bottom: 28px; } .newtab-actions { margin-top: 24px; } }
 @media (prefers-reduced-motion: reduce) { .home-card:hover { transform: none; } html { scroll-behavior: auto; } }
 
 .newtab-actions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }

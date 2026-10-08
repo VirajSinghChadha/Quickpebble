@@ -42,7 +42,7 @@ export function HomeOnboarding() {
   if (!home.loaded || home.onboarded === WHATS_NEW) return null;
 
   const finish = (apply: boolean) =>
-    void useStore.getState().setHome(apply ? { weather: weather && !!useStore.getState().home.place, news, newsSource: source, onboarded: WHATS_NEW } : { onboarded: WHATS_NEW });
+    void useStore.getState().setHome(apply ? { weather, news, newsSource: source, onboarded: WHATS_NEW } : { onboarded: WHATS_NEW });
 
   return (
     <div className="absolute inset-0 z-30 grid place-items-center overflow-y-auto bg-bg/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="New on your home page">
@@ -70,7 +70,7 @@ export function HomeOnboarding() {
           </section>
         </div>
 
-        {weather && !home.place && <p className="mt-4 text-[12px] text-group-school">Search for your city above to show the weather. Without one, the weather card stays off.</p>}
+        {weather && !home.place && <p className="mt-4 text-[12px] text-text-secondary">No city yet? You can also choose it later, right on the weather card.</p>}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => finish(false)} className="rounded-xl border border-border px-4 py-2 text-[13px] hover:bg-surface-secondary">No thanks</button>
           <button type="button" autoFocus onClick={() => finish(true)} disabled={!weather && !news} className="rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40 dark:text-bg">Turn on what I chose</button>

@@ -3,6 +3,7 @@ import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudMoon, CloudRain, Cl
 import { ipc, type Weather } from "../../lib/ipc";
 import { cacheGet, cacheSet, placeLabel, weatherInfo, type WeatherIcon } from "../../lib/home";
 import { useStore } from "../../store/useStore";
+import { CityPicker } from "./HomeOptions";
 
 const ICONS: Record<WeatherIcon, typeof Sun> = { sun: Sun, moon: Moon, "cloud-sun": CloudSun, "cloud-moon": CloudMoon, cloud: Cloud, fog: CloudFog, drizzle: CloudDrizzle, rain: CloudRain, snow: CloudSnow, storm: CloudLightning };
 const TTL = 20 * 60 * 1000;
@@ -41,12 +42,13 @@ export function WeatherCard() {
   );
   useEffect(() => void load(), [load]);
 
-  const card = "home-widget rounded-2xl border border-border bg-surface p-4 text-left";
+  const card = "home-widget flex flex-col rounded-2xl border border-border bg-surface p-4 text-left";
   if (!place) {
     return (
       <section className={card} aria-label="Weather">
-        <p className="font-medium">Weather</p>
-        <p className="mt-1 text-[12px] text-text-secondary">Choose your city with the wrench icon at the bottom left.</p>
+        <p className="font-medium">Which city is your weather for?</p>
+        <p className="mb-2 mt-0.5 text-[12px] text-text-secondary">Only the city's location is sent, to Open-Meteo.</p>
+        <CityPicker />
       </section>
     );
   }
@@ -59,7 +61,7 @@ export function WeatherCard() {
         <button type="button" aria-label="Refresh weather" title="Refresh" onClick={() => void load(true)} className="grid size-6 place-items-center rounded-md hover:bg-surface-secondary"><RefreshCw size={12} className={loading ? "animate-spin" : ""} /></button>
       </div>
       {w && info ? (
-        <div className="mt-2 flex items-center gap-4">
+        <div className="mt-2 flex flex-1 items-center gap-4">
           <WeatherIconView icon={info.icon} />
           <div className="min-w-0">
             <p className="text-[34px] font-semibold leading-none tracking-tight">{Math.round(w.temp)}{deg}</p>
