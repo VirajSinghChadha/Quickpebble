@@ -65,12 +65,16 @@ pub fn get_key(provider: &str) -> Option<String> {
     if let Some(k) = std::env::var(&env_name).ok().or_else(|| (provider == "gemini").then(|| std::env::var("GEMINI_API_KEY").ok()).flatten()).filter(|k| !k.trim().is_empty()) {
         return Some(k.trim().to_string());
     }
-    if let Some(k) = key_cache().lock().ok()?.get(provider) {
+    if let Some(k) = key_cache().lock().ok()?.get(provider).filter(|k| !k.is_empty()) {
         return Some(k.clone());
     }
-    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty())?;
-    key_cache().lock().ok()?.insert(provider.to_string(), k.clone());
-    Some(k)
+    // An empty entry in the cache means "already asked and got nothing / was denied": don't prompt again this launch.
+    if key_cache().lock().ok()?.get(provider).is_some() {
+        return None;
+    }
+    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty());
+    key_cache().lock().ok()?.insert(provider.to_string(), k.clone().unwrap_or_default());
+    k
 }
 
 pub fn set_key(provider: &str, key: &str) -> Result<(), String> {
