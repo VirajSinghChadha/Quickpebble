@@ -1,0 +1,38 @@
+fn main() {
+    tauri_build::try_build(
+        tauri_build::Attributes::new().app_manifest(
+            tauri_build::AppManifest::new().commands(&[
+                "qp_report",
+                "qp_shortcut",
+                "tab_create",
+                "tab_activate",
+                "tab_close",
+                "tab_navigate",
+                "tab_nav",
+                "tab_set_pinned",
+                "tab_set_muted",
+                "content_visible",
+                "history_search",
+                "history_clear",
+                "bookmark_toggle",
+                "bookmark_list",
+                "suggest",
+                "settings_get",
+                "settings_set",
+                "memory_saver_get",
+                "memory_saver_set",
+                "memory_stats",
+                "ai_status",
+                "ai_run",
+                "ai_set_key",
+                "privacy_stats",
+                "privacy_permissions",
+                "privacy_set_permission",
+                "privacy_clear_data",
+                "window_new_private",
+                "window_control",
+            ]),
+        ),
+    )
+    .expect("failed to run tauri-build");
+}

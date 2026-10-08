@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Pebble UI design tokens. Utilities (bg-bg, text-text-primary, …) read these at runtime,
+   so the .dark override below re-themes the whole UI without regenerating CSS. */
+@theme {
+  --color-primary: #2563eb;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f1f5f9;
+  --color-text-primary: #172033;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+  --color-accent: #38bdf8;
+
+  --color-group-school: #f59e0b;
+  --color-group-work: #2563eb;
+  --color-group-personal: #10b981;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --ease-pebble: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --shadow-pebble: 0 1px 2px rgb(15 23 42 / 0.08), 0 4px 12px rgb(15 23 42 / 0.08);
+  --shadow-float: 0 8px 32px rgb(15 23 42 / 0.18);
+}
+
+.dark {
+  --color-primary: #60a5fa;
+  --color-bg: #101827;
+  --color-surface: #1b2638;
+  --color-surface-secondary: #243247;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-border: #334155;
+  --color-accent: #38bdf8;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  user-select: none;
+  -webkit-user-select: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* Thin scrollbars that match the surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

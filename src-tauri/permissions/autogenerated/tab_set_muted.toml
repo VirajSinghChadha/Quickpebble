@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tab-set-muted"
+description = "Enables the tab_set_muted command without any pre-configured scope."
+commands.allow = ["tab_set_muted"]
+
+[[permission]]
+identifier = "deny-tab-set-muted"
+description = "Denies the tab_set_muted command without any pre-configured scope."
+commands.deny = ["tab_set_muted"]

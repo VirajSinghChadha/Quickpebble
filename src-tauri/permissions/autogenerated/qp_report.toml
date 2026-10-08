@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-qp-report"
+description = "Enables the qp_report command without any pre-configured scope."
+commands.allow = ["qp_report"]
+
+[[permission]]
+identifier = "deny-qp-report"
+description = "Denies the qp_report command without any pre-configured scope."
+commands.deny = ["qp_report"]

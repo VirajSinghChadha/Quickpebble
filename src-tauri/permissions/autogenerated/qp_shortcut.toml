@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-qp-shortcut"
+description = "Enables the qp_shortcut command without any pre-configured scope."
+commands.allow = ["qp_shortcut"]
+
+[[permission]]
+identifier = "deny-qp-shortcut"
+description = "Denies the qp_shortcut command without any pre-configured scope."
+commands.deny = ["qp_shortcut"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-memory-saver-set"
+description = "Enables the memory_saver_set command without any pre-configured scope."
+commands.allow = ["memory_saver_set"]
+
+[[permission]]
+identifier = "deny-memory-saver-set"
+description = "Denies the memory_saver_set command without any pre-configured scope."
+commands.deny = ["memory_saver_set"]

@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pages",
+  "description": "Web pages may only report their own state and forward shortcuts. Identity comes from the webview label, never the payload.",
+  "windows": ["main", "private-*"],
+  "webviews": ["tab-*"],
+  "remote": { "urls": ["https://*", "http://*"] },
+  "permissions": ["allow-qp-report", "allow-qp-shortcut"]
+}

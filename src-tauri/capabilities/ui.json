@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "ui",
+  "description": "Quick Pebble chrome (local UI only).",
+  "windows": ["main", "private-*"],
+  "webviews": ["ui-*"],
+  "permissions": ["core:default", "ui-commands"]
+}

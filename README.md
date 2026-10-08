@@ -1,0 +1,159 @@
+<div align="center">
+
+<img src="public/pebble.svg" alt="Quick Pebble logo" width="96" height="96" />
+
+# Quick Pebble
+
+**Browse quicker.**
+
+A lightweight, privacy-first desktop browser with a calm design, tab memory saving, and AI that runs on your own machine.
+
+[![CI](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml/badge.svg)](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![Tauri 2](https://img.shields.io/badge/Tauri-2.x-24C8DB)
+![React 19](https://img.shields.io/badge/React-19-61DAFB)
+
+</div>
+
+---
+
+## Highlights
+
+| | |
+|---|---|
+| **Pebble UI** | A compact 92 px chrome, floating "pebble" tabs, 12 px radii, light and dark themes, and 150–180 ms transitions. |
+| **Local AI first** | Page summaries, tab auto-grouping and address-bar completions run through [Ollama](https://ollama.com) on `localhost`. Cloud providers (OpenAI, Anthropic, Gemini) are opt-in. |
+| **Memory Saver** | Idle background tabs are suspended and restored when you return. Never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
+| **Privacy Center** | Tracker blocking, per-site camera / microphone / location / notification rules, private windows, one-click data clearing. |
+| **Quick Actions** | `⌘⇧P` command palette and `⌘⇧A` tab search. |
+| **Small and native** | Tauri 2 + Rust, using the OS web engine (WKWebView on macOS, WebView2 on Windows). No bundled Chromium. |
+
+## Install
+
+Grab a build from the [Releases](https://github.com/VirajSinghChadha/Quickpebble/releases) page once one is published, or build from source below.
+
+macOS builds are unsigned unless you add your own signing identity, so the first launch needs *right-click → Open*.
+
+## Build from source
+
+**Requirements:** Node 20+, Rust (stable), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your OS (Xcode Command Line Tools on macOS; WebView2 and MSVC Build Tools on Windows).
+
+```bash
+git clone https://github.com/VirajSinghChadha/Quickpebble.git
+cd Quickpebble
+npm install
+npm run tauri:dev      # run the app with hot reload
+```
+
+```bash
+npm run tauri:build    # production bundle for the current OS
+./scripts/package_macos.sh          # macOS .dmg
+iscc scripts\installer_windows.iss  # Windows installer (after `npx tauri build --no-bundle`)
+```
+
+### Optional: local AI
+
+```bash
+brew install ollama        # or https://ollama.com/download
+ollama serve
+ollama pull llama3         # or: ollama pull mistral
+```
+
+Quick Pebble detects Ollama automatically. Change the model or provider under **Settings → AI**.
+
+## Keyboard shortcuts
+
+Use `⌘` on macOS and `Ctrl` on Windows/Linux.
+
+| Shortcut | Action |
+|---|---|
+| `⌘T` / `⌘W` | New tab / close tab |
+| `⌘L` | Focus the address bar |
+| `⌘R` | Reload |
+| `⌘[` / `⌘]` | Back / forward |
+| `⌘D` | Bookmark this page |
+| `⌘⇧P` | Quick Actions |
+| `⌘⇧A` | Search tabs |
+| `⌘⇧N` | Private window |
+
+Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal** group (or let the AI choose).
+
+## How it works
+
+```text
+┌─────────────────────────── window ───────────────────────────┐
+│ UI webview (React)  ── tab strip + toolbar + overlays        │
+│ ┌───────────────────────────────────────────────────────────┐│
+│ │ Page webview per tab (child webview, 92 px below the top) ││
+│ └───────────────────────────────────────────────────────────┘│
+└───────────────────────────────┬───────────────────────────────┘
+                                │ Tauri IPC
+        ┌───────────────────────┴────────────────────────┐
+        │ Rust core: tabs · memory saver · SQLite · AI   │
+        └────────────────────────────────────────────────┘
+```
+
+```text
+quick-pebble/
+├── src/                      React 19 + TypeScript + Tailwind v4 frontend
+│   ├── components/           TabStrip, AddressBar, Toolbar, QuickActions, PrivacyCenter, NewTabPage, …
+│   ├── hooks/                useTabs, useOllama, useShortcuts, useTheme
+│   ├── store/                Zustand store (tabs, theme, overlays, session restore)
+│   ├── lib/                  typed IPC client, shortcut table, URL helpers
+│   └── styles/globals.css    Pebble UI design tokens
+├── src-tauri/
+│   ├── src/browser.rs        tab webviews, windows, IPC commands
+│   ├── src/daemon.rs         Ollama bridge + OpenAI / Anthropic / Gemini fallbacks
+│   ├── src/memory_saver.rs   suspension policy and exclusion rules
+│   ├── src/database.rs       SQLite: history, bookmarks, settings, site permissions
+│   ├── src/security.rs       URL normalisation, navigation policy, tracker blocklist
+│   ├── src/inject.js         script injected into pages (state reporting, shortcuts, permission blocks)
+│   ├── capabilities/         least-privilege IPC permissions
+│   └── tauri.conf.json
+├── scripts/                  macOS DMG script, Inno Setup installer
+└── .github/workflows/        CI and release pipelines
+```
+
+- **Tabs are native child webviews.** The React UI draws the chrome; each live tab is its own webview placed below it. Tabs showing the new tab page, and suspended tabs, have no webview at all.
+- **Memory Saver** runs a 30-second background loop. *Balanced* suspends after 20 idle minutes, *Maximum* after 5; the timeout halves when system memory is above 85 % used. Suspending closes the webview, and activating the tab reloads its URL.
+- **Overlays** (menus, palette, dialogs) are drawn by the UI webview, which sits beneath page webviews, so the page is briefly hidden while one is open.
+
+## Privacy and security model
+
+- **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to that provider, and the app tells you so each time. API keys are stored in the OS keychain, never in the database.
+- **Tracker blocking** stops top-level navigations to known ad and analytics hosts (a bundled list in `security.rs`). It does not filter sub-resource requests such as scripts and pixels inside a page, so it is not a replacement for a full content blocker.
+- **Navigation policy.** Only `http`, `https` and `about:blank` can load. `javascript:`, `file:`, `data:` and custom schemes are refused.
+- **Pages get almost no IPC.** Web pages may call exactly two commands (report their own state, forward a shortcut). Which tab is calling comes from the webview label, never from the payload. The UI webview has a separate capability.
+- **Site permissions.** "Block" rules are enforced by overriding `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run. This is best-effort and applies on the next page load. "Ask" and "Allow" fall through to the system web engine's own behaviour.
+- **Private windows** use non-persistent webview storage, don't write history, and don't save tab sessions.
+- **The SQLite database is not encrypted.** It sits in your OS app-data folder, protected by your user account. If you need encryption at rest, rely on full-disk encryption or swap in SQLCipher.
+
+## Known limitations
+
+These are the honest edges of v1.0:
+
+- Only macOS compilation and unit tests have been run so far. Windows and Linux builds are covered by the CI matrix but haven't been exercised by hand.
+- No cross-platform API reports per-tab memory, so the "MB saved" figure is an estimate (about 100 MB per suspended tab).
+- Download tracking isn't wired up yet, so the "don't suspend during a download" rule is implemented in the policy but the flag is never set.
+- Audio detection looks at `<audio>`/`<video>` elements; audio from Web Audio or WebRTC-only pages isn't detected.
+- Web extensions, sync, a password manager and a built-in PDF viewer are not part of v1.0.
+- Keyboard shortcuts are captured inside pages by an injected script, so they won't fire on pages that block script injection.
+
+## Development
+
+```bash
+npm run typecheck                                  # TypeScript
+npm test                                           # Vitest (frontend logic)
+cargo test --manifest-path src-tauri/Cargo.toml    # Rust unit tests
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+```
+
+Design tokens live in `src/styles/globals.css`; changing a `--color-*` value re-themes the whole app. When you add a Rust command, register it in `lib.rs`, list it in `build.rs`, and grant it in `src-tauri/permissions/ui.toml`.
+
+## Contributing
+
+Issues and pull requests are welcome. Please run the checks above before opening a PR.
+
+## License
+
+[MIT](LICENSE)
