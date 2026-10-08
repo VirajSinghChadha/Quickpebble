@@ -37,7 +37,9 @@ class Action(BaseModel):
     direction: Optional[Literal["up", "down"]] = None
     amount: int = 3
     category: str = Field(default="none", pattern=r"^[a-z][a-z0-9_]{0,39}$")   # one of the site's permission ids, or "none"
-    risk: Literal["low", "high"] = "low"     # "high" = hard to undo or affects others; the app asks the person first
+    risk: Literal["low", "high"] = "low"
+    ax: Optional[float] = Field(default=None, ge=0, le=1)   # exact point as a fraction of the screen, set by the refinement step
+    ay: Optional[float] = Field(default=None, ge=0, le=1)     # "high" = hard to undo or affects others; the app asks the person first
 
     @field_validator("fx", "fy")
     @classmethod

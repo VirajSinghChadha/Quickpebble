@@ -8,8 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 @dataclass(frozen=True)
 class Grid:
-    cols: int = 24
-    rows: int = 14
+    cols: int = 26
+    rows: int = 16
 
     def label(self, col: int, row: int) -> str:
         return f"{chr(ord('A') + col)}{row + 1}"

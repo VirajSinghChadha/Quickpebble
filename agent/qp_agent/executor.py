@@ -20,7 +20,8 @@ KEY_NAMES = {"cmd": "command", "ctrl": "ctrl", "alt": "option", "option": "optio
 MAX_EDGE = 1600
 
 
-def capture_gridded_jpeg_b64(grid: Grid) -> str:
+def capture(grid: Grid) -> tuple[Image.Image, str]:
+    """(screenshot without the grid, base64 JPEG of the screenshot with the grid drawn on it)."""
     try:
         img: Image.Image = pyautogui.screenshot()
     except Exception as e:  # macOS raises when Screen Recording is denied
@@ -28,9 +29,17 @@ def capture_gridded_jpeg_b64(grid: Grid) -> str:
     scale = MAX_EDGE / max(img.size)
     if scale < 1:
         img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+    return img, jpeg_b64(draw_grid(img, grid))
+
+
+def jpeg_b64(img: Image.Image, quality: int = 82) -> str:
     buf = io.BytesIO()
-    draw_grid(img, grid).save(buf, "JPEG", quality=80)
+    img.convert("RGB").save(buf, "JPEG", quality=quality)
     return base64.b64encode(buf.getvalue()).decode()
+
+
+def capture_gridded_jpeg_b64(grid: Grid) -> str:
+    return capture(grid)[1]
 
 
 def _paste(text: str) -> None:
@@ -81,7 +90,10 @@ def screen_changed(before: list[int] | None, after: list[int] | None) -> bool | 
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
     if action.type in ("click", "double_click", "right_click", "scroll"):
-        x, y = grid.to_screen(action.cell, action.fx, action.fy, width, height)
+        if action.ax is not None and action.ay is not None:   # exact point found by the zoomed second look
+            x, y = min(width - 1, int(action.ax * width)), min(height - 1, int(action.ay * height))
+        else:
+            x, y = grid.to_screen(action.cell, action.fx, action.fy, width, height)
         pyautogui.moveTo(x, y, duration=0.25)
         time.sleep(0.1)
         if action.type == "click":

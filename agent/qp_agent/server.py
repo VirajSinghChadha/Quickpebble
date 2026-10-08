@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic import ValidationError
 
-from . import executor, gemini
+from . import executor, gemini, refine
 from .grid import Grid
 from .schema import Action
 
@@ -51,6 +51,17 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("request too large")
         return json.loads(self.rfile.read(n) or b"{}")
 
+    def _refine(self, resp, raw, key: str, model: str) -> None:
+        """Zoom in on the chosen cell and let Gemini pinpoint the target, replacing the coarse position."""
+        try:
+            crop, bounds = refine.gridded_crop(raw, GRID, resp.action.cell)
+            intent = f"{resp.action.type.replace('_', ' ')}: {resp.user.message}"
+            fine = gemini.refine(key, model, intent, executor.jpeg_b64(crop), refine.FINE)
+            if fine:
+                resp.action.ax, resp.action.ay = refine.fine_to_screen(fine["cell"], fine["fx"], fine["fy"], bounds)
+        except Exception:
+            pass   # keep the coarse position
+
     def do_GET(self):
         if not self._authorised():
             return self._send(403, {"error": "forbidden"})
@@ -73,10 +84,12 @@ class Handler(BaseHTTPRequestHandler):
                 key = os.environ.get("GEMINI_API_KEY", "")
                 if not key:
                     raise gemini.AgentError("No Gemini API key saved. Add one in Settings → AI.")
-                shot = executor.capture_gridded_jpeg_b64(GRID)
+                raw, shot = executor.capture(GRID)
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
                 page_text = str(body.get("page_text") or "")[:6000] or None
                 resp = gemini.propose(key, model, GRID, goal, history, shot, cats, page_text)
+                if resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_REFINE", "1") != "0":
+                    self._refine(resp, raw, key, model)
                 self._send(200, resp.model_dump(exclude_none=True))
             elif self.path == "/verify":
                 goal, pending = str(body.get("goal", "")).strip(), str(body.get("pending", ""))[:300]

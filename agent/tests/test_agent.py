@@ -83,3 +83,34 @@ def test_site_specific_categories_and_unknown_labels():
     assert (ok.action.category, ok.action.risk) == ("submit_quiz_answers", "low")
     odd = parse_reply(reply(type="click", cell="A1", category="make_coffee"), G, ids)
     assert (odd.action.category, odd.action.risk) == ("none", "high")
+
+
+def test_refinement_maps_a_zoomed_cell_back_to_the_screen():
+    from qp_agent.refine import FINE, crop_around, fine_to_screen
+    g = Grid(cols=26, rows=16)
+    raw = Image.new("RGB", (2600, 1600), "white")
+    crop, bounds = crop_around(raw, g, "M8")
+    assert crop.width >= 960
+    x0, y0, x1, y1 = bounds
+    assert x0 < 12 / 26 < x1 and y0 < 7 / 16 < y1
+    # the centre of the crop maps to the centre of the chosen coarse cell
+    ax, ay = fine_to_screen("F6", 1.0, 1.0, bounds)       # centre of a 12x12 grid = F6/G7 boundary
+    assert abs(ax - 12.5 / 26) < 0.001 and abs(ay - 7.5 / 16) < 0.001
+    assert 0 <= fine_to_screen("A1", 0, 0, bounds)[0] < fine_to_screen("L12", 1, 1, bounds)[0] <= 1
+    assert FINE.cols == FINE.rows == 12
+
+
+def test_edge_cells_stay_inside_the_screen():
+    from qp_agent.refine import crop_around
+    g = Grid(cols=26, rows=16)
+    _, b = crop_around(Image.new("RGB", (1600, 1000), "white"), g, "A1")
+    assert b[0] == 0 and b[1] == 0
+    _, b = crop_around(Image.new("RGB", (1600, 1000), "white"), g, "Z16")
+    assert b[2] == 1 and b[3] == 1
+
+
+def test_action_accepts_refined_point_and_rejects_out_of_range():
+    a = Action(type="click", cell="A1", ax=0.5, ay=0.25)
+    assert (a.ax, a.ay) == (0.5, 0.25)
+    with pytest.raises(ValueError):
+        Action(type="click", cell="A1", ax=1.5, ay=0.1)

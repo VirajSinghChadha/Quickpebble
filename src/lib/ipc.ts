@@ -237,6 +237,8 @@ export interface ScreenAction {
   direction?: "up" | "down";
   amount?: number;
   category?: string; // id of one of the site's permissions, or "none"
+  ax?: number; // exact point (fraction of the screen) found by the zoomed second look; sent back unchanged
+  ay?: number;
   risk?: "low" | "high";
 }
 
