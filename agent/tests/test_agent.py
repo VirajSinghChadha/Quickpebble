@@ -144,3 +144,17 @@ def test_crosshair_keeps_size_and_marks_the_spot():
     im = draw_crosshair(Image.new("RGB", (400, 300), "black"), 0.5, 0.5)
     assert im.size == (400, 300)
     assert im.getpixel((200, 150))[0] > 200   # yellow/white at the crosshair centre
+
+
+import sys as _sys
+
+
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
+def test_non_ascii_text_is_pasted_on_windows(monkeypatch):
+    from qp_agent import executor
+    calls = []
+    monkeypatch.setattr(executor.sys, "platform", "win32")
+    monkeypatch.setattr(executor, "_set_clipboard_windows", lambda t: calls.append(("clip", t)))
+    monkeypatch.setattr(executor.pyautogui, "hotkey", lambda *k: calls.append(("keys", k)))
+    executor._paste("héllo 你好")
+    assert calls == [("clip", "héllo 你好"), ("keys", ("ctrl", "v"))]

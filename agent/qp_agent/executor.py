@@ -42,11 +42,45 @@ def capture_gridded_jpeg_b64(grid: Grid) -> str:
     return capture(grid)[1]
 
 
+def _set_clipboard_windows(text: str) -> None:
+    """Puts Unicode text on the Windows clipboard (no extra packages needed)."""
+    import ctypes
+    from ctypes import wintypes
+
+    CF_UNICODETEXT, GMEM_MOVEABLE = 13, 0x0002
+    k32, u32 = ctypes.windll.kernel32, ctypes.windll.user32  # type: ignore[attr-defined]
+    k32.GlobalAlloc.restype, k32.GlobalAlloc.argtypes = wintypes.HGLOBAL, [wintypes.UINT, ctypes.c_size_t]
+    k32.GlobalLock.restype, k32.GlobalLock.argtypes = wintypes.LPVOID, [wintypes.HGLOBAL]
+    k32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+    u32.OpenClipboard.argtypes = [wintypes.HWND]
+    u32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+    data = text.encode("utf-16-le") + b"\x00\x00"
+    handle = k32.GlobalAlloc(GMEM_MOVEABLE, len(data))
+    if not handle:
+        raise RuntimeError("Could not prepare the clipboard")
+    ptr = k32.GlobalLock(handle)
+    ctypes.memmove(ptr, data, len(data))
+    k32.GlobalUnlock(handle)
+    if not u32.OpenClipboard(None):
+        raise RuntimeError("Could not open the clipboard (another program may be using it)")
+    try:
+        u32.EmptyClipboard()
+        if not u32.SetClipboardData(CF_UNICODETEXT, handle):
+            raise RuntimeError("Could not copy the text")
+    finally:
+        u32.CloseClipboard()
+
+
 def _paste(text: str) -> None:
-    if sys.platform != "darwin":
-        raise RuntimeError("Typing non-ASCII text is only supported on macOS")
-    subprocess.run(["pbcopy"], input=text.encode(), check=True)
-    pyautogui.hotkey("command", "v")
+    """Types text that keystrokes can't carry (accents, other alphabets) by pasting it."""
+    if sys.platform == "darwin":
+        subprocess.run(["pbcopy"], input=text.encode(), check=True)
+        pyautogui.hotkey("command", "v")
+    elif sys.platform == "win32":
+        _set_clipboard_windows(text)
+        pyautogui.hotkey("ctrl", "v")
+    else:
+        raise RuntimeError("Typing non-English characters is only supported on macOS and Windows")
 
 
 def _applescript_string(text: str) -> str:
