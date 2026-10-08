@@ -57,11 +57,13 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1 || \
               gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+            tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+            test "$tag_sha" = "$GITHUB_SHA" || { echo "Existing tag points to another commit; use its tagged source to retry"; exit 1; }
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
               --draft --title "Quick Pebble $TAG" \
-              --notes "See the [README](https://github.com/$GITHUB_REPOSITORY#install) for install options. Existing installs will offer this update in-app."
+              --notes-file CHANGELOG.md
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)" >> "$GITHUB_OUTPUT"
 
@@ -72,8 +74,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS (Apple silicon), os: macos-latest, target: aarch64-apple-darwin }
-          - { name: macOS (Intel), os: macos-latest, target: x86_64-apple-darwin }
+          - { name: macOS (Apple silicon), os: macos-15, target: aarch64-apple-darwin }
+          - { name: macOS (Intel), os: macos-15-intel, target: x86_64-apple-darwin }
           - { name: Windows, os: windows-latest, target: "" }
     runs-on: ${{ matrix.os }}
     steps:
