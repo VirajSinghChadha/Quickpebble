@@ -33,12 +33,17 @@ export function SettingsPanel() {
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+  const [researchKey, setResearchKey] = useState("");
+  const [researchReady, setResearchReady] = useState(false);
+  const [researchMessage, setResearchMessage] = useState("");
+  const [researchBusy, setResearchBusy] = useState(false);
   const [key, setKey] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const { status, refresh } = useOllama(5000);
   const close = () => useStore.getState().setOverlay(null);
 
   useEffect(() => {
+    void ipc.researchStatus().then(setResearchReady);
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
@@ -164,6 +169,12 @@ export function SettingsPanel() {
           </p>
           {msg && <p role="alert" className="pt-1 text-[12px] text-red-500">{msg}</p>}
         </div>
+        <section className="py-4" aria-label="Web research settings">
+          <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Web research</h3>
+          <p className="mb-3 text-xs leading-relaxed text-text-secondary">Add your Brave Search API key to let the assistant find sources beyond your open tabs. Searches run only when you enable “Search the web for sources” in chat. Your question goes to Brave; excerpts go to your chosen AI provider. Your key stays in the OS keychain.</p>
+          <div className="flex gap-2"><input type="password" autoComplete="off" aria-label="Brave Search API key" value={researchKey} onChange={e => setResearchKey(e.target.value)} placeholder={researchReady ? 'Key stored · paste to replace' : 'Paste Brave Search API key'} className={`${selectCls} min-w-0 flex-1`}/><button type="button" disabled={researchBusy || !researchKey.trim()} className="rounded-lg bg-primary px-3 text-white disabled:opacity-40 dark:text-bg" onClick={async () => { setResearchBusy(true); try { await ipc.researchKeySet(researchKey); setResearchKey(''); setResearchReady(true); setResearchMessage('Search key saved'); } catch(e) { setResearchMessage(String(e)); } finally { setResearchBusy(false); } }}>Save</button>{researchReady && <button type="button" disabled={researchBusy} className="rounded-lg border border-border px-3" onClick={async () => { setResearchBusy(true); try { await ipc.researchKeySet(''); setResearchReady(false); setResearchMessage('Search key removed'); } catch(e) { setResearchMessage(String(e)); } finally { setResearchBusy(false); } }}>Remove</button>}</div>
+          {researchMessage && <p role="status" className="mt-2 text-xs text-text-secondary">{researchMessage}</p>}
+        </section>
       </div>
     </Modal>
   );

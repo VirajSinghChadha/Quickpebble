@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, Clock, Cpu, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bookmark, Clock, Command, Cpu, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { ipc, type Bookmark as Bm, type HistoryEntry, type MemoryStats } from "../lib/ipc";
 import { useOllama } from "../hooks/useOllama";
 import { displayUrl, hostOf } from "../lib/url";
@@ -45,7 +45,7 @@ function Logo({ size = 64 }: { size?: number }) {
 function Tiles({ items }: { items: { name: string; url: string }[] }) {
   const tab = useStore(selectActive);
   return (
-    <div className="mx-auto grid max-w-2xl grid-cols-3 gap-3 sm:grid-cols-6">
+    <div className="quick-tiles mx-auto grid w-full max-w-2xl gap-3">
       {items.map((l) => (
         <button
           key={l.url}
@@ -64,11 +64,21 @@ function Tiles({ items }: { items: { name: string; url: string }[] }) {
 }
 
 function Classic() {
+  const [marks, setMarks] = useState<Bm[]>([]);
+  const bookmarksVersion = useStore(s => s.bookmarksVersion);
+  useEffect(() => { let active = true; void ipc.bookmarkList().then(b => { if (active) setMarks(b.slice(0, 6)); }); return () => { active = false; }; }, [bookmarksVersion]);
   return (
-    <div className="flex flex-col items-center gap-8 pt-[12vh]">
-      <div className="flex items-center gap-4"><Logo /><div><h1 className="text-3xl font-semibold tracking-tight">Quick Pebble</h1><p className="text-text-secondary">Browse quicker.</p></div></div>
-      <SearchBox />
-      <Tiles items={QUICK_LINKS} />
+    <div className="newtab-content mx-auto flex max-w-4xl flex-col px-8 pb-8 pt-[7vh]">
+      <div className="mb-14 flex items-center justify-between text-xs text-text-secondary"><span className="flex items-center gap-2 font-medium"><Logo size={24}/> QUICK PEBBLE</span><span>{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span></div>
+      <div className="mb-8 text-center"><span className="newtab-eyebrow">YOUR SPACE TO EXPLORE</span><h1 className="mt-4 text-[clamp(32px,4vw,48px)] font-semibold tracking-[-0.045em] leading-tight">A clearer view of the web.</h1><p className="mt-3 text-sm text-text-secondary">Less noise. More room for what matters.</p></div>
+      <SearchBox big />
+      <div className="mt-7"><Tiles items={marks.length ? marks.map(b => ({ name: b.title || hostOf(b.url), url: b.url })) : QUICK_LINKS}/></div>
+      <div className="newtab-actions mt-12 grid gap-3 sm:grid-cols-3">
+        <button type="button" className="home-card" onClick={() => useStore.getState().setSidebar('assistant')}><span className="home-card-icon"><Sparkles size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Ask Pebble</strong><span className="mt-1 block text-xs text-text-secondary">Answers with page sources</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
+        <button type="button" className="home-card" onClick={() => useStore.getState().setSidebar('therapist')}><span className="home-card-icon"><Bookmark size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Your workspaces</strong><span className="mt-1 block text-xs text-text-secondary">Pick up where you left off</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
+        <button type="button" className="home-card" onClick={() => useStore.getState().setOverlay('privacy')}><span className="home-card-icon"><ShieldCheck size={19}/></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Privacy center</strong><span className="mt-1 block text-xs text-text-secondary">Browse with control</span></span><ArrowUpRight size={15} className="text-text-secondary"/></button>
+      </div>
+      <button type="button" onClick={() => useStore.getState().setOverlay('palette')} className="mx-auto mt-9 flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-text-secondary hover:bg-surface"><Command size={13}/> Quick actions <kbd className="shortcut-key">{modKey}⇧P</kbd></button>
     </div>
   );
 }
@@ -137,7 +147,7 @@ function Productivity() {
 export function NewTabPage() {
   const layout = useStore((s) => s.layout);
   return (
-    <main className="h-full overflow-y-auto bg-bg" aria-label="New tab">
+    <main className="newtab h-full overflow-y-auto bg-bg" aria-label="New tab">
       {layout === "minimal" ? <Minimal /> : layout === "productivity" ? <Productivity /> : <Classic />}
     </main>
   );

@@ -1,13 +1,10 @@
-import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Bot, Download, MoonStar, Puzzle, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Bot, Download, RotateCw, Settings, Sparkles, MoreHorizontal, X, Minus, Square } from "lucide-react";
 import { useUpdater } from "../store/useUpdater";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
-import { selectActive, useStore, type Theme } from "../store/useStore";
+import { selectActive, useStore } from "../store/useStore";
 import { AddressBar } from "./AddressBar";
 import { IconButton } from "./IconButton";
-
-const THEME_ORDER: Theme[] = ["system", "light", "dark"];
-const THEME_ICON = { system: SunMoon, light: Sun, dark: MoonStar };
 
 /** Custom min/max/close buttons for platforms without a native overlay title bar. */
 export function WindowControls() {
@@ -25,13 +22,10 @@ export function WindowControls() {
 /** 52px toolbar: navigation, centered address bar, and tools. */
 export function Toolbar() {
   const tab = useStore(selectActive);
-  const theme = useStore((s) => s.theme);
-  const setTheme = useStore((s) => s.setTheme);
   const setOverlay = useStore((s) => s.setOverlay);
   const sidebar = useStore((s) => s.sidebar);
   const update = useUpdater((s) => s.info);
   const hasPage = !!tab.url;
-  const ThemeIcon = THEME_ICON[theme];
 
   return (
     <div className="flex h-[52px] items-center gap-1 border-b border-border bg-surface px-3" role="toolbar" aria-label="Browser toolbar">
@@ -48,10 +42,8 @@ export function Toolbar() {
       </IconButton>
       <IconButton label={`Reader mode (${modKey}⇧R)`} disabled={!hasPage} onClick={() => void ipc.tabReader(tab.id)}><BookOpen size={16} /></IconButton>
       <IconButton label="Summarize page with AI" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
-      <IconButton label={`Assistant (${modKey}J)`} active={sidebar !== null} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
-      <IconButton label="Extensions" onClick={() => setOverlay("extensions")}><Puzzle size={16} /></IconButton>
-      <IconButton label="Privacy Center" onClick={() => setOverlay("privacy")}><ShieldCheck size={17} /></IconButton>
-      <IconButton label={`Theme: ${theme}`} onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length])}><ThemeIcon size={16} /></IconButton>
+      <IconButton label={`Assistant (${modKey}J)`} active={sidebar === "assistant"} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
+      <IconButton label="More tools · extensions, privacy and theme" onClick={() => setOverlay("palette")}><MoreHorizontal size={18}/></IconButton>
       {update && (
         <button type="button" onClick={() => setOverlay("settings")} className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-[12px] font-medium text-white dark:text-bg" title={`Version ${update.version} is available`}>
           <Download size={13} /> Update

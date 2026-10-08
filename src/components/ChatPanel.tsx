@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Answer } from "./Answer";
 import { Bot, Check, CircleAlert, MousePointerClick, Send, Square, Trash2, X } from "lucide-react";
 import { useOllama } from "../hooks/useOllama";
 import { selectActive, useStore } from "../store/useStore";
@@ -10,16 +11,24 @@ const SUGGESTIONS = {
 };
 
 export function ChatPanel() {
-  const { items, busy, mode, approvalMode, approval, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { items, busy, mode, approvalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const sourceTabs = useStore(s => s.tabs);
+  const activeId = useStore(s => s.activeId);
+  const [showSources, setShowSources] = useState(false);
+  const scroll = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const hasPage = useStore((s) => !!selectActive(s).url);
   const { status } = useOllama(30000);
   const [text, setText] = useState("");
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [items, approval, busy]);
+  useEffect(() => { if (follow.current) end.current?.scrollIntoView({ block: "end", behavior: "auto" }); }, [items, approval, busy]);
+  useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(composer.current.scrollHeight, 112)}px`; } }, [text]);
 
   const submit = () => {
     if (!text.trim() || busy) return;
+    follow.current = true;
     void send(text);
     setText("");
   };
@@ -35,6 +44,7 @@ export function ChatPanel() {
               role="tab"
               aria-selected={mode === m}
               type="button"
+              disabled={busy}
               onClick={() => setMode(m)}
               className={`rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-150 ${mode === m ? "bg-surface text-text-primary shadow-pebble" : "text-text-secondary"}`}
             >
@@ -59,19 +69,29 @@ export function ChatPanel() {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3" aria-live="polite">
+      {mode === "ask" && <div className="border-b border-border px-3 py-2">
+        <button type="button" disabled={busy} onClick={() => setShowSources(!showSources)} aria-expanded={showSources} className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-surface-secondary"><span>Sources · {sourceTabIds.length ? `${sourceTabIds.length} selected pages` : hasPage && includeCurrentPage ? 'Current page' : 'No pages attached'}</span><span>{showSources ? 'Done' : 'Choose'}</span></button>
+        <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-secondary"><input type="checkbox" disabled={busy} checked={webResearch} onChange={e => setWebResearch(e.target.checked)}/> Search the web for sources</label>
+        {webResearch && <p className="mt-1 px-2 text-[10px] leading-relaxed text-text-secondary">Sends your question to Brave Search. API key required in Settings. Results are search excerpts.</p>}
+        {showSources && <div className="mt-2 space-y-1">
+          <p className="px-2 pb-1 text-[11px] text-text-secondary">Choose up to four loaded pages. Only their text is used. With none selected, use the current page if enabled.</p>
+          <label className="flex items-center gap-2 px-2 py-1 text-xs"><input type="checkbox" disabled={busy} checked={includeCurrentPage} onChange={e => setIncludeCurrentPage(e.target.checked)}/> Use current page when none selected</label>
+          {sourceTabs.filter(t => t.url && !t.suspended && !t.needsLoad).map(t => <label key={t.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs"><input type="checkbox" disabled={busy || (sourceTabIds.length >= 4 && !sourceTabIds.includes(t.id))} checked={sourceTabIds.includes(t.id)} onChange={e => setSourceTabIds(e.target.checked ? [...sourceTabIds, t.id] : sourceTabIds.filter(id => id !== t.id))}/><span className="truncate">{t.title || t.url}{t.id === activeId ? ' · current' : ''}</span></label>)}
+        </div>}
+      </div>}
+      <div ref={scroll} onScroll={() => { const e = scroll.current; if (e) follow.current = e.scrollHeight - e.scrollTop - e.clientHeight < 70; }} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" aria-live="polite">
         {items.length === 0 && (
           <div className="mt-6 space-y-4 text-center">
             <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-surface-secondary text-primary"><Bot size={24} /></div>
             <div>
-              <p className="text-[14px] font-semibold">{mode === "act" ? "Tell me what to do" : "Ask about this page"}</p>
+              <p className="text-[14px] font-semibold">{mode === "act" ? "Tell me what to do" : "A little clarity, one question away"}</p>
               <p className="mx-auto mt-1 max-w-[260px] text-text-secondary">
-                {mode === "act" ? "I can click, type, scroll and open tabs in this browser for you. You stay in control." : "I'll answer using the page you're on."}
+                {mode === "act" ? "I can click, type, scroll and open tabs in this browser for you. You stay in control." : "Get clear answers with citations from the pages you choose."}
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
               {SUGGESTIONS[mode].map((s) => (
-                <button key={s} type="button" onClick={() => void send(s)} className="rounded-xl border border-border px-3 py-2 text-left text-[12.5px] transition-colors duration-150 hover:bg-surface-secondary">
+                <button key={s} type="button" disabled={busy} onClick={() => { follow.current = true; void send(s); }} className="rounded-xl border border-border px-3 py-2 text-left text-[12.5px] transition-colors duration-150 hover:bg-surface-secondary">
                   {s}
                 </button>
               ))}
@@ -81,7 +101,7 @@ export function ChatPanel() {
         {items.map((m) =>
           m.kind === "user" ? (
             <div key={m.id} className="ml-8 whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3 py-2 text-white dark:text-bg">{m.text}</div>
-          ) : m.kind === "step" ? (
+          ) : m.kind === "assistant" ? <Answer key={m.id} item={m}/> : m.kind === "step" ? (
             <div key={m.id} className="flex items-start gap-2 px-1 text-[12px] text-text-secondary">
               {m.ok ? <Check size={13} className="mt-0.5 shrink-0 text-group-personal" /> : <X size={13} className="mt-0.5 shrink-0 text-red-500" />}
               <span className="min-w-0 break-words">{m.text}</span>
@@ -112,19 +132,20 @@ export function ChatPanel() {
         <div ref={end} />
       </div>
 
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border p-4">
         <div className="flex items-end gap-2 rounded-xl border border-border bg-surface px-3 py-2 focus-within:border-primary">
           <textarea
+            ref={composer}
             value={text}
             rows={1}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 submit();
               }
             }}
-            placeholder={mode === "act" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask about this page…"}
+            placeholder={mode === "act" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask a question…"}
             aria-label="Message"
             className="max-h-28 min-h-5 flex-1 resize-none bg-transparent outline-none placeholder:text-text-secondary"
           />
