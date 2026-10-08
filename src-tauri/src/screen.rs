@@ -129,6 +129,7 @@ pub async fn screen_propose(
     goal: String,
     history: Vec<String>,
     categories: Option<Value>,
+    page_text: Option<String>,
 ) -> Result<Value, String> {
     if goal.trim().is_empty() || goal.len() > 4000 || history.len() > 40 {
         return Err("Invalid request".into());
@@ -137,7 +138,7 @@ pub async fn screen_propose(
         let (app, db, state) = (app.clone(), &*db, &*state);
         tokio::task::block_in_place(|| connection(&app, db, state))?
     };
-    post(port, &token, "/propose", json!({ "goal": goal, "history": history, "categories": categories })).await
+    post(port, &token, "/propose", json!({ "goal": goal, "history": history, "categories": categories, "page_text": page_text })).await
 }
 
 /// Runs one user-approved action. The Python side validates it again before touching the mouse or keyboard.
@@ -149,4 +150,25 @@ pub async fn screen_act(state: State<'_, ScreenAgent>, action: Value) -> Result<
         (r.port, r.token.clone())
     };
     post(port, &token, "/act", json!({ "action": action })).await.map(|_| ())
+}
+
+/// Independent second look before a submit-type action. Returns `{ ok, problems }`.
+#[tauri::command]
+pub async fn screen_verify(
+    app: AppHandle,
+    db: State<'_, Db>,
+    state: State<'_, ScreenAgent>,
+    goal: String,
+    history: Vec<String>,
+    pending: String,
+    page_text: Option<String>,
+) -> Result<Value, String> {
+    if goal.trim().is_empty() || goal.len() > 4000 || history.len() > 40 || pending.len() > 300 {
+        return Err("Invalid request".into());
+    }
+    let (port, token) = {
+        let (app, db, state) = (app.clone(), &*db, &*state);
+        tokio::task::block_in_place(|| connection(&app, db, state))?
+    };
+    post(port, &token, "/verify", json!({ "goal": goal, "history": history, "pending": pending, "page_text": page_text })).await
 }

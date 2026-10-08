@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-screen-verify"
+description = "Enables the screen_verify command without any pre-configured scope."
+commands.allow = ["screen_verify"]
+
+[[permission]]
+identifier = "deny-screen-verify"
+description = "Denies the screen_verify command without any pre-configured scope."
+commands.deny = ["screen_verify"]

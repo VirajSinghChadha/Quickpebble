@@ -5,7 +5,7 @@ import requests
 from pydantic import ValidationError
 
 from .grid import Grid
-from .prompt import system_prompt, user_prompt
+from .prompt import VERIFY_SYSTEM, system_prompt, user_prompt, verify_prompt
 from .schema import GEMINI_SCHEMA, AgentResponse
 
 # "light" Gemini. Change with the QP_AGENT_MODEL environment variable (or the Quick Pebble setting).
@@ -36,13 +36,13 @@ def _first_error(e: ValidationError) -> str:
     return f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
 
 
-def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str], jpeg_b64: str, categories: list[dict] | None = None, retries: int = 2) -> AgentResponse:
+def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str], jpeg_b64: str, categories: list[dict] | None = None, page_text: str | None = None, retries: int = 2) -> AgentResponse:
     error = None
     for _ in range(retries + 1):
         body = {
             "systemInstruction": {"parts": [{"text": system_prompt(grid, categories)}]},
             "contents": [{"role": "user", "parts": [
-                {"text": user_prompt(goal, history, error)},
+                {"text": user_prompt(goal, history, error, page_text)},
                 {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64}},
             ]}],
             "generationConfig": {"responseMimeType": "application/json", "responseSchema": GEMINI_SCHEMA, "temperature": 0.2},
@@ -66,3 +66,29 @@ def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str],
         except ValueError as e:
             error = str(e)
     raise AgentError(f"Gemini kept returning an invalid response ({error}). Try a larger model.")
+
+
+VERIFY_SCHEMA = {"type": "OBJECT", "properties": {"ok": {"type": "BOOLEAN"}, "problems": {"type": "STRING"}}, "required": ["ok", "problems"]}
+
+
+def verify(api_key: str, model: str, goal: str, history: list[str], pending: str, jpeg_b64: str, page_text: str | None = None) -> dict:
+    """Independent second look before a submit-type action. Returns {"ok": bool, "problems": str}."""
+    body = {
+        "systemInstruction": {"parts": [{"text": VERIFY_SYSTEM}]},
+        "contents": [{"role": "user", "parts": [
+            {"text": verify_prompt(goal, history, pending, page_text)},
+            {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64}},
+        ]}],
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": VERIFY_SCHEMA, "temperature": 0.1},
+    }
+    try:
+        r = requests.post(ENDPOINT.format(model=model), headers={"x-goog-api-key": api_key}, json=body, timeout=90)
+    except requests.RequestException as e:
+        raise AgentError(f"Could not reach Gemini: {e}") from e
+    if not r.ok:
+        raise AgentError(f"Gemini error (HTTP {r.status_code}) during double-check")
+    try:
+        out = json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+        return {"ok": bool(out["ok"]), "problems": str(out.get("problems", ""))[:600]}
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        raise AgentError("The double-check returned an unreadable reply") from e

@@ -52,6 +52,7 @@ fn main() {
                 "extension_remove",
                 "screen_propose",
                 "screen_act",
+                "screen_verify",
             ]),
         ),
     )

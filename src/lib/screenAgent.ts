@@ -13,6 +13,8 @@ const HARD_STOP_REPEATS = 6;      // identical actions in a row before giving up
 const NUDGE_AFTER_REPEATS = 2;    // after this many, tell the model its approach isn't working
 const MAX_ACTION_FAILURES = 3;    // failed actions in a row before giving up
 const PROPOSE_ATTEMPTS = 3;
+const MAX_VERIFY_FAILS = 3;       // double-checks that find problems in a row before asking the person
+const SUBMITTY = /submit|answer|send|confirm|check|finish|publish|post|order|done/i;
 const TRANSIENT = /HTTP (408|429|5\d\d)|not responding|invalid response|Could not reach|timed out|overloaded/i;
 /** Backstop when the model says "none" but its own message describes a sensitive step. */
 const WORD_CATEGORY: [RegExp, string][] = [
@@ -27,6 +29,8 @@ export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = con
 export interface ScreenIO {
   propose(goal: string, history: string[]): Promise<ScreenResponse>;
   act(action: ScreenAction): Promise<void>;
+  /** Independent second look before a submit-type step. */
+  verify(goal: string, history: string[], pending: string): Promise<{ ok: boolean; problems: string }>;
   /** Numbered choice dialog. `risky` steps never offer "auto". */
   choose(description: string, risky: boolean): Promise<Choice>;
   mode(): ScreenMode;
@@ -51,6 +55,13 @@ export function describeScreenAction(a: ScreenAction): string {
   }
 }
 
+/** Is this a click/Enter that sends something off? Those get a double-check first. */
+export function needsDoubleCheck(res: ScreenResponse): boolean {
+  const { action, user } = res;
+  if (action.type !== "click" && !(action.type === "key" && /^(enter|return)$/i.test(action.key ?? ""))) return false;
+  return SUBMITTY.test(action.category ?? "") || /\b(submit|confirm|send|finish|check (my )?answer|publish|post|place order)\b/i.test(user.message ?? "");
+}
+
 /** Which of the site's permissions (if any) does this step fall under? "unknown" = risky but unlabeled. */
 export function categoryOf(res: ScreenResponse, site: SitePerms): string | "unknown" | null {
   const { action, user } = res;
@@ -72,6 +83,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
   let lastKey = "";
   let repeats = 0;
   let failures = 0;
+  let verifyFails = 0;
   for (let n = 0; n < maxSteps; n++) {
     if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
     let res: ScreenResponse | undefined;
@@ -104,12 +116,39 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     }
 
     const desc = describeScreenAction(action);
+
+    // Double-check before anything is submitted: an independent look at the work against the task.
+    let doubtful = "";
+    if (needsDoubleCheck(res)) {
+      io.onEvent({ kind: "say", text: "Double-checking before I submit…" });
+      try {
+        const v = await io.verify(goal, history.slice(-12), desc);
+        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+        if (v.ok) {
+          verifyFails = 0;
+          io.onEvent({ kind: "step", text: "Double-check passed", ok: true });
+        } else if (++verifyFails < MAX_VERIFY_FAILS) {
+          io.onEvent({ kind: "step", text: `Double-check found a problem: ${v.problems}`, ok: false });
+          history.push(`${history.length + 1}. (double-check found a problem before submitting: ${v.problems}) — fix it first, then submit`);
+          lastKey = "";
+          repeats = 0;
+          continue;
+        } else {
+          doubtful = v.problems;
+          verifyFails = 0;
+        }
+      } catch (e) {
+        io.onEvent({ kind: "step", text: `Could not double-check (${String(e).slice(0, 120)}), asking you instead`, ok: false });
+        doubtful = "the double-check could not run";
+      }
+    }
     const site = io.permissions();
     const risky = isRisky(res, site);
     const cat = categoryOf(res, site);
-    if (risky || io.mode() === "ask") {
+    if (risky || doubtful || io.mode() === "ask") {
       const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(site, cat)}] ` : "";
-      const choice = await io.choose(`${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky);
+      const warn = doubtful ? `⚠ Double-check is not confident: ${doubtful}. ` : "";
+      const choice = await io.choose(`${warn}${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky || !!doubtful);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
         return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });

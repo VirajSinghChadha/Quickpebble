@@ -169,9 +169,13 @@ export const ipc = {
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
     call<T>("agent_exec", { tabId, op, args }),
-  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[]) => {
+  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
-    return call<ScreenResponse>("screen_propose", { goal, history, categories });
+    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText });
+  },
+  screenVerify: async (goal: string, history: string[], pending: string, pageText?: string) => {
+    if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
+    return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
   screenAct: (action: ScreenAction) => call<void>("screen_act", { action }),
   extensionList: () => call<ExtensionInfo[]>("extension_list", undefined, []),

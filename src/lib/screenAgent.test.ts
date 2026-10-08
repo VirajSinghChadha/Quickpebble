@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fallbackSite, parseGenerated } from "./permissions";
-import { isRisky, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
+import { isRisky, needsDoubleCheck, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
 const res = (action: ScreenAction, message = "m", thinking = "t"): ScreenResponse => ({ user: { thinking, message }, action });
@@ -16,6 +16,7 @@ function make(steps: ScreenResponse[], answers: Choice[] = [], startMode: Screen
     choose: async (description, risky) => (asked.push({ description, risky }), answers.shift() ?? "allow"),
     mode: () => mode,
     permissions: () => fallbackSite(),
+    verify: async () => ({ ok: true, problems: "" }),
     setMode: (m) => (mode = m),
     sleep: async () => {},
     onEvent: (e) => void events.push(`${e.kind}:${e.text}`),
@@ -119,6 +120,34 @@ describe("runScreenAgent", () => {
     u.io.act = async () => { throw new Error("boom"); };
     await runScreenAgent("g", u.io, { aborted: false });
     expect(u.events.at(-1)).toContain("boom");
+  });
+
+  it("double-checks before submitting and fixes problems first", async () => {
+    const submit = res({ type: "click", cell: "Q14", category: "submit" }, "Submit the answer");
+    const t = make([submit, res({ type: "type", text: "7^4" }), submit, res({ type: "done" }, "ok")]);
+    const calls: string[] = [];
+    let n = 0;
+    t.io.verify = async (_g, _h, pending) => (calls.push(pending), n++ === 0 ? { ok: false, problems: "answer should be 7^4" } : { ok: true, problems: "" });
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(calls).toHaveLength(2);
+    expect(t.acted.map((a) => a.type)).toEqual(["type", "click"]); // first submit was held back
+    expect(t.events.some((e) => e.includes("Double-check found a problem"))).toBe(true);
+  });
+
+  it("asks the person if the double-check keeps failing", async () => {
+    const submit = res({ type: "click", cell: "Q14", category: "submit" }, "Submit");
+    const t = make([submit, submit, submit, res({ type: "done" })], ["stop"]);
+    t.io.verify = async () => ({ ok: false, problems: "still wrong" });
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(t.asked.at(-1)?.description).toContain("not confident");
+    expect(t.acted).toHaveLength(0);
+  });
+
+  it("only double-checks submit-like steps", () => {
+    expect(needsDoubleCheck(res({ type: "click", cell: "A1" }, "Open the menu"))).toBe(false);
+    expect(needsDoubleCheck(res({ type: "type", text: "x" }, "Submit"))).toBe(false);
+    expect(needsDoubleCheck(res({ type: "key", key: "enter" }, "Press enter to submit the answer"))).toBe(true);
+    expect(needsDoubleCheck(res({ type: "click", cell: "A1", category: "submit_quiz_answers" }))).toBe(true);
   });
 
   it("honours abort", async () => {

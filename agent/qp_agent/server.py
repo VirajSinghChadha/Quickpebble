@@ -1,6 +1,7 @@
 """Local sidecar that Quick Pebble talks to over 127.0.0.1. One token, printed once on stdout, guards it.
 
 POST /propose  {"goal": str, "history": [str]}  ->  {"user": {...}, "action": {...}}   (screenshot + Gemini; nothing executed)
+POST /verify {"goal","history","pending","page_text"} -> {"ok": bool, "problems": str}   (second look before a submit)
 POST /act      {"action": {...}}                ->  {"ok": true}                          (executes one validated action)
 GET  /health                                    ->  {"ok": true}
 """
@@ -74,8 +75,18 @@ class Handler(BaseHTTPRequestHandler):
                     raise gemini.AgentError("No Gemini API key saved. Add one in Settings → AI.")
                 shot = executor.capture_gridded_jpeg_b64(GRID)
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
-                resp = gemini.propose(key, model, GRID, goal, history, shot, cats)
+                page_text = str(body.get("page_text") or "")[:6000] or None
+                resp = gemini.propose(key, model, GRID, goal, history, shot, cats, page_text)
                 self._send(200, resp.model_dump(exclude_none=True))
+            elif self.path == "/verify":
+                goal, pending = str(body.get("goal", "")).strip(), str(body.get("pending", ""))[:300]
+                history = [str(h)[:200] for h in body.get("history", [])][-40:]
+                key = os.environ.get("GEMINI_API_KEY", "")
+                if not goal or not pending or not key:
+                    raise ValueError("invalid verify request")
+                shot = executor.capture_gridded_jpeg_b64(GRID)
+                model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
+                self._send(200, gemini.verify(key, model, goal, history, pending, shot, str(body.get("page_text") or "")[:6000] or None))
             elif self.path == "/act":
                 action = Action.model_validate(body.get("action"))
                 action.check_cell(GRID)

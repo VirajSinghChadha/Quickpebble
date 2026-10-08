@@ -83,6 +83,7 @@ pub fn run() {
             extensions::extension_remove,
             screen::screen_propose,
             screen::screen_act,
+            screen::screen_verify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

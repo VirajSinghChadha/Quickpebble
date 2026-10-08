@@ -48,6 +48,14 @@ let nextId = 1;
 let signal = { aborted: false };
 /** Actions the screen agent has taken this session; survives across messages, reset by Clear. */
 const screenHistory: string[] = [];
+/** Text of the page in the active tab, so the agent reads all of it and not just what is on screen. */
+async function activePageText(): Promise<string | undefined> {
+  const tab = selectActive(useStore.getState());
+  if (!tab.url) return undefined;
+  const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot").catch(() => null);
+  return snap?.text ? snap.text.slice(0, 6000) : undefined;
+}
+
 /** Per-site permissions chosen for this session only. */
 const sessionPerms = new Map<string, SitePerms>();
 let activePerms: SitePerms = fallbackSite();
@@ -239,7 +247,8 @@ export const useChat = create<ChatState>((set, get) => ({
         if (runSignal.aborted) return;
         const io = makeIO();
         await runScreenAgent(screenGoal(prior, goal), {
-          propose: (g, h) => ipc.screenPropose(g, h, activePerms.items),
+          propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText()),
+          verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),
           act: ipc.screenAct,
           choose: (description, risky) => askChoice(description, risky, get().screenApprovalMode === "ask"),
           mode: () => get().screenApprovalMode,
