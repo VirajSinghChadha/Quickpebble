@@ -12,19 +12,23 @@ export interface Analysis {
 
 const isPage = (t: Tab) => /^https?:\/\//.test(t.url);
 
-/** Later copies of an already-seen URL count as duplicates; the first one is kept. */
-export function findDuplicates(tabs: Tab[]): Tab[] {
-  const seen = new Set<string>();
+/** Keep active and pinned copies; otherwise keep the first occurrence. */
+export function findDuplicates(tabs: Tab[], activeId?: string): Tab[] {
+  const keep = new Map<string, Tab>();
   const dupes: Tab[] = [];
   for (const t of tabs.filter(isPage)) {
-    if (seen.has(t.url)) dupes.push(t);
-    else seen.add(t.url);
+    const previous = keep.get(t.url);
+    if (!previous) keep.set(t.url, t);
+    else if (t.pinned || t.id === activeId) {
+      if (!previous.pinned && previous.id !== activeId) dupes.push(previous);
+      keep.set(t.url, t);
+    } else dupes.push(t);
   }
   return dupes;
 }
 
 export function analyze(tabs: Tab[], activeId: string): Analysis {
-  const duplicates = findDuplicates(tabs);
+  const duplicates = findDuplicates(tabs, activeId);
   const inactive = tabs.filter((t) => t.id !== activeId).length;
   const score = Math.max(
     0,
