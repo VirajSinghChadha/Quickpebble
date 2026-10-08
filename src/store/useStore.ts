@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ipc, isPrivateWindow, type TabEvent, type UpdateInfo } from "../lib/ipc";
+import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
@@ -76,10 +76,8 @@ interface State {
   bookmarksBar: boolean;
   bookmarksVersion: number;
   httpsPrompt: { id: string; url: string } | null;
-  update: UpdateInfo | null;
   toggleBookmarksBar: () => void;
   setHttpsPrompt: (p: { id: string; url: string } | null) => void;
-  setUpdate: (u: UpdateInfo | null) => void;
   closedTabs: { url: string; title: string; group: GroupName | null; pinned: boolean }[];
 
   setSidebar: (s: Sidebar) => void;
@@ -160,7 +158,6 @@ export const useStore = create<State>((set, get) => ({
   bookmarksBar: safeGet("qp.bookmarksBar") === "1",
   bookmarksVersion: 0,
   httpsPrompt: null,
-  update: null,
   closedTabs: [],
 
   toggleBookmarksBar: () => {
@@ -170,7 +167,6 @@ export const useStore = create<State>((set, get) => ({
     void ipc.chromeSet(BASE_CHROME + (on ? BOOKMARKS_BAR : 0));
   },
   setHttpsPrompt: (httpsPrompt) => set({ httpsPrompt, overlay: httpsPrompt ? "https" : get().overlay === "https" ? null : get().overlay }),
-  setUpdate: (update) => set({ update }),
 
   setSidebar: (sidebar) => {
     set({ sidebar });
