@@ -40,6 +40,30 @@ def _paste(text: str) -> None:
     pyautogui.hotkey("command", "v")
 
 
+def _applescript_string(text: str) -> str:
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _type_text(text: str) -> None:
+    """Types text exactly, including symbols like ^ that pyautogui can mistype on macOS."""
+    if sys.platform == "darwin":
+        lines = text.split("\n")
+        script = ["tell application \"System Events\""]
+        for i, line in enumerate(lines):
+            if i:
+                script.append("key code 36")
+            if line:
+                script.append(f"keystroke {_applescript_string(line)}")
+        script.append("end tell")
+        r = subprocess.run(["osascript", "-e", "\n".join(script)], capture_output=True, text=True)
+        if r.returncode == 0:
+            return
+    if text.isascii():
+        pyautogui.write(text, interval=0.02)
+    else:
+        _paste(text)
+
+
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
     if action.type in ("click", "double_click", "right_click", "scroll"):
@@ -55,10 +79,7 @@ def perform(action: Action, grid: Grid) -> None:
         else:
             pyautogui.scroll(action.amount * (-1 if action.direction == "down" else 1) * 5)
     elif action.type == "type":
-        if action.text.isascii():
-            pyautogui.write(action.text, interval=0.02)
-        else:
-            _paste(action.text)
+        _type_text(action.text)
     elif action.type == "key":
         pyautogui.hotkey(*[KEY_NAMES.get(p.lower(), p.lower()) for p in action.key.split("+")])
     elif action.type == "wait":

@@ -13,7 +13,7 @@ const NUDGE_AFTER_REPEATS = 2;    // after this many, tell the model its approac
 const MAX_ACTION_FAILURES = 3;    // failed actions in a row before giving up
 const PROPOSE_ATTEMPTS = 3;
 const TRANSIENT = /HTTP (408|429|5\d\d)|not responding|invalid response|Could not reach|timed out|overloaded/i;
-const RISKY = /\b(buy|purchase|pay|checkout|check out|place order|order|delete|erase|remove|overwrite|send|submit|post|publish|confirm|accept|transfer|install|sign out|log out|quit|close without saving|unsubscribe|donate)\b/i;
+const RISKY = /\b(buy|purchase|pay|checkout|check out|place order|delete|erase|overwrite|transfer|donate|sign out|log out|unsubscribe)\b/i;
 
 export type Choice = "allow" | "auto" | "skip" | "stop";
 export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = confirm only risky steps
@@ -50,8 +50,8 @@ export function isRisky(res: ScreenResponse): boolean {
   return action.risk === "high" || RISKY.test(user.message ?? "");
 }
 
-export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS): Promise<void> {
-  const history: string[] = [];
+/** `history` is shared across messages in a session so the agent remembers what it already did. */
+export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
   let lastKey = "";
   let repeats = 0;
   let failures = 0;
@@ -96,7 +96,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       }
       if (choice === "skip") {
         io.onEvent({ kind: "step", text: `${desc} — skipped`, ok: false });
-        history.push(`${n + 1}. (the person refused: ${desc}) — try a different approach`);
+        history.push(`${history.length + 1}. (the person refused: ${desc}) — try a different approach`);
         continue;
       }
       if (choice === "auto") io.setMode("auto");
@@ -105,12 +105,12 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       await io.act(action);
       failures = 0;
       io.onEvent({ kind: "step", text: desc, ok: true });
-      history.push(`${n + 1}. ${desc}`);
+      history.push(`${history.length + 1}. ${desc}`);
       if (action.type !== "wait") await io.sleep(500);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
       if (++failures >= MAX_ACTION_FAILURES) return io.onEvent({ kind: "error", text: String(e) });
-      history.push(`${n + 1}. (failed: ${desc} — ${String(e).slice(0, 120)}) — try something else`);
+      history.push(`${history.length + 1}. (failed: ${desc} — ${String(e).slice(0, 120)}) — try something else`);
       await io.sleep(800);
     }
   }

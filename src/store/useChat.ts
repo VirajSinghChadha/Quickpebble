@@ -40,6 +40,8 @@ interface ChatState {
 
 let nextId = 1;
 let signal = { aborted: false };
+/** Actions the screen agent has taken this session; survives across messages, reset by Clear. */
+const screenHistory: string[] = [];
 
 const add = (kind: ChatKind, text: string, ok?: boolean) =>
   useChat.setState((s) => ({ items: [...s.items, { id: nextId++, kind, text, ok }] }));
@@ -47,8 +49,16 @@ const add = (kind: ChatKind, text: string, ok?: boolean) =>
 /** Plain conversation turns only (no step logs), for model context. */
 function history(items: ChatItem[]): ChatMsg[] {
   return items
-    .filter((i) => i.kind === "user" || i.kind === "assistant")
+    .filter((i) => i.kind === "user" || i.kind === "assistant" || i.kind === "question")
     .map((i) => ({ role: i.kind === "user" ? ("user" as const) : ("assistant" as const), content: i.text }));
+}
+
+/** Screen mode starts a fresh run per message, so earlier turns (including its own questions) go into the goal. */
+function screenGoal(prior: ChatMsg[], latest: string): string {
+  if (!prior.length) return latest;
+  const lines = prior.slice(-8).map((m) => `${m.role === "user" ? "Person" : "You"}: ${m.content.slice(0, 400)}`).join("\n");
+  const goal = `Conversation so far:\n${lines}\n\nLatest message from the person: ${latest}\n\nContinue the task using everything above. Do not ask again for anything the person already told you.`;
+  return goal.length > 3800 ? goal.slice(-3800) : goal;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -108,7 +118,10 @@ export const useChat = create<ChatState>((set, get) => ({
   approval: null,
   setMode: (mode) => set({ mode }),
   setApprovalMode: (approvalMode) => set({ approvalMode }),
-  clear: () => set({ items: [] }),
+  clear: () => {
+    screenHistory.length = 0;
+    set({ items: [] });
+  },
 
   stop: () => {
     signal.aborted = true;
@@ -152,7 +165,7 @@ export const useChat = create<ChatState>((set, get) => ({
         set(s => ({ items: [...s.items, { id: nextId++, kind: "assistant", ...answer }] }));
       } else if (mode === "screen") {
         const io = makeIO();
-        await runScreenAgent(goal, {
+        await runScreenAgent(screenGoal(prior, goal), {
           propose: ipc.screenPropose,
           act: ipc.screenAct,
           choose: (description, risky) => askChoice(description, risky, get().screenApprovalMode === "ask"),
@@ -160,7 +173,7 @@ export const useChat = create<ChatState>((set, get) => ({
           setMode: (m) => set({ screenApprovalMode: m }),
           sleep,
           onEvent: io.onEvent,
-        }, runSignal);
+        }, runSignal, undefined, screenHistory);
       } else {
         await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
       }
