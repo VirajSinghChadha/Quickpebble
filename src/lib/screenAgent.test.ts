@@ -60,15 +60,53 @@ describe("runScreenAgent", () => {
     expect(getMode()).toBe("auto");
   });
 
-  it("allows several waits in a row but stops on a repeated click", async () => {
+  it("keeps going when an action repeats, nudging the model, and only stops after many repeats", async () => {
+    const c = res({ type: "click", cell: "P14" });
+    const history: string[][] = [];
+    const t = make([c, c, c, c, c, c, c, c]);
+    const orig = t.io.propose;
+    t.io.propose = async (g, h) => (history.push([...h]), orig(g, h));
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(t.acted.length).toBeGreaterThanOrEqual(5);
+    expect(history.some((h) => h.some((l) => l.includes("try a different")))).toBe(true);
+    expect(t.events.at(-1)).toContain("without progress");
+  });
+
+  it("allows many waits in a row", async () => {
     const w = res({ type: "wait" });
-    const a = make([w, w, w, w, res({ type: "done" })]);
-    await runScreenAgent("g", a.io, { aborted: false });
-    expect(a.events.at(-1)).toContain("final:");
-    const c = res({ type: "click", cell: "A1" });
-    const b = make([c, c, c, c]);
-    await runScreenAgent("g", b.io, { aborted: false });
-    expect(b.events.at(-1)).toContain("keep repeating");
+    const t = make([w, w, w, w, w, w, res({ type: "done" }, "ok")]);
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(t.events.at(-1)).toBe("final:ok");
+  });
+
+  it("retries temporary Gemini errors", async () => {
+    const t = make([res({ type: "done" }, "fine")]);
+    let calls = 0;
+    const real = t.io.propose;
+    t.io.propose = async (g, h) => { if (++calls < 3) throw new Error("Gemini error (HTTP 503): overloaded"); return real(g, h); };
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(calls).toBe(3);
+    expect(t.events.at(-1)).toBe("final:fine");
+  });
+
+  it("does not retry non-temporary errors like a bad key", async () => {
+    const t = make([]);
+    let calls = 0;
+    t.io.propose = async () => { calls++; throw new Error("API key not valid (HTTP 400)"); };
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(calls).toBe(1);
+  });
+
+  it("recovers from one failed action but gives up after three", async () => {
+    const t = make([res({ type: "click", cell: "A1" }), res({ type: "click", cell: "B2" }), res({ type: "done" }, "ok")]);
+    let n = 0;
+    t.io.act = async () => { if (n++ === 0) throw new Error("boom"); };
+    await runScreenAgent("g", t.io, { aborted: false });
+    expect(t.events.at(-1)).toBe("final:ok");
+    const u = make([res({ type: "click", cell: "A1" }), res({ type: "click", cell: "B1" }), res({ type: "click", cell: "C1" }), res({ type: "done" })]);
+    u.io.act = async () => { throw new Error("boom"); };
+    await runScreenAgent("g", u.io, { aborted: false });
+    expect(u.events.at(-1)).toContain("error:boom");
   });
 
   it("honours abort", async () => {

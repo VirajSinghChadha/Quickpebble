@@ -6,8 +6,13 @@
  */
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
-export const MAX_SCREEN_STEPS = 25;
-const MAX_WAITS_IN_A_ROW = 5;
+export const MAX_SCREEN_STEPS = 40;
+const MAX_WAITS_IN_A_ROW = 8;
+const HARD_STOP_REPEATS = 6;      // identical actions in a row before giving up
+const NUDGE_AFTER_REPEATS = 2;    // after this many, tell the model its approach isn't working
+const MAX_ACTION_FAILURES = 3;    // failed actions in a row before giving up
+const PROPOSE_ATTEMPTS = 3;
+const TRANSIENT = /HTTP (408|429|5\d\d)|not responding|invalid response|Could not reach|timed out|overloaded/i;
 const RISKY = /\b(buy|purchase|pay|checkout|check out|place order|order|delete|erase|remove|overwrite|send|submit|post|publish|confirm|accept|transfer|install|sign out|log out|quit|close without saving|unsubscribe|donate)\b/i;
 
 export type Choice = "allow" | "auto" | "skip" | "stop";
@@ -49,26 +54,36 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
   const history: string[] = [];
   let lastKey = "";
   let repeats = 0;
+  let failures = 0;
   for (let n = 0; n < maxSteps; n++) {
     if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
-    let res: ScreenResponse;
-    try {
-      res = await io.propose(goal, history.slice(-12));
-    } catch (e) {
-      return io.onEvent({ kind: "error", text: String(e) });
+    let res: ScreenResponse | undefined;
+    for (let attempt = 1; attempt <= PROPOSE_ATTEMPTS && !res; attempt++) {
+      try {
+        res = await io.propose(goal, history.slice(-12));
+      } catch (e) {
+        if (attempt === PROPOSE_ATTEMPTS || !TRANSIENT.test(String(e))) return io.onEvent({ kind: "error", text: String(e) });
+        io.onEvent({ kind: "say", text: `Temporary problem, retrying (${attempt}/${PROPOSE_ATTEMPTS - 1})…` });
+        await io.sleep(1500 * attempt);
+        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+      }
     }
+    if (!res) return;
     if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
     const { user, action } = res;
     if (user.thinking) io.onEvent({ kind: "say", text: user.thinking });
     if (action.type === "done") return io.onEvent({ kind: "final", text: user.message || "Done." });
     if (action.type === "ask") return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" });
 
-    // Waiting for a page to load is legitimate for a while; anything else repeated 3x means we're stuck.
+    // Same action again and again usually means it isn't working. Nudge the model to change approach instead
+    // of quitting; only give up after many identical attempts. Waiting is allowed to repeat for longer.
     const key = JSON.stringify([action.type, action.cell, action.fx, action.fy, action.text, action.key]);
     repeats = key === lastKey ? repeats + 1 : 0;
     lastKey = key;
-    if (repeats >= (action.type === "wait" ? MAX_WAITS_IN_A_ROW : 2)) {
-      return io.onEvent({ kind: "error", text: "I keep repeating the same action, so I stopped. Try rephrasing the task." });
+    const limit = action.type === "wait" ? MAX_WAITS_IN_A_ROW : HARD_STOP_REPEATS;
+    if (repeats >= limit) return io.onEvent({ kind: "error", text: "I tried the same thing several times without progress, so I stopped. Try rephrasing the task." });
+    if (repeats >= NUDGE_AFTER_REPEATS && action.type !== "wait") {
+      history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different cell, an offset inside the cell, a keyboard key, or scrolling)`);
     }
 
     const desc = describeScreenAction(action);
@@ -88,12 +103,15 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     }
     try {
       await io.act(action);
+      failures = 0;
       io.onEvent({ kind: "step", text: desc, ok: true });
       history.push(`${n + 1}. ${desc}`);
       if (action.type !== "wait") await io.sleep(500);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
-      return io.onEvent({ kind: "error", text: String(e) });
+      if (++failures >= MAX_ACTION_FAILURES) return io.onEvent({ kind: "error", text: String(e) });
+      history.push(`${n + 1}. (failed: ${desc} — ${String(e).slice(0, 120)}) — try something else`);
+      await io.sleep(800);
     }
   }
   io.onEvent({ kind: "error", text: `Stopped after ${maxSteps} steps. Say “continue” to keep going.` });
