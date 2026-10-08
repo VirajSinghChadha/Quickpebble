@@ -1,0 +1,57 @@
+name: Preview (Windows)
+
+# Builds an unsigned Windows installer (no updater key needed) and attaches it to a GitHub pre-release.
+# Run it by pushing a tag like `preview-win-2026-10-08`, or from Actions → Run workflow.
+# Pre-releases are not "latest", so the in-app updater and Homebrew are unaffected.
+on:
+  push:
+    tags: ["preview-win-*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing pre-release to attach the installer to
+        required: true
+        default: preview-2026-10-08
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - run: npm ci
+      - name: Build installer
+        run: npx tauri build --bundles nsis --config scripts/tauri.preview.conf.json
+      - name: Find the installer
+        id: find
+        shell: bash
+        run: |
+          f=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          test -n "$f" || { echo "No installer produced"; exit 1; }
+          cp "$f" Quick.Pebble_preview_x64-setup.exe
+          echo "sha=$(sha256sum Quick.Pebble_preview_x64-setup.exe | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          ls -la Quick.Pebble_preview_x64-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quick-Pebble-Windows-preview
+          path: |
+            Quick.Pebble_preview_x64-setup.exe
+            docs/READ-ME-FIRST-Windows.html
+      - name: Attach to the pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || 'preview-2026-10-08' }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease' | grep -qx true \
+            || { echo "$TAG must be an existing PRE-release (so it can't replace the stable one)"; exit 1; }
+          gh release upload "$TAG" Quick.Pebble_preview_x64-setup.exe docs/READ-ME-FIRST-Windows.html --clobber --repo "$GITHUB_REPOSITORY"
+          echo "SHA-256: ${{ steps.find.outputs.sha }}"

@@ -42,7 +42,7 @@ Download the installer for your system from the [latest release](https://github.
 | macOS, Intel | `Quick.Pebble_<version>_x64.dmg` |
 | Windows 10/11 (64-bit) | `Quick.Pebble_<version>_x64-setup.exe` (or `.msi`) |
 
-> **Builds are not code-signed or notarised yet.** The first time you open Quick Pebble, macOS asks you to confirm it: follow the short [macOS install guide](docs/INSTALL-macOS.md) (System Settings → Privacy & Security → **Open Anyway**). The Homebrew cask clears the warning for you. On Windows, SmartScreen may show "unknown publisher" → **More info → Run anyway**. Releases are verified by a separate update signature, described under [Updates](#updates).
+> **Builds are not code-signed or notarised yet.** The first time you open Quick Pebble, macOS asks you to confirm it: follow the short [macOS install guide](docs/INSTALL-macOS.md) (System Settings → Privacy & Security → **Open Anyway**). The Homebrew cask clears the warning for you. On Windows, SmartScreen shows "unknown publisher": follow the [Windows install guide](docs/INSTALL-Windows.md) (**More info → Run anyway**). Releases are verified by a separate update signature, described under [Updates](#updates).
 
 ### Linux
 

@@ -47,20 +47,30 @@ fn agent_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .ok_or_else(|| "The screen agent files were not found (expected an `agent` folder).".to_string())
 }
 
+/// `python3` on macOS and Linux, `python` on Windows (where python.org's installer provides no `python3`). `QP_PYTHON` overrides.
+fn python_command() -> String {
+    std::env::var("QP_PYTHON").unwrap_or_else(|_| if cfg!(windows) { "python" } else { "python3" }.into())
+}
+
 fn start(app: &AppHandle, model: &str, precision: &str) -> Result<Running, String> {
     let key = daemon::get_key("gemini").ok_or("Screen mode needs a Gemini API key. Add one in Settings → AI.")?;
     let dir = agent_dir(app)?;
-    let python = std::env::var("QP_PYTHON").unwrap_or_else(|_| "python3".into());
-    let mut child = Command::new(&python)
-        .args(["-m", "qp_agent.server"])
-        .current_dir(&dir)
+    let python = python_command();
+    let mut cmd = Command::new(&python);
+    cmd.args(["-m", "qp_agent.server"]).current_dir(&dir);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: don't flash a console
+    }
+    let mut child = cmd
         .env("GEMINI_API_KEY", key)
         .env("QP_AGENT_MODEL", model)
         .env("QP_AGENT_PRECISION", precision)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|_| "Python 3 was not found. Install it (https://www.python.org) to use Screen mode.".to_string())?;
+        .map_err(|_| "Python 3 was not found. Install it from https://www.python.org (on Windows, tick \"Add python.exe to PATH\") to use Screen mode.".to_string())?;
     let stdout = child.stdout.take().ok_or("Could not start the screen agent")?;
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -81,7 +91,7 @@ fn start(app: &AppHandle, model: &str, precision: &str) -> Result<Running, Strin
                 let _ = e.read_to_string(&mut err);
             }
             let hint = if err.contains("ModuleNotFoundError") {
-                format!("Install the agent's Python packages: python3 -m pip install -r {}/requirements.txt", dir.display())
+                format!("Install the agent's Python packages: {python} -m pip install -r \"{}\"", dir.join("requirements.txt").display())
             } else {
                 err.lines().last().unwrap_or("it did not start").to_string()
             };
