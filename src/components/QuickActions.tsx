@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Bot, Brain, EyeOff, FileText, HeartPulse, History, Layers, Moon, Palette, Plus, Puzzle, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { BookOpen, Bot, Brain, Bookmark, Download, EyeOff, FileText, HeartPulse, History, Layers, Moon, Palette, Plus, Puzzle, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { ipc } from "../lib/ipc";
 import { modKey } from "../lib/actions";
 import { selectActive, useStore } from "../store/useStore";
@@ -59,6 +59,9 @@ export function QuickActions() {
       { id: "library", title: "Open History & Bookmarks", hint: `${modKey}Y`, icon: History, run: () => s.setOverlay("library") },
       { id: "reopen", title: "Reopen Closed Tab", hint: `${modKey}⇧T`, icon: RotateCcw, run: () => s.reopenTab() },
       { id: "find", title: "Find in Page", hint: `${modKey}F`, icon: Search, run: () => void ipc.tabFind(selectActive(useStore.getState()).id) },
+      { id: "reader", title: "Toggle Reader Mode", hint: `${modKey}⇧R`, icon: BookOpen, run: () => void ipc.tabReader(selectActive(useStore.getState()).id) },
+      { id: "bar", title: "Toggle Bookmarks Bar", hint: `${modKey}⇧B`, icon: Bookmark, run: () => s.toggleBookmarksBar() },
+      { id: "update", title: "Check for Updates", icon: Download, run: () => s.setOverlay("settings") },
       { id: "privacy", title: "Open Privacy Center", icon: ShieldCheck, run: () => s.setOverlay("privacy") },
       { id: "settings", title: "Open Settings", icon: Settings, run: () => s.setOverlay("settings") },
       { id: "ai", title: "Toggle AI Address Suggestions", icon: Brain, run: () => s.setAiAutocomplete(!useStore.getState().aiAutocomplete) },

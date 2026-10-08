@@ -1,11 +1,13 @@
 import { create } from "zustand";
-import { ipc, isPrivateWindow, type TabEvent } from "../lib/ipc";
+import { ipc, isPrivateWindow, type TabEvent, type UpdateInfo } from "../lib/ipc";
 
 export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
 export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
 export type Sidebar = null | "assistant" | "therapist";
 export const SIDEBAR_WIDTH = 380;
-export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary" | "extensions" | "library";
+export const BASE_CHROME = 92;
+export const BOOKMARKS_BAR = 34;
+export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary" | "extensions" | "library" | "https";
 export type Theme = "light" | "dark" | "system";
 export type Layout = "classic" | "minimal" | "productivity";
 
@@ -71,6 +73,13 @@ interface State {
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
+  bookmarksBar: boolean;
+  bookmarksVersion: number;
+  httpsPrompt: { id: string; url: string } | null;
+  update: UpdateInfo | null;
+  toggleBookmarksBar: () => void;
+  setHttpsPrompt: (p: { id: string; url: string } | null) => void;
+  setUpdate: (u: UpdateInfo | null) => void;
   closedTabs: { url: string; title: string; group: GroupName | null; pinned: boolean }[];
 
   setSidebar: (s: Sidebar) => void;
@@ -80,7 +89,7 @@ interface State {
   newTab: (url?: string, opts?: Partial<Tab>) => string;
   closeTab: (id: string) => void;
   activate: (id: string) => void;
-  navigate: (id: string, input: string) => Promise<void>;
+  navigate: (id: string, input: string, allowHttp?: boolean) => Promise<void>;
   applyEvent: (e: TabEvent) => void;
   togglePin: (id: string) => void;
   toggleMute: (id: string) => void;
@@ -147,7 +156,20 @@ export const useStore = create<State>((set, get) => ({
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
+  bookmarksBar: safeGet("qp.bookmarksBar") === "1",
+  bookmarksVersion: 0,
+  httpsPrompt: null,
+  update: null,
   closedTabs: [],
+
+  toggleBookmarksBar: () => {
+    const on = !get().bookmarksBar;
+    safeSet("qp.bookmarksBar", on ? "1" : "0");
+    set({ bookmarksBar: on });
+    void ipc.chromeSet(BASE_CHROME + (on ? BOOKMARKS_BAR : 0));
+  },
+  setHttpsPrompt: (httpsPrompt) => set({ httpsPrompt, overlay: httpsPrompt ? "https" : get().overlay === "https" ? null : get().overlay }),
+  setUpdate: (update) => set({ update }),
 
   setSidebar: (sidebar) => {
     set({ sidebar });
@@ -167,6 +189,7 @@ export const useStore = create<State>((set, get) => ({
     const { tabs, activeId } = get();
     for (const t of tabs) await ipc.tabCreate(t.id, t.pinned);
     get().activate(activeId);
+    if (get().bookmarksBar) void ipc.chromeSet(BASE_CHROME + BOOKMARKS_BAR);
     const s = await ipc.settingsGet();
     if (s.theme === "light" || s.theme === "dark" || s.theme === "system") set({ theme: s.theme });
     if (s.newtab_layout === "classic" || s.newtab_layout === "minimal" || s.newtab_layout === "productivity")
@@ -218,9 +241,9 @@ export const useStore = create<State>((set, get) => ({
     persist(get().tabs, id);
   },
 
-  navigate: async (id, input) => {
+  navigate: async (id, input, allowHttp = false) => {
     try {
-      const url = await ipc.tabNavigate(id, input);
+      const url = await ipc.tabNavigate(id, input, allowHttp);
       set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, url, loading: true, needsLoad: false, suspended: false } : t)) }));
     } catch (e) {
       console.warn("navigate failed", e);
@@ -267,7 +290,7 @@ export const useStore = create<State>((set, get) => ({
     const t = get().tabs.find((x) => x.id === id);
     if (!t?.url) return;
     const added = await ipc.bookmarkToggle(t.url, t.title || t.url);
-    set((s) => ({ tabs: s.tabs.map((x) => (x.id === id ? { ...x, bookmarked: added } : x)) }));
+    set((s) => ({ tabs: s.tabs.map((x) => (x.id === id ? { ...x, bookmarked: added } : x)), bookmarksVersion: s.bookmarksVersion + 1 }));
   },
 
   setOverlay: (overlay) => set({ overlay }),

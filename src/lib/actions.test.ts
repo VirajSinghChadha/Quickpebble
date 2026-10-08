@@ -19,6 +19,11 @@ describe("matchShortcut", () => {
     expect(matchShortcut(ev("j", { metaKey: true }), true)).toBe("assistant");
     expect(matchShortcut(ev("-", { ctrlKey: true }), false)).toBe("zoom-out");
   });
+  it("distinguishes reload from reader mode by Shift", () => {
+    expect(matchShortcut(ev("r", { metaKey: true }), true)).toBe("reload");
+    expect(matchShortcut(ev("R", { metaKey: true, shiftKey: true }), true)).toBe("reader");
+    expect(matchShortcut(ev("B", { metaKey: true, shiftKey: true }), true)).toBe("bookmarks-bar");
+  });
   it("ignores alt chords", () => {
     expect(matchShortcut(ev("t", { metaKey: true, altKey: true }), true)).toBeNull();
   });

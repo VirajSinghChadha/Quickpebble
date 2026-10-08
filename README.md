@@ -26,6 +26,10 @@ A lightweight, privacy-first desktop browser with a calm design, tab memory savi
 | **AI Assistant side panel** | Chat about the page, or tell it to do things: it can click, type, scroll, open tabs and navigate. Every action is shown, approval is on by default, and a Stop button is always there. |
 | **Chrome extensions** | Add extensions from the Chrome Web Store (link or ID) or a `.crx` file. Content scripts and `chrome.storage` run natively; see [Extensions](#chrome-extensions). |
 | **Tab Therapist (built in)** | Tab health score, duplicate cleanup, auto-organise into groups and saved tabs — ported from the Tab Therapist extension and runs natively. |
+| **Reader mode** | `⌘⇧R` strips a page to clean, resizable text with light / sepia / dark themes. |
+| **Bookmarks bar** | `⌘⇧B` toggles a bookmarks strip under the toolbar. |
+| **HTTPS-only mode** | `http://` links are upgraded to `https://`; if a site has no HTTPS you get a warning before continuing. |
+| **Signed auto-updates** | Checks GitHub Releases, verifies the signature, and installs only when you click. |
 | **Memory Saver** | Idle background tabs are suspended and restored when you return. Never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
 | **Privacy Center** | Tracker blocking, per-site camera / microphone / location / notification rules, private windows, one-click data clearing. |
 | **Quick Actions** | `⌘⇧P` command palette and `⌘⇧A` tab search. |
@@ -83,6 +87,8 @@ Use `⌘` on macOS and `Ctrl` on Windows/Linux.
 | `⌘+` / `⌘-` / `⌘0` | Zoom in / out / reset |
 | `⌘⇧T` | Reopen closed tab |
 | `⌘Y` | History & bookmarks |
+| `⌘⇧R` | Reader mode |
+| `⌘⇧B` | Show / hide bookmarks bar |
 
 Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal** group (or let the AI choose).
 
@@ -164,7 +170,9 @@ quick-pebble/
 ## Privacy and security model
 
 - **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to that provider, and the app tells you so each time. API keys are stored in the OS keychain, never in the database.
-- **Tracker blocking** stops top-level navigations to known ad and analytics hosts (a bundled list in `security.rs`). It does not filter sub-resource requests such as scripts and pixels inside a page, so it is not a replacement for a full content blocker.
+- **Tracker blocking** has two layers. Navigations to known ad and analytics hosts are refused natively. Inside pages, a script injected before page code blocks `fetch`, `XMLHttpRequest`, `sendBeacon` and dynamically added `<script>`/`<img>`/`<iframe>` elements pointing at those hosts, and hides common ad containers. System webviews offer no request-interception API, so this is **best-effort**: resources the HTML parser loads before the script runs (for example a hard-coded `<script src>` in the page source) can still get through. It is not uBlock Origin.
+- **HTTPS-only mode** upgrades `http://` navigations (not localhost, private IPs or `.local`). It first checks that the HTTPS site responds; if not, you decide whether to continue over HTTP for that site for the session.
+- **Updates** are verified with an Ed25519 signature against the public key embedded in `tauri.conf.json`. Install requires an explicit click.
 - **Navigation policy.** Only `http`, `https` and `about:blank` can load. `javascript:`, `file:`, `data:` and custom schemes are refused.
 - **Pages get almost no IPC.** Web pages may call exactly two commands (report their own state, forward a shortcut). Which tab is calling comes from the webview label, never from the payload. The UI webview has a separate capability.
 - **Site permissions.** "Block" rules are enforced by overriding `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run. This is best-effort and applies on the next page load. "Ask" and "Allow" fall through to the system web engine's own behaviour.
@@ -178,6 +186,8 @@ These are the honest edges of v1.0:
 - Only macOS compilation and unit tests have been run so far. Windows and Linux builds are covered by the CI matrix but haven't been exercised by hand.
 - No cross-platform API reports per-tab memory, so the "MB saved" figure is an estimate (about 100 MB per suspended tab).
 - Download tracking isn't wired up yet, so the "don't suspend during a download" rule is implemented in the policy but the flag is never set.
+- Reader mode uses a simple density heuristic (not Mozilla Readability), so it can miss unusual layouts; the toolbar button reports when it finds nothing.
+- Auto-update has not been exercised end to end yet — that needs a first signed release to exist.
 - Audio detection looks at `<audio>`/`<video>` elements; audio from Web Audio or WebRTC-only pages isn't detected.
 - Web extensions, sync, a password manager and a built-in PDF viewer are not part of v1.0.
 - The agent can't use pages that need pointer drags, canvas games or CAPTCHAs, and it can fail on heavily dynamic sites.
@@ -195,6 +205,17 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 ```
 
 Design tokens live in `src/styles/globals.css`; changing a `--color-*` value re-themes the whole app. When you add a Rust command, register it in `lib.rs`, list it in `build.rs`, and grant it in `src-tauri/permissions/ui.toml`.
+
+## Releasing (maintainers)
+
+Updates are signed, so a release needs the signing key:
+
+1. Generate a key pair once: `npx tauri signer generate -w ~/.tauri/quickpebble.key` (keep the private key and password out of git).
+2. Put the **public** key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
+3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+4. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, then push a tag like `v1.1.0`. The release workflow builds the installers and publishes `latest.json`, which running apps read.
+
+If you lose the private key, existing installs can't receive updates and users must reinstall.
 
 ## Contributing
 

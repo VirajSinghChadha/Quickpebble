@@ -1,15 +1,21 @@
 import { useEffect } from "react";
-import { ipc, onTabEvent } from "../lib/ipc";
+import { ipc, onHttpsFallback, onTabEvent, onUpdate } from "../lib/ipc";
 import { useStore } from "../store/useStore";
 
 /** Boots the session and keeps the store in sync with Rust-side tab events. */
 export function useTabs(): void {
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    const st = useStore.getState();
-    void st.init();
-    void onTabEvent((e) => useStore.getState().applyEvent(e)).then((u) => (unlisten = u));
-    return () => unlisten?.();
+    const unlisten: (() => void)[] = [];
+    let disposed = false;
+    const keep = (u: () => void) => (disposed ? u() : unlisten.push(u));
+    void useStore.getState().init();
+    void onTabEvent((e) => useStore.getState().applyEvent(e)).then(keep);
+    void onHttpsFallback((e) => useStore.getState().setHttpsPrompt(e)).then(keep);
+    void onUpdate((u) => useStore.getState().setUpdate(u)).then(keep);
+    return () => {
+      disposed = true;
+      unlisten.forEach((u) => u());
+    };
   }, []);
 }
 

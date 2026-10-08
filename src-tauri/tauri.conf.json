@@ -18,7 +18,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app", "nsis", "msi", "deb", "appimage"],
+    "targets": [
+      "dmg",
+      "app",
+      "nsis",
+      "msi",
+      "deb",
+      "appimage"
+    ],
     "category": "Productivity",
     "shortDescription": "Browse quicker.",
     "icon": [
@@ -28,6 +35,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": { "minimumSystemVersion": "11.0" }
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU1NzM5MUFDRjcwRjIzRjIKUldUeUl3LzNySkZ6NVdQWTFoaHJ6d1J1QzQvSUliOXo4S2llT01RbkMzR3psSFJxVE11bjZqUCsK",
+      "endpoints": [
+        "https://github.com/VirajSinghChadha/Quickpebble/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

@@ -62,6 +62,141 @@
   window.addEventListener("hashchange", () => report(false));
   setInterval(() => report(false), 2500);
 
+  // ---- content blocker (best effort) ---------------------------------------
+  // System webviews expose no request-interception API, so sub-resources are blocked by wrapping the
+  // APIs pages use to load them. Resources the HTML parser fetches before this runs cannot be stopped.
+  const TRACKERS = __QP_TRACKERS__;
+  const BLOCK = __QP_BLOCK__;
+  let blockedSince = 0;
+  setInterval(() => { if (blockedSince) { const n = blockedSince; blockedSince = 0; invoke("qp_blocked", { count: n }); } }, 3000);
+  const pageHost = location.hostname.toLowerCase();
+  const trackerUrl = (u) => {
+    try {
+      const h = new URL(String(u && u.url ? u.url : u), location.href).hostname.toLowerCase();
+      if (h === pageHost || h.endsWith("." + pageHost) || pageHost.endsWith("." + h)) return false; // first party
+      return TRACKERS.some((t) => h === t || h.endsWith("." + t));
+    } catch (_) { return false; }
+  };
+  if (BLOCK) {
+    const hit = () => { blockedSince++; };
+    const origFetch = window.fetch;
+    if (origFetch) window.fetch = function (input) { if (trackerUrl(input)) { hit(); return Promise.reject(new TypeError("Failed to fetch")); } return origFetch.apply(this, arguments); };
+    const xOpen = XMLHttpRequest.prototype.open, xSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__qpBlock = trackerUrl(u); return xOpen.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function () {
+      if (this.__qpBlock) { hit(); const x = this; setTimeout(() => x.dispatchEvent(new ProgressEvent("error")), 0); return; }
+      return xSend.apply(this, arguments);
+    };
+    if (navigator.sendBeacon) { const ob = navigator.sendBeacon.bind(navigator); navigator.sendBeacon = (u, d) => (trackerUrl(u) ? (hit(), false) : ob(u, d)); }
+    for (const [C, prop] of [[HTMLScriptElement, "src"], [HTMLImageElement, "src"], [HTMLIFrameElement, "src"], [HTMLLinkElement, "href"]]) {
+      const d = Object.getOwnPropertyDescriptor(C.prototype, prop);
+      if (!d || !d.set) continue;
+      Object.defineProperty(C.prototype, prop, { ...d, set(v) { if (trackerUrl(v)) { hit(); setTimeout(() => this.dispatchEvent(new Event("error")), 0); return; } d.set.call(this, v); } });
+    }
+    const setAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (n, v) {
+      if ((n === "src" || n === "href") && /^(SCRIPT|IMG|IFRAME|LINK)$/.test(this.tagName) && trackerUrl(v)) { hit(); return; }
+      return setAttr.call(this, n, v);
+    };
+    new MutationObserver((muts) => {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        const list = n.matches && n.matches("script[src],img[src],iframe[src],link[href]") ? [n] : [];
+        n.querySelectorAll && list.push(...n.querySelectorAll("script[src],img[src],iframe[src]"));
+        for (const el of list) if (trackerUrl(el.getAttribute("src") || el.getAttribute("href"))) { el.remove(); hit(); }
+      }
+    }).observe(document, { childList: true, subtree: true });
+    const css = document.createElement("style");
+    css.textContent = "ins.adsbygoogle,.adsbygoogle,[id^='google_ads_'],[id^='div-gpt-ad'],.OUTBRAIN,#taboola-below-article-thumbnails,iframe[src*='doubleclick.net']{display:none!important}";
+    const addCss = () => (document.head || document.documentElement).appendChild(css);
+    document.head || document.documentElement ? addCss() : document.addEventListener("DOMContentLoaded", addCss, { once: true });
+  }
+
+  // ---- reader mode ---------------------------------------------------------
+  const READER_BAD = "script,style,noscript,nav,aside,footer,form,iframe,button,svg,canvas,video,audio,object,embed,select,input,textarea,[role=navigation],[role=banner],[aria-hidden=true]";
+  const READER_OK = new Set("h1 h2 h3 h4 h5 h6 p ul ol li blockquote pre code em strong b i a img figure figcaption br hr table thead tbody tr th td sup sub".split(" "));
+  const tlen = (el) => (el.textContent || "").replace(/\s+/g, " ").trim().length;
+  const rscore = (el) => {
+    let s = 0;
+    el.querySelectorAll("p").forEach((p) => { const t = tlen(p); if (t > 40) s += t; });
+    const links = Array.from(el.querySelectorAll("a")).reduce((n, a) => n + tlen(a), 0);
+    return s * (1 - Math.min(links / (tlen(el) || 1), 0.9));
+  };
+  const httpUrl = (u) => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (_) { return null; } };
+  function readerClean(node, doc) {
+    const out = doc.createDocumentFragment();
+    for (const c of Array.from(node.childNodes)) {
+      if (c.nodeType === 3) { out.appendChild(doc.createTextNode(c.textContent)); continue; }
+      if (c.nodeType !== 1 || c.matches(READER_BAD)) continue;
+      const tag = c.tagName.toLowerCase();
+      if (!READER_OK.has(tag)) { out.appendChild(readerClean(c, doc)); continue; } // unwrap div/span/section…
+      const el = doc.createElement(tag);
+      if (tag === "a") { const h = httpUrl(c.getAttribute("href")); if (h) { el.setAttribute("href", h); el.setAttribute("rel", "noopener noreferrer"); } }
+      if (tag === "img") {
+        const src = httpUrl(c.currentSrc || c.getAttribute("src") || c.getAttribute("data-src"));
+        if (!src) continue;
+        el.setAttribute("src", src); el.setAttribute("alt", c.getAttribute("alt") || ""); el.setAttribute("loading", "lazy");
+      } else el.appendChild(readerClean(c, doc));
+      if ((tag === "p" || tag === "li" || /^h\d$/.test(tag)) && !el.textContent.trim() && !el.querySelector("img")) continue;
+      out.appendChild(el);
+    }
+    return out;
+  }
+  function readerExtract(doc) {
+    const cands = Array.from(doc.querySelectorAll("article,main,[role=main],div,section")).map((el) => [el, rscore(el)]);
+    const max = Math.max(0, ...cands.map((c) => c[1]));
+    if (max < 200) return null;
+    // Ancestors always out-score their children, so take the most specific block that holds most of the text.
+    const best = cands.filter((c) => c[1] >= max * 0.85).sort((a, b) => tlen(a[0]) - tlen(b[0]))[0][0];
+    const h1 = best.querySelector("h1") || doc.querySelector("h1");
+    const author = doc.querySelector('meta[name=author]');
+    return {
+      title: (h1 && h1.textContent.trim()) || doc.title,
+      byline: (author && author.content) || "",
+      site: location.hostname.replace(/^www\./, ""),
+      body: readerClean(best, doc),
+    };
+  }
+  window.__qpReader = () => {
+    const open = document.getElementById("__qp_reader");
+    if (open) { open.remove(); document.documentElement.style.overflow = open.__prev || ""; return; }
+    const art = readerExtract(document);
+    const host = document.createElement("div");
+    host.id = "__qp_reader";
+    host.style.cssText = "all:initial;position:fixed;inset:0;z-index:2147483647";
+    host.__prev = document.documentElement.style.overflow;
+    const root = host.attachShadow({ mode: "closed" });
+    const style = document.createElement("style");
+    style.textContent = ":host{all:initial}.r{position:fixed;inset:0;overflow:auto;font:var(--fs,19px)/1.7 Georgia,'Iowan Old Style',serif;background:var(--bg);color:var(--fg);--bg:#fff;--fg:#1f2937;--mut:#6b7280;--ln:#2563eb}.r.sepia{--bg:#f4ecd8;--fg:#433422;--mut:#7b6a52;--ln:#8a4b08}.r.dark{--bg:#111827;--fg:#e5e7eb;--mut:#9ca3af;--ln:#60a5fa}@media (prefers-color-scheme:dark){.r:not(.sepia):not(.light){--bg:#111827;--fg:#e5e7eb;--mut:#9ca3af;--ln:#60a5fa}}.bar{position:sticky;top:0;display:flex;gap:6px;justify-content:flex-end;padding:10px 14px;background:linear-gradient(var(--bg),transparent);font:13px system-ui,sans-serif}.bar button{border:1px solid var(--mut);background:var(--bg);color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer}article{max-width:42em;margin:0 auto;padding:10px 22px 90px}h1{font-size:1.9em;line-height:1.25;margin:.4em 0 .2em}.m{color:var(--mut);font:14px system-ui,sans-serif;margin-bottom:1.6em}img{max-width:100%;height:auto;border-radius:6px}a{color:var(--ln)}pre{overflow:auto;background:rgba(127,127,127,.15);padding:12px;border-radius:8px;font-size:.8em}code{font-size:.9em}blockquote{border-left:3px solid var(--mut);margin-left:0;padding-left:1em;color:var(--mut)}table{border-collapse:collapse}td,th{border:1px solid var(--mut);padding:4px 8px}";
+    const wrap = document.createElement("div");
+    wrap.className = "r";
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    const mk = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
+    let fs = 19;
+    const themes = ["auto", "light", "sepia", "dark"]; let ti = 0;
+    mk("A−", () => { fs = Math.max(13, fs - 2); wrap.style.setProperty("--fs", fs + "px"); });
+    mk("A+", () => { fs = Math.min(32, fs + 2); wrap.style.setProperty("--fs", fs + "px"); });
+    mk("Theme", () => { ti = (ti + 1) % themes.length; wrap.className = "r " + (themes[ti] === "auto" ? "" : themes[ti]); });
+    mk("✕ Close", () => window.__qpReader());
+    const article = document.createElement("article");
+    if (art) {
+      const h = document.createElement("h1"); h.textContent = art.title;
+      const m = document.createElement("div"); m.className = "m"; m.textContent = [art.byline, art.site].filter(Boolean).join(" · ");
+      article.append(h, m, art.body);
+    } else {
+      const p = document.createElement("p"); p.textContent = "Reader mode could not find an article on this page.";
+      article.appendChild(p);
+    }
+    wrap.append(bar, article);
+    root.append(style, wrap);
+    document.documentElement.style.overflow = "hidden";
+    document.documentElement.appendChild(host);
+    const esc = (e) => { if (e.key === "Escape" && document.getElementById("__qp_reader")) { window.__qpReader(); removeEventListener("keydown", esc, true); } };
+    addEventListener("keydown", esc, true);
+  };
+  window.__qpReader.extract = readerExtract;
+
   // ---- find in page --------------------------------------------------------
   window.__qpFind = () => {
     let host = document.getElementById("__qp_find");
@@ -154,7 +289,7 @@
     ["t", false, "new-tab"], ["t", true, "reopen-tab"], ["w", false, "close-tab"], ["l", false, "focus-address"],
     ["r", false, "reload"], ["d", false, "bookmark"], ["[", false, "back"], ["]", false, "forward"],
     ["p", true, "palette"], ["a", true, "tab-search"], ["n", true, "private"], ["j", false, "assistant"],
-    ["f", false, "find"], ["y", false, "library"], ["=", false, "zoom-in"], ["+", true, "zoom-in"],
+    ["f", false, "find"], ["y", false, "library"], ["r", true, "reader"], ["b", true, "bookmarks-bar"], ["=", false, "zoom-in"], ["+", true, "zoom-in"],
     ["-", false, "zoom-out"], ["0", false, "zoom-reset"],
   ];
   window.addEventListener("keydown", (e) => {

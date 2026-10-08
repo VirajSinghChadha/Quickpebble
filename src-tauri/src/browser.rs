@@ -25,7 +25,7 @@ use tauri::{
 };
 use url::Url;
 
-/// Height of tab strip (40) + toolbar (52). Must match `CHROME_HEIGHT` in the frontend.
+/// Height of tab strip (40) + toolbar (52); the frontend raises it when the bookmarks bar is shown.
 pub const CHROME_HEIGHT: f64 = 92.0;
 const INJECT: &str = include_str!("inject.js");
 const MAX_TEXT: usize = 20_000;
@@ -59,6 +59,11 @@ pub struct Browser {
     private_counter: AtomicU32,
     /// Width in logical px of the right-hand side panel, per window.
     sidebar: Mutex<HashMap<String, f64>>,
+    /// Chrome (tab strip + toolbar [+ bookmarks bar]) height per window.
+    chrome: Mutex<HashMap<String, f64>>,
+    /// Hosts the user chose to open over plain HTTP this session.
+    http_allowed: Mutex<HashSet<String>>,
+    upgrade_attempts: Mutex<HashMap<String, (Instant, u32)>>,
     agent_pending: Mutex<HashMap<String, (String, tokio::sync::oneshot::Sender<serde_json::Value>)>>,
     agent_counter: AtomicU32,
 }
@@ -120,9 +125,13 @@ fn content_rect(window: &Window) -> (LogicalPosition<f64>, LogicalSize<f64>) {
         .try_state::<Browser>()
         .map(|st| lock(&st.sidebar).get(window.label()).copied().unwrap_or(0.0))
         .unwrap_or(0.0);
+    let top = window
+        .try_state::<Browser>()
+        .map(|st| lock(&st.chrome).get(window.label()).copied().unwrap_or(CHROME_HEIGHT))
+        .unwrap_or(CHROME_HEIGHT);
     (
-        LogicalPosition::new(0.0, CHROME_HEIGHT),
-        LogicalSize::new((size.width - side).max(1.0), (size.height - CHROME_HEIGHT).max(1.0)),
+        LogicalPosition::new(0.0, top),
+        LogicalSize::new((size.width - side).max(1.0), (size.height - top).max(1.0)),
     )
 }
 
@@ -185,9 +194,14 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .filter(|p| p.policy == "block")
         .map(|p| p.permission)
         .collect();
-    let script = INJECT.replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()));
+    let block_trackers = setting(app, "block_trackers").as_deref() != Some("false");
+    let script = INJECT
+        .replace("__QP_BLOCKED__", &serde_json::to_string(&blocked).unwrap_or_else(|_| "[]".into()))
+        .replace("__QP_TRACKERS__", &serde_json::to_string(security::TRACKER_HOSTS).unwrap_or_else(|_| "[]".into()))
+        .replace("__QP_BLOCK__", if block_trackers { "true" } else { "false" });
     let (pos, size) = content_rect(window);
     let nav_app = app.clone();
+    let nav_label = label.to_string();
     let load_app = app.clone();
     let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .initialization_script(&script)
@@ -203,7 +217,14 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
     let builder = builder
         .on_navigation(move |u| {
             let block = setting(&nav_app, "block_trackers").as_deref() != Some("false");
-            security::allow_navigation(u, block)
+            if !security::allow_navigation(u, block) {
+                return false;
+            }
+            if u.scheme() == "http" && https_only_applies(&nav_app, u) {
+                start_https_upgrade(&nav_app, &nav_label, u.clone());
+                return false;
+            }
+            true
         })
         .on_page_load(move |wv, payload| {
             let st = load_app.state::<Browser>();
@@ -290,6 +311,8 @@ const SHORTCUTS: &[&str] = &[
     "zoom-reset",
     "reopen-tab",
     "library",
+    "reader",
+    "bookmarks-bar",
 ];
 
 #[tauri::command]
@@ -387,20 +410,12 @@ pub fn tab_close(app: AppHandle, window: Window, state: State<Browser>, id: Stri
     }
 }
 
-#[tauri::command]
-pub fn tab_navigate(
-    app: AppHandle,
-    window: Window,
-    state: State<Browser>,
-    db: State<Db>,
-    id: String,
-    input: String,
-) -> Result<String, String> {
-    let label = tab_label(window.label(), &id);
-    let url = security::normalize_input(&input, &engine(&db)).ok_or("empty address")?;
+/// Points tab `label` at `url`, creating its webview if needed, and makes it the active tab.
+fn load_url(app: &AppHandle, window: &Window, label: &str, id: &str, url: &Url) -> Result<(), String> {
+    let state = app.state::<Browser>();
     let private = {
         let mut tabs = lock(&state.tabs);
-        let t = tabs.get_mut(&label).ok_or("unknown tab")?;
+        let t = tabs.get_mut(label).ok_or("unknown tab")?;
         t.url = url.to_string();
         t.title.clear();
         t.favicon.clear();
@@ -409,14 +424,88 @@ pub fn tab_navigate(
         t.last_active = Instant::now();
         t.private
     };
-    match app.get_webview(&label) {
+    match app.get_webview(label) {
         Some(wv) => wv.navigate(url.clone()).map_err(|e| e.to_string())?,
         None => {
-            build_tab_webview(&app, &window, &label, url.clone(), private)?;
+            build_tab_webview(app, window, label, url.clone(), private)?;
         }
     }
-    lock(&state.active).insert(window.label().into(), id);
-    sync_visibility(&app, &state, window.label());
+    lock(&state.active).insert(window.label().into(), id.to_string());
+    sync_visibility(app, &state, window.label());
+    Ok(())
+}
+
+fn https_only_applies(app: &AppHandle, u: &Url) -> bool {
+    let on = setting(app, "https_only").as_deref() != Some("false");
+    let host = u.host_str().unwrap_or_default().to_string();
+    on && security::https_upgrade(u).is_some() && !lock(&app.state::<Browser>().http_allowed).contains(&host)
+}
+
+/// Probes the HTTPS version of an http:// URL. On success the tab is moved to HTTPS; otherwise the
+/// UI is asked whether to continue over plain HTTP.
+fn start_https_upgrade(app: &AppHandle, label: &str, http_url: Url) {
+    let Some(https) = security::https_upgrade(&http_url) else { return };
+    let host = http_url.host_str().unwrap_or_default().to_string();
+    {
+        // A server that bounces https back to http would loop forever: give up after 3 tries in 30 s.
+        let state = app.state::<Browser>();
+        let mut attempts = lock(&state.upgrade_attempts);
+        let e = attempts.entry(host.clone()).or_insert((Instant::now(), 0));
+        if e.0.elapsed() > Duration::from_secs(30) {
+            *e = (Instant::now(), 0);
+        }
+        e.1 += 1;
+        if e.1 > 3 {
+            lock(&state.http_allowed).insert(host);
+            drop(attempts);
+            let _ = app.get_webview(label).map(|wv| wv.navigate(http_url));
+            return;
+        }
+    }
+    let (app, label) = (app.clone(), label.to_string());
+    tauri::async_runtime::spawn(async move {
+        let reachable = match reqwest::Client::builder().timeout(Duration::from_secs(5)).build() {
+            Ok(c) => c.get(https.clone()).send().await.is_ok(),
+            Err(_) => false,
+        };
+        let state = app.state::<Browser>();
+        let Some((window_label, id)) = lock(&state.tabs).get(&label).map(|t| (t.window.clone(), t.id.clone())) else { return };
+        if reachable {
+            if let Some(window) = app.get_window(&window_label) {
+                let _ = load_url(&app, &window, &label, &id, &https);
+            }
+        } else {
+            let _ = app.emit("qp://https-fallback", serde_json::json!({ "window": window_label, "id": id, "url": http_url.to_string() }));
+        }
+    });
+}
+
+#[tauri::command]
+pub fn tab_navigate(
+    app: AppHandle,
+    window: Window,
+    state: State<Browser>,
+    db: State<Db>,
+    id: String,
+    input: String,
+    allow_http: Option<bool>,
+) -> Result<String, String> {
+    let label = tab_label(window.label(), &id);
+    let url = security::normalize_input(&input, &engine(&db)).ok_or("empty address")?;
+    if !lock(&state.tabs).contains_key(&label) {
+        return Err("unknown tab".into());
+    }
+    if allow_http == Some(true) && url.scheme() == "http" {
+        if let Some(h) = url.host_str() {
+            lock(&state.http_allowed).insert(h.to_string());
+        }
+    }
+    if url.scheme() == "http" && https_only_applies(&app, &url) {
+        start_https_upgrade(&app, &label, url.clone());
+        lock(&state.active).insert(window.label().into(), id);
+        return Ok(security::https_upgrade(&url).unwrap_or(url).to_string());
+    }
+    load_url(&app, &window, &label, &id, &url)?;
     Ok(url.to_string())
 }
 
@@ -528,6 +617,8 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "https_only",
+    "auto_update_check",
     "theme",
     "newtab_layout",
     "search_engine",
@@ -946,5 +1037,32 @@ pub fn qp_agent_result(webview: Webview, state: State<Browser>, id: String, resu
         if let Some((_, tx)) = pending.remove(&id) {
             let _ = tx.send(result);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Chrome height (bookmarks bar), reader mode, blocker stats
+// ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn chrome_set(app: AppHandle, window: Window, state: State<Browser>, height: f64) {
+    let h = if height.is_finite() { height.clamp(CHROME_HEIGHT, 200.0) } else { CHROME_HEIGHT };
+    lock(&state.chrome).insert(window.label().into(), h);
+    relayout(&app, &window);
+}
+
+#[tauri::command]
+pub fn tab_reader(app: AppHandle, window: Window, id: String) {
+    if let Some(wv) = app.get_webview(&tab_label(window.label(), &id)) {
+        let _ = wv.eval("window.__qpReader && window.__qpReader()");
+    }
+}
+
+/// Page scripts report how many sub-resource requests they blocked. Capped so a page cannot
+/// meaningfully inflate the counter.
+#[tauri::command]
+pub fn qp_blocked(webview: Webview, count: u32) {
+    if webview.label().starts_with("tab-") {
+        security::BLOCKED_COUNT.fetch_add(u64::from(count.min(50)), Ordering::Relaxed);
     }
 }

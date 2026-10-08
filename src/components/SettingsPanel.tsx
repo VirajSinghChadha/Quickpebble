@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ipc, defaultMemory, type MemoryConfig, type MemoryStats } from "../lib/ipc";
+import { ipc, defaultMemory, type MemoryConfig, type MemoryStats, type UpdateInfo } from "../lib/ipc";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
@@ -22,7 +22,10 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
-  const { theme, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete } = useStore();
+  const { theme, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
+  const [httpsOnly, setHttpsOnly] = useState(true);
+  const [autoUpdate, setAutoUpdate] = useState(true);
+  const [upd, setUpd] = useState<{ state: "idle" | "checking" | "none" | "found" | "installing" | "error"; info?: UpdateInfo; text?: string }>({ state: "idle" });
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [engine, setEngine] = useState("duckduckgo");
@@ -42,6 +45,8 @@ export function SettingsPanel() {
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
+      setHttpsOnly(s.https_only !== "false");
+      setAutoUpdate(s.auto_update_check !== "false");
     });
   }, []);
 
@@ -80,6 +85,47 @@ export function SettingsPanel() {
               {ENGINES.map((e) => <option key={e} value={e}>{e[0].toUpperCase() + e.slice(1)}</option>)}
             </select>
           </Row>
+        </div>
+
+        <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Browsing</h3>
+          <Row label="Bookmarks bar" hint="Shortcut: ⌘⇧B">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={bookmarksBar} onChange={toggleBookmarksBar} aria-label="Bookmarks bar" />
+          </Row>
+          <Row label="HTTPS-only mode" hint="Upgrades http:// links to https://. You're warned before any site is opened insecurely.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={httpsOnly} onChange={(e) => { setHttpsOnly(e.target.checked); void save("https_only", String(e.target.checked)); }} aria-label="HTTPS-only mode" />
+          </Row>
+        </div>
+
+        <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Updates</h3>
+          <Row label="Check for updates automatically" hint="Contacts GitHub Releases shortly after launch. Updates are signature-checked and never installed without your click.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={autoUpdate} onChange={(e) => { setAutoUpdate(e.target.checked); void save("auto_update_check", String(e.target.checked)); }} aria-label="Automatic update checks" />
+          </Row>
+          <div className="flex flex-wrap items-center gap-3 pb-1">
+            {upd.state !== "found" && upd.state !== "installing" && (
+              <button type="button" disabled={upd.state === "checking"} className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary disabled:opacity-40" onClick={async () => {
+                setUpd({ state: "checking" });
+                try {
+                  const info = await ipc.updateCheck();
+                  setUpd(info ? { state: "found", info } : { state: "none" });
+                } catch (e) {
+                  setUpd({ state: "error", text: String(e) });
+                }
+              }}>{upd.state === "checking" ? "Checking…" : "Check now"}</button>
+            )}
+            {upd.state === "none" && <span role="status" className="text-text-secondary">You&apos;re up to date.</span>}
+            {upd.state === "error" && <span role="alert" className="text-[12px] text-red-500">{upd.text}</span>}
+            {(upd.state === "found" || upd.state === "installing") && upd.info && (
+              <>
+                <span role="status">Version {upd.info.version} is available (you have {upd.info.current}).</span>
+                <button type="button" disabled={upd.state === "installing"} className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white disabled:opacity-40 dark:text-bg" onClick={async () => {
+                  setUpd({ ...upd, state: "installing" });
+                  try { await ipc.updateInstall(); } catch (e) { setUpd({ state: "error", text: String(e) }); }
+                }}>{upd.state === "installing" ? "Installing…" : "Install & restart"}</button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="py-2">

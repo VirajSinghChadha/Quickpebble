@@ -3,9 +3,11 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
 import { isPrivateWindow } from "./lib/ipc";
-import { selectActive, useStore } from "./store/useStore";
+import { BASE_CHROME, BOOKMARKS_BAR, selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
 import { PrivacyCenter } from "./components/PrivacyCenter";
+import { BookmarksBar } from "./components/BookmarksBar";
+import { HttpsPrompt } from "./components/HttpsPrompt";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { Library } from "./components/Library";
 import { Sidebar } from "./components/Sidebar";
@@ -24,12 +26,14 @@ export default function App() {
   const overlay = useStore((s) => s.overlay);
   const showNewTab = useStore((s) => !selectActive(s).url);
   const priv = isPrivateWindow();
+  const bar = useStore((s) => s.bookmarksBar);
 
   return (
     <div className={`flex h-full flex-col bg-bg ${priv ? "dark" : ""}`}>
-      <header className="shrink-0 bg-bg" style={{ height: 92 }}>
+      <header className="shrink-0 overflow-hidden bg-bg" style={{ height: BASE_CHROME + (bar ? BOOKMARKS_BAR : 0) }}>
         <TabStrip />
         <Toolbar />
+        {bar && <BookmarksBar />}
       </header>
       {/* Page webviews are positioned natively over this region. */}
       <div className="flex min-h-0 flex-1">
@@ -44,6 +48,7 @@ export default function App() {
         {overlay === "summary" && <SummaryDialog key="summary" />}
         {overlay === "extensions" && <ExtensionsPanel key="extensions" />}
         {overlay === "library" && <Library key="library" />}
+        {overlay === "https" && <HttpsPrompt key="https" />}
       </AnimatePresence>
     </div>
   );

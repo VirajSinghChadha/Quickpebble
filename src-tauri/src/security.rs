@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use url::Url;
 
 /// Host suffixes of well-known ad / tracking networks. Matched on label boundaries.
-const TRACKER_HOSTS: &[&str] = &[
+pub const TRACKER_HOSTS: &[&str] = &[
     "doubleclick.net", "googlesyndication.com", "googleadservices.com", "google-analytics.com",
     "googletagmanager.com", "googletagservices.com", "adservice.google.com", "facebook.net",
     "connect.facebook.net", "analytics.twitter.com", "ads-twitter.com", "ads.linkedin.com",
@@ -46,6 +46,32 @@ pub fn allow_navigation(url: &Url, block_trackers: bool) -> bool {
         }
         _ => false,
     }
+}
+
+/// Hosts that are never upgraded to HTTPS: loopback, private networks and `.local` names.
+pub fn is_local_host(host: &str) -> bool {
+    let h = host.trim_matches(|c| c == '[' || c == ']').to_ascii_lowercase();
+    if h == "localhost" || h.ends_with(".localhost") || h.ends_with(".local") || !h.contains('.') && h.parse::<std::net::IpAddr>().is_err() {
+        return true;
+    }
+    match h.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(ip)) => ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified(),
+        Ok(std::net::IpAddr::V6(ip)) => ip.is_loopback() || ip.is_unspecified(),
+        Err(_) => false,
+    }
+}
+
+/// `http://example.com/a` -> `https://example.com/a`; None if not applicable.
+pub fn https_upgrade(url: &Url) -> Option<Url> {
+    if url.scheme() != "http" || is_local_host(url.host_str()?) {
+        return None;
+    }
+    let mut u = url.clone();
+    u.set_scheme("https").ok()?;
+    if url.port() == Some(80) {
+        u.set_port(None).ok()?;
+    }
+    Some(u)
 }
 
 pub const SEARCH_ENGINES: &[(&str, &str)] = &[
@@ -121,6 +147,19 @@ mod tests {
         assert!(is_tracker_host("stats.doubleclick.net"));
         assert!(is_tracker_host("doubleclick.net"));
         assert!(!is_tracker_host("notdoubleclick.net"));
+    }
+
+    #[test]
+    fn https_upgrade_rules() {
+        let up = |s: &str| https_upgrade(&Url::parse(s).unwrap()).map(|u| u.to_string());
+        assert_eq!(up("http://example.com/a?b=1").as_deref(), Some("https://example.com/a?b=1"));
+        assert_eq!(up("http://example.com:80/").as_deref(), Some("https://example.com/"));
+        assert_eq!(up("http://localhost:3000/"), None);
+        assert_eq!(up("http://192.168.1.5/"), None);
+        assert_eq!(up("http://127.0.0.1:8080/"), None);
+        assert_eq!(up("http://printer.local/"), None);
+        assert_eq!(up("http://intranet/"), None);
+        assert_eq!(up("https://example.com/"), None);
     }
 
     #[test]

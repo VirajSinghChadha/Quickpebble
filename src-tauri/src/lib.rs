@@ -6,6 +6,7 @@ mod database;
 mod extensions;
 mod memory_saver;
 mod security;
+mod updater;
 
 use tauri::Manager;
 
@@ -13,6 +14,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -21,8 +23,10 @@ pub fn run() {
             *state.memory.lock().unwrap() = browser::load_memory_config(&db);
             app.manage(db);
             app.manage(state);
+            app.manage(updater::PendingUpdate::default());
             browser::open_window(app.handle(), "main")?;
             browser::spawn_memory_saver(app.handle().clone());
+            updater::spawn_startup_check(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -56,6 +60,11 @@ pub fn run() {
             browser::window_new_private,
             browser::window_control,
             browser::sidebar_set,
+            browser::chrome_set,
+            browser::tab_reader,
+            browser::qp_blocked,
+            updater::update_check,
+            updater::update_install,
             browser::tab_zoom,
             browser::tab_find,
             browser::ai_chat,

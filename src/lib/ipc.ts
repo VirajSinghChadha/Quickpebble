@@ -96,13 +96,19 @@ export interface ExtensionInfo {
   source: string;
 }
 
+export interface UpdateInfo {
+  version: string;
+  current: string;
+  notes: string | null;
+}
+
 export const defaultMemory: MemoryConfig = { enabled: true, mode: "balanced", timeout_minutes: null };
 
 export const ipc = {
   tabCreate: (id: string, pinned = false) => call<void>("tab_create", { id, pinned }),
   tabActivate: (id: string) => call<void>("tab_activate", { id }),
   tabClose: (id: string) => call<void>("tab_close", { id }),
-  tabNavigate: (id: string, input: string) => call<string>("tab_navigate", { id, input }, input),
+  tabNavigate: (id: string, input: string, allowHttp = false) => call<string>("tab_navigate", { id, input, allowHttp }, input),
   tabNav: (id: string, action: "back" | "forward" | "reload" | "stop") => call<void>("tab_nav", { id, action }),
   tabSetPinned: (id: string, pinned: boolean) => call<void>("tab_set_pinned", { id, pinned }),
   tabSetMuted: (id: string, muted: boolean) => call<void>("tab_set_muted", { id, muted }),
@@ -129,6 +135,10 @@ export const ipc = {
     call<void>("privacy_set_permission", { host, permission, policy }),
   privacyClearData: (history: boolean, siteData: boolean) => call<void>("privacy_clear_data", { history, siteData }),
   windowNewPrivate: () => call<void>("window_new_private"),
+  chromeSet: (height: number) => call<void>("chrome_set", { height }),
+  tabReader: (id: string) => call<void>("tab_reader", { id }),
+  updateCheck: () => call<UpdateInfo | null>("update_check", undefined, null),
+  updateInstall: () => call<void>("update_install"),
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
   tabZoom: (id: string, action: "in" | "out" | "reset") => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),
@@ -154,4 +164,15 @@ export async function onShortcut(cb: (action: string) => void): Promise<Unlisten
   if (!isTauri) return () => {};
   const label = windowLabel();
   return listen<{ window: string; action: string }>("qp://shortcut", (e) => e.payload.window === label && cb(e.payload.action));
+}
+
+export async function onHttpsFallback(cb: (e: { id: string; url: string }) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  const label = windowLabel();
+  return listen<{ window: string; id: string; url: string }>("qp://https-fallback", (e) => e.payload.window === label && cb(e.payload));
+}
+
+export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<UpdateInfo>("qp://update", (e) => cb(e.payload));
 }

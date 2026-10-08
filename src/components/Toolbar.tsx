@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bookmark, Bot, MoonStar, Puzzle, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Bot, Download, MoonStar, Puzzle, RotateCw, Settings, ShieldCheck, Sparkles, Sun, SunMoon, X, Minus, Square } from "lucide-react";
 import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
 import { selectActive, useStore, type Theme } from "../store/useStore";
@@ -28,6 +28,7 @@ export function Toolbar() {
   const setTheme = useStore((s) => s.setTheme);
   const setOverlay = useStore((s) => s.setOverlay);
   const sidebar = useStore((s) => s.sidebar);
+  const update = useStore((s) => s.update);
   const hasPage = !!tab.url;
   const ThemeIcon = THEME_ICON[theme];
 
@@ -44,11 +45,17 @@ export function Toolbar() {
       <IconButton label={`Bookmark (${modKey}D)`} disabled={!hasPage} active={tab.bookmarked} onClick={() => void useStore.getState().toggleBookmark(tab.id)}>
         <Bookmark size={16} fill={tab.bookmarked ? "currentColor" : "none"} />
       </IconButton>
+      <IconButton label={`Reader mode (${modKey}⇧R)`} disabled={!hasPage} onClick={() => void ipc.tabReader(tab.id)}><BookOpen size={16} /></IconButton>
       <IconButton label="Summarize page with AI" disabled={!hasPage} onClick={() => void useStore.getState().summarize(tab.id)}><Sparkles size={16} /></IconButton>
       <IconButton label={`Assistant (${modKey}J)`} active={sidebar !== null} onClick={() => useStore.getState().toggleSidebar("assistant")}><Bot size={17} /></IconButton>
       <IconButton label="Extensions" onClick={() => setOverlay("extensions")}><Puzzle size={16} /></IconButton>
       <IconButton label="Privacy Center" onClick={() => setOverlay("privacy")}><ShieldCheck size={17} /></IconButton>
       <IconButton label={`Theme: ${theme}`} onClick={() => setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length])}><ThemeIcon size={16} /></IconButton>
+      {update && (
+        <button type="button" onClick={() => setOverlay("settings")} className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-[12px] font-medium text-white dark:text-bg" title={`Version ${update.version} is available`}>
+          <Download size={13} /> Update
+        </button>
+      )}
       <IconButton label="Settings" onClick={() => setOverlay("settings")}><Settings size={16} /></IconButton>
     </div>
   );

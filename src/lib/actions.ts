@@ -57,6 +57,12 @@ export function runAction(action: string): void {
     case "library":
       s.setOverlay(s.overlay === "library" ? null : "library");
       break;
+    case "reader":
+      void ipc.tabReader(active.id);
+      break;
+    case "bookmarks-bar":
+      s.toggleBookmarksBar();
+      break;
   }
 }
 
@@ -76,6 +82,8 @@ export const SHORTCUTS: { key: string; shift: boolean; action: string }[] = [
   { key: "j", shift: false, action: "assistant" },
   { key: "f", shift: false, action: "find" },
   { key: "y", shift: false, action: "library" },
+  { key: "r", shift: true, action: "reader" },
+  { key: "b", shift: true, action: "bookmarks-bar" },
   { key: "=", shift: false, action: "zoom-in" },
   { key: "+", shift: true, action: "zoom-in" },
   { key: "-", shift: false, action: "zoom-out" },
