@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3
+
+- Fixes Screen mode failing to start on macOS, where the built-in Python is 3.9.
+
 ## 1.2.2
 
 - Screen mode's first-time setup now uses its own Python environment with an up-to-date pip, so it finishes in seconds instead of compiling packages for minutes.
