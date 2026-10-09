@@ -1,4 +1,5 @@
 export function hostOf(url: string): string {
+  if (url.startsWith("ghost:")) return ""; // GhostSearch's own pages aren't a website with permissions
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {

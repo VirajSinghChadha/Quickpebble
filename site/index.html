@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick Pebble — a private Chromium browser with GhostSearch</title>
+<meta name="description" content="Quick Pebble is a free, open-source browser built on Chromium with GhostSearch (a private, Google-free search engine), native ad and tracker blocking, profiles, a password manager and a local-first AI assistant.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Quick Pebble — browse quicker, privately">
+<meta property="og:description" content="Chromium browser with GhostSearch, native ad blocking, profiles, password manager and local AI. Free and open source.">
+<meta property="og:image" content="assets/01-ghostsearch-results.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="assets/pebble.svg">
+<style>
+:root{--bg:#fafaff;--fg:#14142b;--mut:#5b6078;--line:#e4e6f2;--card:#fff;--acc:#5b4bf5;--acc2:#8b7dff;--soft:#f0efff;--code:#14142b;--codefg:#e8e8ff;--shadow:0 30px 80px -30px rgba(40,30,120,.35)}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0c1a;--fg:#ececfa;--mut:#9aa0bd;--line:#23264a;--card:#12142b;--acc:#8b7dff;--acc2:#b4abff;--soft:#181a3a;--code:#07081a;--codefg:#dcdcff;--shadow:0 30px 80px -30px rgba(0,0,0,.7)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+img{max-width:100%;display:block}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em;color:var(--fg);font-size:18px}.brand img{width:28px;height:28px;border-radius:7px}
+.nav nav{display:flex;gap:22px;margin-left:auto;font-size:15px}.nav nav a{color:var(--mut)}.nav nav a:hover{color:var(--fg);text-decoration:none}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:999px;font-weight:600;font-size:16px;border:1px solid transparent;cursor:pointer;text-decoration:none!important}
+.btn.primary{background:var(--acc);color:#fff}.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:var(--line);color:var(--fg);background:var(--card)}.btn.ghost:hover{border-color:var(--acc)}
+.hero{padding:84px 0 40px;text-align:center}
+.hero .tag{display:inline-block;padding:5px 14px;border:1px solid var(--line);border-radius:999px;font-size:13.5px;color:var(--mut);background:var(--card);margin-bottom:22px}
+.hero h1{font-size:clamp(38px,6.4vw,70px);line-height:1.04;letter-spacing:-.035em;margin:0 auto 20px;max-width:15ch}
+.hero h1 em{font-style:normal;background:linear-gradient(100deg,var(--acc),#e056c6 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{font-size:clamp(18px,2.2vw,22px);color:var(--mut);max-width:44em;margin:0 auto 32px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}.fine{margin:14px 0 0;color:var(--mut);font-size:14px}
+.shot{margin:56px auto 0;max-width:1000px;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+.shot img{width:100%;height:auto}
+section{padding:84px 0}section.alt{background:var(--soft)}
+h2{font-size:clamp(30px,4.2vw,46px);line-height:1.1;letter-spacing:-.03em;margin:0 0 14px}
+.sub{color:var(--mut);max-width:42em;margin:0 0 44px;font-size:19px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(310px,100%),1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}
+.card h3{margin:12px 0 6px;font-size:19px;letter-spacing:-.01em}.card p{margin:0;color:var(--mut);font-size:15.5px}
+.ico{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;color:var(--acc);font-size:21px}
+section.alt .ico{background:var(--bg)}
+.split{display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center}
+@media (max-width:860px){.split{grid-template-columns:1fr}.nav nav a:not(.keep){display:none}}
+.split .shot{margin:0}
+ul.ticks{list-style:none;padding:0;margin:20px 0 0}ul.ticks li{padding:7px 0 7px 30px;position:relative;color:var(--mut)}ul.ticks li b{color:var(--fg)}
+ul.ticks li::before{content:"";position:absolute;left:0;top:14px;width:16px;height:16px;border-radius:50%;background:var(--acc);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 11.5 3 8l1-1 2.5 2.5L12 4l1 1z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 11.5 3 8l1-1 2.5 2.5L12 4l1 1z'/%3E%3C/svg%3E") center/contain no-repeat}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:22px}
+.gallery figure{margin:0}.gallery .shot{margin:0;box-shadow:none}.gallery figcaption{color:var(--mut);font-size:15px;margin-top:10px}.gallery figcaption b{color:var(--fg)}
+.honest{border-left:4px solid var(--acc);background:var(--card);padding:18px 22px;border-radius:0 14px 14px 0;margin-top:28px;color:var(--mut);font-size:16px}.honest b{color:var(--fg)}
+pre{background:var(--code);color:var(--codefg);padding:18px 20px;border-radius:14px;overflow:auto;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:14px 0}
+code{font:.92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--soft);padding:2px 6px;border-radius:6px}pre code{background:none;padding:0}
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.dl .card.rec{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 20%,transparent)}
+.dl h3{margin:0 0 4px}.dl p{margin:0 0 14px}
+details{border-bottom:1px solid var(--line);padding:16px 0}details summary{cursor:pointer;font-weight:600;font-size:18px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+details summary::after{content:"+";color:var(--acc);font-size:22px;line-height:1}details[open] summary::after{content:"–"}details p{color:var(--mut);margin:10px 0 0}
+footer{padding:44px 0 60px;border-top:1px solid var(--line);color:var(--mut);font-size:15px}footer .wrap{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between}footer a{color:var(--mut)}footer a:hover{color:var(--fg)}
+.os-only{display:none}
+@media (prefers-reduced-motion:no-preference){.card{transition:transform .2s,border-color .2s}.card:hover{transform:translateY(-3px);border-color:var(--acc)}}
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="#top"><img src="assets/pebble.svg" alt="" width="28" height="28">Quick Pebble</a>
+  <nav aria-label="Main"><a href="#features">Features</a><a href="#ghostsearch">GhostSearch</a><a href="#screens">Screenshots</a><a href="#faq">FAQ</a><a class="keep" href="#download">Download</a><a class="keep" href="https://github.com/VirajSinghChadha/Quickpebble">GitHub</a></nav>
+</div></header>
+
+<main id="top">
+<div class="hero wrap">
+  <span class="tag">Free · Open source · Chromium-powered</span>
+  <h1>Browse quicker. <em>Browse privately.</em></h1>
+  <p class="lead">Quick Pebble is a calm, fast browser on real Chromium, with its own private search engine, ad and tracker blocking built into the network layer, separate profiles, a password manager, and an AI assistant that runs on your own machine.</p>
+  <div class="cta"><a class="btn primary" href="#download" id="hero-dl">Download</a><a class="btn ghost" href="https://github.com/VirajSinghChadha/Quickpebble">View on GitHub</a></div>
+  <p class="fine">macOS · Windows · Linux. Builds aren't paid-certificate signed yet, <a href="#faq">here's what that means</a>.</p>
+  <div class="shot"><img src="assets/01-ghostsearch-results.png" width="1600" height="1025" alt="Quick Pebble showing GhostSearch results for 'how to feed a sourdough starter' in dark mode"></div>
+</div>
+
+<section id="features"><div class="wrap">
+  <h2>Everything you expect, minus the watching.</h2>
+  <p class="sub">A browser that does its job and keeps your data to itself.</p>
+  <div class="grid">
+    <div class="card"><div class="ico">👻</div><h3>GhostSearch</h3><p>A private meta-search engine built in. No Google, no cookies, no account, nothing stored. Tracking is stripped from every result link.</p></div>
+    <div class="card"><div class="ico">🛡️</div><h3>Native ad &amp; tracker blocking</h3><p>Blocks on every network request, before page scripts run, using EasyList / EasyPrivacy-style filter lists plus a built-in tracker list.</p></div>
+    <div class="card"><div class="ico">🌐</div><h3>Real Chromium</h3><p>Pages render exactly as in Chrome. Google, YouTube, PDFs, WebRTC and modern web apps work the way you expect.</p></div>
+    <div class="card"><div class="ico">👤</div><h3>Profiles</h3><p>Separate logins, cookies and site data per profile, so each can hold a different Google account. Private windows keep nothing.</p></div>
+    <div class="card"><div class="ico">🤖</div><h3>Local-first AI</h3><p>Ask about the page with cited answers, or let it click, type and scroll for you. Runs on Ollama on your machine; cloud models are opt-in.</p></div>
+    <div class="card"><div class="ico">🧠</div><h3>Recall</h3><p>Opt-in, on-device search over the text of pages you've read. "What was that article about sourdough?" Stored only on your computer.</p></div>
+    <div class="card"><div class="ico">🔑</div><h3>Password manager</h3><p>AES-256-GCM vault under your master password. Fills only on an exact https match and saves only after you agree. Imports from every major manager.</p></div>
+    <div class="card"><div class="ico">🧩</div><h3>Chrome extensions</h3><p>Install from the Chrome Web Store or a .crx file on Chromium's real extension runtime. They start switched off, and you see what each can touch.</p></div>
+    <div class="card"><div class="ico">🔄</div><h3>In-app updates</h3><p>New versions arrive from GitHub Releases, are integrity-checked, and install with one click. Never without your say-so.</p></div>
+  </div>
+</div></section>
+
+<section id="ghostsearch" class="alt"><div class="wrap split">
+  <div>
+    <h2>Meet GhostSearch.</h2>
+    <p class="sub" style="margin-bottom:10px">Search that works for you, not for an ad profile.</p>
+    <ul class="ticks">
+      <li><b>Several sources at once.</b> DuckDuckGo, Wikipedia, Marginalia, plus Brave Search or your own SearXNG if you add them. Results several sources agree on rise to the top.</li>
+      <li><b>No Google involved.</b> Not as a source, not for suggestions, not for favicons or fonts.</li>
+      <li><b>Nothing stored.</b> No search history, no cookies, no account. The results page has no JavaScript and loads nothing from anywhere else.</li>
+      <li><b>Clean links.</b> <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code> and friends are removed from every result.</li>
+      <li><b>Local bangs.</b> <code>!w</code> <code>!yt</code> <code>!gh</code> <code>!so</code> <code>!mdn</code> jump straight to the site, resolved on your machine.</li>
+    </ul>
+    <div class="honest"><b>The honest part.</b> GhostSearch doesn't have its own web index. Nobody can run one for free. The sources still see your query and your IP address, and DuckDuckGo's results come partly from Bing. Route the browser through Tor or any proxy in Settings to hide the IP too.</div>
+  </div>
+  <div class="shot"><img src="assets/02-ghostsearch-home.png" loading="lazy" width="1600" height="1025" alt="The GhostSearch home page in light mode"></div>
+</div></section>
+
+<section id="screens"><div class="wrap">
+  <h2>A look around.</h2>
+  <p class="sub">Light and dark, with colour themes you can change.</p>
+  <div class="gallery">
+    <figure><div class="shot"><img src="assets/03-assistant-commands.png" loading="lazy" width="1600" height="1025" alt="The AI assistant side panel with slash commands beside a search results page"></div><figcaption><b>Assistant.</b> Ask, run tasks, or type <code>/</code> for shortcuts like <code>/compare</code> and <code>/recall</code>.</figcaption></figure>
+    <figure><div class="shot"><img src="assets/06-recall-memory.png" loading="lazy" width="1600" height="1025" alt="Library showing Recall memory search results for sourdough starter"></div><figcaption><b>Recall.</b> Find pages you read by what was in them. On-device, opt-in, clearable.</figcaption></figure>
+    <figure><div class="shot"><img src="assets/04-newtab.png" loading="lazy" width="1600" height="1025" alt="The new tab page in light mode"></div><figcaption><b>New tab.</b> Uncluttered, with optional weather and news that stay off until you choose.</figcaption></figure>
+    <figure><div class="shot"><img src="assets/05-settings.png" loading="lazy" width="1600" height="1025" alt="Settings with GhostSearch selected as the search engine"></div><figcaption><b>Settings.</b> GhostSearch is the default; Google and others are one click away.</figcaption></figure>
+    <figure><div class="shot"><img src="assets/07-profiles.png" loading="lazy" width="1600" height="1025" alt="The profiles panel"></div><figcaption><b>Profiles.</b> One per Google account, or per part of your life.</figcaption></figure>
+    <figure><div class="shot"><img src="assets/09-privacy.png" loading="lazy" width="1600" height="1025" alt="The Privacy Center"></div><figcaption><b>Privacy Center.</b> Blocked-request counter, per-site camera, mic, location and notification rules, one-click data clearing.</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="download" class="alt"><div class="wrap">
+  <h2>Get Quick Pebble.</h2>
+  <p class="sub">Free forever. MIT licensed. No account, no ads, no tracking.</p>
+  <div class="dl">
+    <div class="card" data-os="mac"><h3> macOS</h3><p>Apple silicon and Intel. DMG from GitHub Releases, or Homebrew.</p><a class="btn primary" href="https://github.com/VirajSinghChadha/Quickpebble/releases/latest">Download DMG</a></div>
+    <div class="card" data-os="win"><h3>⊞ Windows</h3><p>Windows 10 / 11, 64-bit. Installer from GitHub Releases.</p><a class="btn primary" href="https://github.com/VirajSinghChadha/Quickpebble/releases/latest">Download installer</a></div>
+    <div class="card" data-os="linux"><h3>🐧 Linux</h3><p>AppImage and .deb from GitHub Releases.</p><a class="btn primary" href="https://github.com/VirajSinghChadha/Quickpebble/releases/latest">Download AppImage</a></div>
+  </div>
+  <h3 style="margin:34px 0 0">Build from source</h3>
+  <pre><code>git clone https://github.com/VirajSinghChadha/Quickpebble.git
+cd Quickpebble
+git checkout chromium-electron   # until it is merged into main
+npm install
+npm run electron:dev             # or: npm run dist   → installer in release/</code></pre>
+  <p class="fine">Needs Node 20+. The 2.0 Chromium edition is on the <code>chromium-electron</code> branch; releases on the page above may still be the older 1.x build until 2.0 is tagged.</p>
+</div></section>
+
+<section id="faq"><div class="wrap" style="max-width:820px">
+  <h2>Questions.</h2>
+  <details><summary>Is it safe to run an unsigned app?</summary><p>Builds aren't signed with a paid Apple or Microsoft certificate yet, so your system asks you to confirm the first launch (macOS: System Settings → Privacy &amp; Security → <i>Open Anyway</i>; Windows: <i>More info → Run anyway</i>). The code is open, and in-app updates are checked for integrity (checksum, bundle identity, version and code signature) before they replace anything. Homebrew installs clear the macOS warning for you.</p></details>
+  <details><summary>Why Chromium?</summary><p>The first version used the system web view, so Google looked different, sign-in was shaky and extensions barely worked. Chromium fixes that, and gives a request-level API for real ad blocking.</p></details>
+  <details><summary>Does Quick Pebble send my data anywhere?</summary><p>No account, no analytics, no telemetry. It contacts GitHub (anonymously) to look for updates, the search sources when you search with GhostSearch, and whatever AI provider you pick. The default AI is Ollama on your own computer. Cloud providers are opt-in and the panel always shows which one is active.</p></details>
+  <details><summary>Is there a VPN?</summary><p>No. A real VPN needs servers someone pays for. You can route the browser through any SOCKS5 or HTTP proxy (Tor, a VPN's proxy port) in Settings.</p></details>
+  <details><summary>Can it sync with my Google account?</summary><p>You can sign in to Google sites normally, in separate profiles. Chrome Sync (bookmarks and passwords across devices) belongs to Google's own Chrome and isn't available to any other browser.</p></details>
+  <details><summary>How is GhostSearch different from DuckDuckGo or Startpage?</summary><p>It runs inside the browser, combines several independent sources, and keeps nothing on a server, because there isn't one. It doesn't have its own index though, so it depends on the sources it asks, and it says so on the page when one is unavailable.</p></details>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div>© Quick Pebble contributors · MIT License</div>
+  <div><a href="https://github.com/VirajSinghChadha/Quickpebble">GitHub</a> · <a href="https://github.com/VirajSinghChadha/Quickpebble/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/VirajSinghChadha/Quickpebble/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/VirajSinghChadha/Quickpebble/issues">Report an issue</a></div>
+</div></footer>
+
+<script>
+// Highlights the download that matches this computer. Purely local: reads the user agent, sends nothing.
+(function () {
+  var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  var os = /mac/i.test(p) ? "mac" : /win/i.test(p) ? "win" : /linux|x11/i.test(p) ? "linux" : "";
+  if (!os) return;
+  var card = document.querySelector('[data-os="' + os + '"]');
+  if (card) card.classList.add("rec");
+  var label = { mac: "Download for macOS", win: "Download for Windows", linux: "Download for Linux" }[os];
+  var b = document.getElementById("hero-dl"); if (b) b.textContent = label;
+})();
+</script>
+</body>
+</html>

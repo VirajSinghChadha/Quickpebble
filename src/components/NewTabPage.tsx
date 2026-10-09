@@ -45,7 +45,7 @@ function SearchBox({ big }: { big?: boolean }) {
 }
 
 function Logo({ size = 64 }: { size?: number }) {
-  return <img src="/pebble.svg" alt="" width={size} height={size} className="rounded-[22%]" draggable={false} />;
+  return <img src={`${import.meta.env.BASE_URL}pebble.svg`} alt="" width={size} height={size} className="rounded-[22%]" draggable={false} />;
 }
 
 function Tiles({ items }: { items: { name: string; url: string }[] }) {

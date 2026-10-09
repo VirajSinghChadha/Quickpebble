@@ -8,7 +8,9 @@
 - **GhostSearch**: a private, Google-free meta-search engine built into the browser and set as the default. Combines independent sources, strips tracking from links, stores nothing. Change it in Settings → Search engine.
 - **Password manager** and **Chrome extensions** (real Chromium extension runtime) are back, ported to the new engine.
 - Releases now build installers for macOS (Apple silicon and Intel), Windows and Linux.
-- Not yet ported: Screen mode and in-app updates.
+- **Screen mode** is back (Python agent; now also works on the Python 3.9 that macOS ships).
+- **In-app updates** for unsigned builds (checksum, bundle id, version and signature checks; one click; relaunches).
+- A website in `site/` (GitHub Pages or Vercel) and screenshots in the README.
 
 - **Recall (opt-in):** an on-device full-text index of pages you read. Search it from Library → Memory, or tick "Search pages I've read" in the assistant to answer from it with citations. Off by default; never saved in private windows or for login, payment and webmail pages; cleared along with history; forget single pages any time.
 - **Slash commands** in Ask mode: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare`, `/tabs`, `/recall`. `/compare` and `/tabs` read up to four open pages at once.
