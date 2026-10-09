@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quick Pebble admin</title><meta name="robots" content="noindex"><link rel="stylesheet" href="style.css"></head>
+<body><div class="wrap">
+<header class="top"><span class="logo">Quick Pebble admin</span><a href="index.html" class="btn ghost">Site</a></header>
+
+<section id="login" class="card" style="max-width:420px;margin:40px auto">
+<h3>Enter admin code</h3>
+<form id="loginForm" class="bar"><input id="code" type="password" autocomplete="off" placeholder="Admin code" aria-label="Admin code" style="flex:1"><button class="btn" type="submit">Unlock</button></form>
+<p id="loginErr" class="err" role="alert"></p>
+<p class="note" style="text-align:left;padding:0">The code is checked by the server on every request. It is kept only in this tab and is forgotten when you close it.</p>
+</section>
+
+<section id="panel" hidden>
+<div class="bar"><button class="btn ghost" id="refresh">Refresh</button><button class="btn ghost" id="lock">Lock</button><span id="status" class="tag"></span></div>
+<h2>Access codes</h2>
+<form id="newCode" class="bar"><input id="label" placeholder="Label (e.g. Aditya)" aria-label="Label"><input id="uses" type="number" min="1" value="1" style="width:90px" aria-label="Max uses"><button class="btn" type="submit">Create code</button></form>
+<div class="scroll"><table><thead><tr><th>Code</th><th>Label</th><th>Used</th><th>Status</th><th></th></tr></thead><tbody id="codes"></tbody></table></div>
+<h2>Users</h2>
+<div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Joined</th><th>Last sign-in</th><th>Access code</th><th>Saved keys</th><th></th></tr></thead><tbody id="users"></tbody></table></div>
+<p class="note" style="text-align:left">Saved API keys are shown by ID and last 4 characters only. Full keys can't be viewed here.</p>
+</section>
+</div>
+<script src="admin.js"></script></body></html>

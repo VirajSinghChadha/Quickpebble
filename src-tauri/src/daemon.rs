@@ -9,7 +9,6 @@ use std::time::Duration;
 
 pub const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 pub const DEFAULT_LOCAL_MODEL: &str = "llama3";
-const KEYRING_SERVICE: &str = "app.quickpebble.browser";
 /// Max characters of page text sent to a model.
 const MAX_PAGE_CHARS: usize = 8_000;
 
@@ -58,39 +57,23 @@ fn key_cache() -> &'static std::sync::Mutex<std::collections::HashMap<String, St
     CACHE.get_or_init(Default::default)
 }
 
-/// API key for a provider. Order: environment variable (no keychain prompt), in-memory cache, OS keychain.
-/// Caching means macOS asks for keychain access at most once per launch instead of on every status check.
+/// API key for a provider. Order: environment variable, then the in-memory copy.
+/// Keys are no longer written to the OS keychain (which asked for permission after every update): the app
+/// loads them from the signed-in account at start-up and holds them only in memory.
 pub fn get_key(provider: &str) -> Option<String> {
     let env_name = format!("QP_{}_API_KEY", provider.to_uppercase());
     if let Some(k) = std::env::var(&env_name).ok().or_else(|| (provider == "gemini").then(|| std::env::var("GEMINI_API_KEY").ok()).flatten()).filter(|k| !k.trim().is_empty()) {
         return Some(k.trim().to_string());
     }
-    if let Some(k) = key_cache().lock().ok()?.get(provider).filter(|k| !k.is_empty()) {
-        return Some(k.clone());
-    }
-    // Only a successful read is cached. A missing or denied entry is retried next time, so a one-off
-    // keychain failure can never make a saved key look absent for the rest of the launch.
-    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty())?;
-    key_cache().lock().ok()?.insert(provider.to_string(), k.clone());
-    Some(k)
+    key_cache().lock().ok()?.get(provider).filter(|k| !k.is_empty()).cloned()
 }
 
 pub fn set_key(provider: &str, key: &str) -> Result<(), String> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| e.to_string())?;
-    if let Ok(mut c) = key_cache().lock() {
-        c.remove(provider);
-    }
+    let mut cache = key_cache().lock().map_err(|_| "key store lock poisoned".to_string())?;
     if key.is_empty() {
-        let _ = entry.delete_credential();
-        return Ok(());
-    }
-    entry.set_password(key).map_err(|e| format!("The system keychain refused to save the key: {e}"))?;
-    match entry.get_password() {
-        Ok(saved) if saved == key => {}
-        _ => return Err("The key was written but could not be read back from the system keychain. Allow access if macOS asks, or set the GEMINI_API_KEY environment variable instead.".into()),
-    }
-    if let Ok(mut c) = key_cache().lock() {
-        c.insert(provider.to_string(), key.to_string());
+        cache.remove(provider);
+    } else {
+        cache.insert(provider.to_string(), key.to_string());
     }
     Ok(())
 }
