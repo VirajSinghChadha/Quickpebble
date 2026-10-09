@@ -7,7 +7,8 @@ import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 
-const ENGINES = ["google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
+const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
+const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
 const PROVIDERS = ["ollama", "openai", "anthropic", "gemini"];
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -34,7 +35,8 @@ export function SettingsPanel() {
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [engine, setEngine] = useState("google");
+  const [engine, setEngine] = useState("ghostsearch");
+  const [searxUrl, setSearxUrl] = useState("");
   const [blockLevel, setBlockLevel] = useState("standard");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
@@ -57,7 +59,8 @@ export function SettingsPanel() {
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
-      setEngine(s.search_engine ?? "google");
+      setEngine(s.search_engine ?? "ghostsearch");
+      setSearxUrl(s.ghost_searx_url ?? "");
       setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
       setChromeUa(s.chrome_ua !== "false");
       setCookies(s.cookie_banners !== "false");
@@ -119,9 +122,15 @@ export function SettingsPanel() {
           </Row>
           <Row label="Search engine">
             <select className={selectCls} value={engine} onChange={(e) => { setEngine(e.target.value); void save("search_engine", e.target.value); }} aria-label="Search engine">
-              {ENGINES.map((e) => <option key={e} value={e}>{e[0].toUpperCase() + e.slice(1)}</option>)}
+              {ENGINES.map((e) => <option key={e} value={e}>{ENGINE_LABELS[e] ?? e[0].toUpperCase() + e.slice(1)}</option>)}
             </select>
           </Row>
+          {engine === "ghostsearch" && (
+            <div className="space-y-1.5 pb-2">
+              <p className="text-[12px] text-text-secondary">GhostSearch asks several independent sources at once (DuckDuckGo, Wikipedia, Marginalia, plus Brave Search if you add a key under Web research), strips tracking from the links and stores nothing. No Google. The sources see your query and IP address; use a proxy such as Tor (below) to hide the IP too.</p>
+              <input value={searxUrl} onChange={(e) => setSearxUrl(e.target.value)} onBlur={() => void save("ghost_searx_url", searxUrl.trim())} placeholder="Optional: your own SearXNG address, https://search.example.org" aria-label="SearXNG address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" />
+            </div>
+          )}
         </div>
 
         <div className="py-2">

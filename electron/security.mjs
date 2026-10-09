@@ -3,6 +3,7 @@ import { TRACKER_HOSTS } from "./trackers.mjs";
 
 export { TRACKER_HOSTS };
 export const SEARCH_ENGINES = {
+  ghostsearch: "ghost://search?q=",
   google: "https://www.google.com/search?q=",
   brave: "https://search.brave.com/search?q=",
   duckduckgo: "https://duckduckgo.com/?q=",
@@ -36,6 +37,7 @@ export function allowNavigation(url, blockTrackers) {
   const u = typeof url === "string" ? parseUrl(url) : url;
   if (!u) return false;
   if (u.protocol === "about:") return u.href === "about:blank";
+  if (u.protocol === "ghost:") return true; // our own search pages (served by the app, never the network)
   if (u.protocol !== "http:" && u.protocol !== "https:") return false;
   return !(blockTrackers && isTrackerHost(u.hostname));
 }
@@ -63,7 +65,7 @@ export function httpsUpgrade(url) {
 }
 
 /** Turns whatever the user typed into a loadable URL (or a search URL). */
-export function normalizeInput(input, engine = "google") {
+export function normalizeInput(input, engine = "ghostsearch") {
   const s = String(input ?? "").trim();
   if (!s) return null;
   const direct = parseUrl(s);
@@ -75,6 +77,6 @@ export function normalizeInput(input, engine = "google") {
     const u = parseUrl(`${scheme}://${s}`);
     if (u && (u.hostname.includes(".") || u.hostname === "localhost")) return u;
   }
-  const base = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.google;
+  const base = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.ghostsearch;
   return new URL(base + encodeURIComponent(s).replace(/%20/g, "+"));
 }

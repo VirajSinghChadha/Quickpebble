@@ -2,7 +2,7 @@
   "name": "quick-pebble",
   "version": "2.0.0",
   "private": true,
-  "description": "Quick Pebble — browse quicker. A privacy-first Chromium browser with local AI.",
+  "description": "Quick Pebble \u2014 browse quicker. A privacy-first Chromium browser with local AI.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -55,8 +55,8 @@
       "electron/**/*",
       "dist/**/*",
       "package.json",
-      "!electron/*.test.mjs",
-      "!electron/smoke*.mjs"
+      "!electron/**/*.test.mjs",
+      "!electron/**/smoke*.mjs"
     ],
     "asar": true,
     "mac": {

@@ -10,7 +10,7 @@ import { PERMISSIONS, POLICIES, SEARCH_ENGINES, parseUrl } from "./security.mjs"
 import { stats as blockStats } from "./adblock.mjs";
 import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
 
-const SETTING_KEYS = new Set(["recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server"]);
+const SETTING_KEYS = new Set(["recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -80,6 +80,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
       if (key === "home_news_source" && !home.NEWS_SOURCES[value]) throw new Error("unknown news source");
       if (key.startsWith("home_") && key !== "home_weather_place" && value.length > 64) throw new Error("value too long");
       if (["site_profiles", "screen_permissions", "profiles"].includes(key) && (value.length > 65536 || !jsonOk(value))) throw new Error(`invalid ${key}`);
+      if (key === "ghost_searx_url" && value && !/^https?:$/.test(parseUrl(value)?.protocol ?? "")) throw new Error("The SearXNG address must start with http:// or https://");
       if (key === "ollama_url" && !/^https?:$/.test(parseUrl(value)?.protocol ?? "")) throw new Error("Ollama URL must be http(s)");
       db.setSetting(key, value);
       if (key === "proxy_mode" || key === "proxy_server") extras.applyProxy?.();

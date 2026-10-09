@@ -58,6 +58,7 @@ export class Browser {
   }
   prepareSession(ses) {
     ses.setUserAgent(chromeUserAgent());
+    if (this.ghost) ses.protocol.handle("ghost", this.ghost);
     this.onSession?.(ses);
     installBlocker(ses, (wc) => {
       const e = this.byContents.get(wc.id);
@@ -260,7 +261,7 @@ export class Browser {
   // ---------------------------------------------------------------- navigation
   navigate(win, id, input, allowHttp = false) {
     const t = this.tab(win, id);
-    const url = normalizeInput(input, this.setting("search_engine") || "google");
+    const url = normalizeInput(input, this.setting("search_engine") || "ghostsearch");
     if (!url) throw new Error("empty address");
     if (!allowNavigation(url, this.setting("block_trackers") !== "false")) throw new Error("Blocked by tracker protection. Turn it off for this site in the Site panel to open it.");
     if (allowHttp && url.protocol === "http:") this.httpAllowed.add(url.hostname);

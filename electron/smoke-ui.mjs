@@ -9,7 +9,8 @@ export async function run({ browser, commands }) {
   const url = `http://127.0.0.1:${server.address().port}/hi`;
   const win = browser.windows.get("main");
   const ui = win.ui.webContents;
-  await sleep(2500);
+  for (let i = 0; i < 40 && !(await ui.executeJavaScript(`!!document.querySelector('input[placeholder*="Search or enter"]')`).catch(() => false)); i++) await sleep(250);
+  await sleep(800);
   const state = () => ui.executeJavaScript(`JSON.stringify({ tabs: [...document.querySelectorAll('[role=tab]')].map(t => t.textContent.trim()), address: document.querySelector('input[aria-label="Address"], input[placeholder*="Search or enter"]')?.value })`);
   console.log("UI before", await state());
   await ui.executeJavaScript(`document.querySelector('input[placeholder*="Search or enter"]').focus()`);

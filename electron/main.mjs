@@ -10,12 +10,14 @@ import { buildCommands } from "./commands.mjs";
 import { Filters } from "./filters.mjs";
 import { Vault } from "./vault.mjs";
 import { Extensions } from "./extensions.mjs";
+import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1";
 
 app.setName("Quick Pebble");
+registerGhostScheme();
 if (smoke && process.env.QP_SMOKE_NOGPU === "1") app.disableHardwareAcceleration();
 if (smoke) app.setPath("userData", fs.mkdtempSync(path.join(app.getPath("temp"), "qp-smoke-")));
 // A second launch just focuses the first one.
@@ -59,6 +61,8 @@ app.whenReady().then(async () => {
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
   browser.onDownload = (e, item, wc) => downloads.handle(e, item, wc);
+  browser.ghost = ghostHandler(db);
+  session.defaultSession.protocol.handle("ghost", browser.ghost);
   filters = new Filters();
   browser.extraBlock = () => filters.matcher();
   const filtersReady = filters.start().catch(() => {});
@@ -82,10 +86,10 @@ app.whenReady().then(async () => {
   applyProxy().catch(() => {});
   setupMenu();
   browser.openWindow({ label: "main" });
-  if (process.env.QP_SMOKE_EXT === "1") import("./smoke-ext.mjs").then((m) => m.run({ browser, commands, db, extensions })).catch((e) => { console.error("EXT FAIL", e); app.exit(1); });
-  else if (process.env.QP_SMOKE_UI === "1") import("./smoke-ui.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("UI FAIL", e); app.exit(1); });
-  else if (process.env.QP_SMOKE_WEB === "1") import("./smoke-web.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("WEB FAIL", e); app.exit(1); });
-  else if (smoke) import("./smoke.mjs").then((m) => m.run({ browser, commands, db, filters, filtersReady })).catch((e) => { console.error("SMOKE FAIL", e); app.exit(1); });
+  // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
+  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE: "smoke" };
+  const hit = Object.keys(runs).find((k) => process.env[k] === "1");
+  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });

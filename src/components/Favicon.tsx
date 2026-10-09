@@ -6,7 +6,7 @@ import { hostOf } from "../lib/url";
 export function Favicon({ src, url, size = 16 }: { src: string; url: string; size?: number }) {
   const [failed, setFailed] = useState<string | null>(null);
   if (!src || failed === src) {
-    const letter = hostOf(url).charAt(0).toUpperCase();
+    const letter = url.startsWith("ghost:") ? "G" : hostOf(url).charAt(0).toUpperCase();
     return letter ? (
       <span
         className="grid shrink-0 place-items-center rounded-[4px] bg-surface-secondary text-[9px] font-semibold text-text-secondary"
