@@ -10,7 +10,7 @@ import { buildCommands } from "./commands.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1";
 
 app.setName("Quick Pebble");
 if (smoke && process.env.QP_SMOKE_NOGPU === "1") app.disableHardwareAcceleration();
@@ -62,7 +62,8 @@ app.whenReady().then(async () => {
 
   setupMenu();
   browser.openWindow({ label: "main" });
-  if (smoke) import("./smoke.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("SMOKE FAIL", e); app.exit(1); });
+  if (process.env.QP_SMOKE_WEB === "1") import("./smoke-web.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("WEB FAIL", e); app.exit(1); });
+  else if (smoke) import("./smoke.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("SMOKE FAIL", e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });
