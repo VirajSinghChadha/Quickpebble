@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+
+- Screen mode's first-time setup now uses its own Python environment with an up-to-date pip, so it finishes in seconds instead of compiling packages for minutes.
+
 ## 1.2.1
 
 - Screen mode now installs its own Python packages the first time it runs, so there is no pip step (Python 3 itself is still required).
