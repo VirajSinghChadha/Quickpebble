@@ -8,10 +8,12 @@ import { Browser, chromeUserAgent } from "./browser.mjs";
 import { Downloads } from "./downloads.mjs";
 import { buildCommands } from "./commands.mjs";
 import { Filters } from "./filters.mjs";
+import { Vault } from "./vault.mjs";
+import { Extensions } from "./extensions.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1";
 
 app.setName("Quick Pebble");
 if (smoke && process.env.QP_SMOKE_NOGPU === "1") app.disableHardwareAcceleration();
@@ -19,7 +21,7 @@ if (smoke) app.setPath("userData", fs.mkdtempSync(path.join(app.getPath("temp"),
 // A second launch just focuses the first one.
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let browser, db, downloads, commands, filters;
+let browser, db, downloads, commands, filters, extensions;
 
 function appUrl() {
   if (process.env.QP_DEV_URL) return process.env.QP_DEV_URL;
@@ -55,12 +57,15 @@ app.whenReady().then(async () => {
   db = new Db(path.join(app.getPath("userData"), "pebble.db"));
   browser = new Browser(db, { appUrl: appUrl(), devtools: dev || process.env.QP_DEVTOOLS === "1" });
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
-  browser.onSession = (ses) => { applyProxy().catch(() => {}); };
+  browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
   browser.onDownload = (e, item, wc) => downloads.handle(e, item, wc);
   filters = new Filters();
   browser.extraBlock = () => filters.matcher();
   const filtersReady = filters.start().catch(() => {});
-  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters } });
+  extensions = new Extensions(() => [...browser.sessions].filter((x) => x.storagePath));
+  const vault = new Vault(db, browser);
+  browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
+  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions } });
   session.defaultSession.setUserAgent(chromeUserAgent());
 
   ipcMain.handle("qp:invoke", async (event, cmd, args) => {
@@ -77,7 +82,8 @@ app.whenReady().then(async () => {
   applyProxy().catch(() => {});
   setupMenu();
   browser.openWindow({ label: "main" });
-  if (process.env.QP_SMOKE_UI === "1") import("./smoke-ui.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("UI FAIL", e); app.exit(1); });
+  if (process.env.QP_SMOKE_EXT === "1") import("./smoke-ext.mjs").then((m) => m.run({ browser, commands, db, extensions })).catch((e) => { console.error("EXT FAIL", e); app.exit(1); });
+  else if (process.env.QP_SMOKE_UI === "1") import("./smoke-ui.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("UI FAIL", e); app.exit(1); });
   else if (process.env.QP_SMOKE_WEB === "1") import("./smoke-web.mjs").then((m) => m.run({ browser, commands, db })).catch((e) => { console.error("WEB FAIL", e); app.exit(1); });
   else if (smoke) import("./smoke.mjs").then((m) => m.run({ browser, commands, db, filters, filtersReady })).catch((e) => { console.error("SMOKE FAIL", e); app.exit(1); });
 });

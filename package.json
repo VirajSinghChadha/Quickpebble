@@ -1,8 +1,8 @@
 {
   "name": "quick-pebble",
-  "version": "1.2.2",
+  "version": "2.0.0",
   "private": true,
-  "description": "Quick Pebble \u2014 browse quicker. A privacy-first Chromium browser with local AI.",
+  "description": "Quick Pebble — browse quicker. A privacy-first Chromium browser with local AI.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@ghostery/adblocker": "^2.18.2",
     "@tauri-apps/api": "^2.1.1",
+    "fflate": "^0.8.3",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
@@ -69,7 +70,8 @@
           ]
         }
       ],
-      "icon": "src-tauri/icons/icon.icns"
+      "icon": "src-tauri/icons/icon.icns",
+      "hardenedRuntime": true
     },
     "win": {
       "target": [
@@ -87,6 +89,15 @@
     },
     "directories": {
       "output": "release"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "VirajSinghChadha",
+        "repo": "Quickpebble",
+        "releaseType": "draft"
+      }
+    ],
+    "artifactName": "Quick.Pebble_${version}_${arch}.${ext}"
   }
 }
