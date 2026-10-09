@@ -181,8 +181,9 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     downloads_clear_finished: () => downloads.clearFinished(),
 
     // ---- updates (the Chromium build ships updates through its installer for now)
-    update_check: () => extras.updateCheck?.() ?? null,
-    update_install: unsupported("In-app updating"),
+    update_check: () => extras.updater.check({ userInitiated: true }),
+    update_install: (w) => extras.updater.install((p) => B.emitUi(w, "qp://update-progress", p)),
+    update_skip: () => extras.updater.skip(),
 
     // ---- not yet ported
     ...(extras.screen ?? { screen_propose: unsupported("Screen control"), screen_act: unsupported("Screen control"), screen_verify: unsupported("Screen control") }),

@@ -184,10 +184,16 @@ export const ipc = {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
     return call<UpdateInfo | null>("update_check");
   },
-  updateInstall: async (_onProgress: (progress: UpdateProgress) => void) => {
+  updateInstall: async (onProgress: (progress: UpdateProgress) => void) => {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
-    return call<void>("update_install");
+    const stop = await listen<UpdateProgress>("qp://update-progress", (e) => onProgress(e.payload));
+    try {
+      return await call<void>("update_install");
+    } finally {
+      stop();
+    }
   },
+  updateSkip: () => call<void>("update_skip"),
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
   tabZoom: (id: string, action: "in" | "out" | "reset" | `set:${number}`) => call<number | null>("tab_zoom", { id, action }, null),
   tabFind: (id: string) => call<void>("tab_find", { id }),

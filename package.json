@@ -109,6 +109,7 @@
           "!**/__pycache__/**"
         ]
       }
-    ]
+    ],
+    "afterSign": "scripts/adhoc-sign.cjs"
   }
 }
