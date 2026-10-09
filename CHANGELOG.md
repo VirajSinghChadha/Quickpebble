@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Chromium engine.** The app now runs on Chromium (Electron) instead of the system web view. Pages, including Google, render as in Chrome.
+- **Native ad and tracker blocking** on every request with EasyList/EasyPrivacy-style filter lists, plus the built-in tracker list.
+- **Profiles** with separate logins and cookies (for example one Google account each), and a **proxy** setting.
+- Not yet ported: password manager, extension installs, Screen mode, in-app updates.
+
 - **Recall (opt-in):** an on-device full-text index of pages you read. Search it from Library → Memory, or tick "Search pages I've read" in the assistant to answer from it with citations. Off by default; never saved in private windows or for login, payment and webmail pages; cleared along with history; forget single pages any time.
 - **Slash commands** in Ask mode: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare`, `/tabs`, `/recall`. `/compare` and `/tabs` read up to four open pages at once.
 - Answers now suggest follow-up questions, and the whole conversation can be copied as Markdown with its sources.

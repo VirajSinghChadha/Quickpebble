@@ -21,6 +21,24 @@ and an AI assistant that runs on your own machine.
 
 ---
 
+## Chromium edition (this branch)
+
+This branch replaces the system web view with **real Chromium** (via Electron), so pages render exactly as in Chrome: Google looks and behaves like it does in Chrome, Google accounts sign in normally, and PDFs, WebRTC and modern web APIs work. The React UI, AI assistant, Recall, workspaces and privacy features are carried over; the Rust backend is ported to `electron/`.
+
+```bash
+npm install
+npm run electron:dev     # app with hot reload
+npm start                # build the UI and run
+npm run dist             # installers in release/ (dmg, nsis, AppImage/deb)
+```
+
+- **Native ad & tracker blocking.** Every network request is checked in the browser process, including ones the HTML parser starts before any page script runs. It combines the built-in tracker list with EasyList / EasyPrivacy / uBlock-style filter lists (via Ghostery's engine), cached on disk and refreshed daily. Strict mode also blocks third-party ad paths.
+- **Profiles.** Separate cookies, logins and site data per profile (Command palette → Profiles), so each can hold a different Google account. Private windows use an in-memory session.
+- **Proxy.** Settings → Profiles & network can route everything through a SOCKS5/HTTP proxy such as Tor (`socks5://127.0.0.1:9050`) or your own VPN's proxy port. Quick Pebble does **not** include a VPN: a real one needs servers someone pays for.
+- **Not ported yet in this edition:** the password manager (vault), Chrome-extension installs, Screen mode (Python agent), and in-app auto-update. They are stubbed with clear messages. The Tauri build still lives in `src-tauri/`.
+- **Google sign-in** works as in Chrome, but Google account *sync* (bookmarks, passwords across devices) is private to Google's own Chrome and cannot be offered by any other browser.
+- Quick checks: `QP_SMOKE=1 npx electron electron/main.mjs` runs a headless end-to-end test against a local site.
+
 ## Install
 
 ### macOS — Homebrew (recommended)
