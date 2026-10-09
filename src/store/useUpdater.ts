@@ -30,6 +30,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
   },
   install: async () => {
     if (!get().info || get().state === "installing" || get().state === "checking") return;
+    if (get().info?.manual) { await ipc.updateOpenPage(); return; }
     set({ state: "installing", progress: null, percent: null, error: null });
     try {
       await ipc.updateInstall((progress) => {

@@ -78,6 +78,7 @@ pub fn run() {
             browser::qp_blocked,
             updater::update_check,
             updater::update_install,
+            updater::update_open_page,
             browser::tab_zoom,
             browser::tab_find,
             browser::ai_chat,

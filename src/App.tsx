@@ -19,12 +19,16 @@ import { TabSearch } from "./components/TabSearch";
 import { TabStrip } from "./components/TabStrip";
 import { Toolbar } from "./components/Toolbar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
+import { AuthGate } from "./components/AuthGate";
+import { useAccount } from "./store/useAccount";
 
 export default function App() {
   useTheme();
   useTabs();
   useShortcuts();
   useContentVisibility();
+  const accountStatus = useAccount((s) => s.status);
+  useEffect(() => { if (!isPrivateWindow()) void useAccount.getState().init(); else useAccount.setState({ status: "ready" }); }, []);
   // Keep the downloads list live, and open the panel's badge when something starts.
   useEffect(() => {
     let off = () => {};
@@ -70,6 +74,7 @@ export default function App() {
         {overlay === "https" && <HttpsPrompt key="https" />}
       </AnimatePresence>
       <UpdatePrompt />
+      {accountStatus !== "ready" && <AuthGate />}
     </div>
     </MotionConfig>
   );
