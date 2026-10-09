@@ -34,13 +34,17 @@ Works on Apple silicon and Intel. The app updates itself afterwards (see [Update
 
 ### macOS / Windows — direct download
 
-Download the installer for your system from the [latest release](https://github.com/VirajSinghChadha/Quickpebble/releases/latest):
+Click the file for your computer (current version **1.3.0**). The [latest release page](https://github.com/VirajSinghChadha/Quickpebble/releases/latest) always has the newest.
 
-| System | File |
-|---|---|
-| macOS, Apple silicon | `Quick.Pebble_<version>_aarch64.dmg` |
-| macOS, Intel | `Quick.Pebble_<version>_x64.dmg` |
-| Windows 10/11 (64-bit) | `Quick.Pebble_<version>_x64-setup.exe` (or `.msi`) |
+| Your computer | Download | Then |
+|---|---|---|
+| **Mac with Apple silicon** (M1, M2, M3, M4) | [Quick.Pebble_1.3.0_aarch64.dmg](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v1.3.0/Quick.Pebble_1.3.0_aarch64.dmg) | Open it, drag Quick Pebble to Applications. Read **READ-ME-FIRST** in the same window. |
+| **Mac with an Intel chip** | [Quick.Pebble_1.3.0_x64.dmg](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v1.3.0/Quick.Pebble_1.3.0_x64.dmg) | Same as above. |
+| **Windows 10 / 11 (64-bit)** | [Quick.Pebble_1.3.0_x64-setup.exe](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v1.3.0/Quick.Pebble_1.3.0_x64-setup.exe) ([.msi](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v1.3.0/Quick.Pebble_1.3.0_x64_en-US.msi) for managed PCs) | Run it. On the blue "protected your PC" screen click **More info → Run anyway**. |
+
+Not sure which Mac you have? Apple menu → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel.
+
+You need a free beta access code to create an account the first time you open the app. Screen mode needs [Python 3](https://www.python.org/downloads/) installed (on Windows, tick **Add python.exe to PATH**).
 
 > **Builds are not code-signed or notarised yet.** The first time you open Quick Pebble, macOS asks you to confirm it: follow the short [macOS install guide](docs/INSTALL-macOS.md) (System Settings → Privacy & Security → **Open Anyway**). The Homebrew cask clears the warning for you. On Windows, SmartScreen shows "unknown publisher": follow the [Windows install guide](docs/INSTALL-Windows.md) (**More info → Run anyway**). Releases are verified by a separate update signature, described under [Updates](#updates).
 
