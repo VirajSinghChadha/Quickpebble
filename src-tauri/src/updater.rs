@@ -73,7 +73,7 @@ pub async fn update_install(
     app.restart();
 }
 
-/// Check 15 seconds after launch and every 6 hours, unless disabled in Settings.
+/// Check 15 seconds after launch and every hour, unless disabled in Settings.
 pub fn spawn_startup_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(15)).await;
@@ -88,7 +88,7 @@ pub fn spawn_startup_check(app: AppHandle) {
                     let _ = app.emit("qp://update", info);
                 }
             }
-            tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
+            tokio::time::sleep(Duration::from_secs(60 * 60)).await;
         }
     });
 }

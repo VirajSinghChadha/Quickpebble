@@ -1,6 +1,6 @@
 {
   "name": "quick-pebble",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Quick Pebble — browse quicker. A privacy-first desktop browser with local AI.",
   "type": "module",

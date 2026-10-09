@@ -68,13 +68,11 @@ pub fn get_key(provider: &str) -> Option<String> {
     if let Some(k) = key_cache().lock().ok()?.get(provider).filter(|k| !k.is_empty()) {
         return Some(k.clone());
     }
-    // An empty entry in the cache means "already asked and got nothing / was denied": don't prompt again this launch.
-    if key_cache().lock().ok()?.get(provider).is_some() {
-        return None;
-    }
-    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty());
-    key_cache().lock().ok()?.insert(provider.to_string(), k.clone().unwrap_or_default());
-    k
+    // Only a successful read is cached. A missing or denied entry is retried next time, so a one-off
+    // keychain failure can never make a saved key look absent for the rest of the launch.
+    let k = keyring::Entry::new(KEYRING_SERVICE, provider).ok()?.get_password().ok().filter(|k| !k.is_empty())?;
+    key_cache().lock().ok()?.insert(provider.to_string(), k.clone());
+    Some(k)
 }
 
 pub fn set_key(provider: &str, key: &str) -> Result<(), String> {
@@ -86,7 +84,11 @@ pub fn set_key(provider: &str, key: &str) -> Result<(), String> {
         let _ = entry.delete_credential();
         return Ok(());
     }
-    entry.set_password(key).map_err(|e| e.to_string())?;
+    entry.set_password(key).map_err(|e| format!("The system keychain refused to save the key: {e}"))?;
+    match entry.get_password() {
+        Ok(saved) if saved == key => {}
+        _ => return Err("The key was written but could not be read back from the system keychain. Allow access if macOS asks, or set the GEMINI_API_KEY environment variable instead.".into()),
+    }
     if let Ok(mut c) = key_cache().lock() {
         c.insert(provider.to_string(), key.to_string());
     }

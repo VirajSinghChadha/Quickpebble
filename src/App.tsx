@@ -18,6 +18,7 @@ import { SummaryDialog } from "./components/SummaryDialog";
 import { TabSearch } from "./components/TabSearch";
 import { TabStrip } from "./components/TabStrip";
 import { Toolbar } from "./components/Toolbar";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 
 export default function App() {
   useTheme();
@@ -68,6 +69,7 @@ export default function App() {
         {overlay === "library" && <Library key="library" />}
         {overlay === "https" && <HttpsPrompt key="https" />}
       </AnimatePresence>
+      <UpdatePrompt />
     </div>
     </MotionConfig>
   );
