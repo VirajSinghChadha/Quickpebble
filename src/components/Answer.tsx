@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
-import type { ChatItem } from '../store/useChat';
+import { useChat, type ChatItem } from '../store/useChat';
 import { useStore } from '../store/useStore';
 
 export function Answer({ item }: { item: ChatItem }) {
+  const busy = useChat((s) => s.busy);
+  const send = useChat((s) => s.send);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
   const sources = item.sources ?? [];
@@ -24,7 +26,10 @@ export function Answer({ item }: { item: ChatItem }) {
     </div>
     {item.blocks && <div className="mt-4 border-t border-border pt-3">
       <p className="mb-2 text-[11px] font-medium text-text-secondary">{sources.length ? 'Sources used · check the original pages' : 'No source citations · general answer'}</p>
-      <div className="space-y-1.5">{sources.map(s => <button key={s.id} type="button" onClick={() => open(s.url)} className="source-card flex w-full items-center gap-2 text-left"><span className="citation shrink-0">{s.id}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{s.title}</span><span className="block truncate text-[11px] text-text-secondary">{new URL(s.url).hostname}{s.kind === "search" ? " · search excerpt" : " · page"}</span></span><ExternalLink size={12} className="shrink-0 text-text-secondary"/></button>)}</div>
+      <div className="space-y-1.5">{sources.map(s => <button key={s.id} type="button" onClick={() => open(s.url)} className="source-card flex w-full items-center gap-2 text-left"><span className="citation shrink-0">{s.id}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{s.title}</span><span className="block truncate text-[11px] text-text-secondary">{new URL(s.url).hostname}{s.kind === "search" ? " · search excerpt" : s.kind === "memory" ? " · from pages you read" : " · page"}</span></span><ExternalLink size={12} className="shrink-0 text-text-secondary"/></button>)}</div>
+    </div>}
+    {!!item.followups?.length && <div className="mt-3 flex flex-col gap-1.5" aria-label="Suggested follow-up questions">
+      {item.followups.map(q => <button key={q} type="button" disabled={busy} onClick={() => void send(q)} className="rounded-xl border border-border px-3 py-1.5 text-left text-[12px] transition-colors duration-150 hover:bg-surface-secondary disabled:opacity-40">{q}</button>)}
     </div>}
     {copyError && <p role="status" className="mt-2 text-xs text-text-secondary">{copyError}</p>}
   </article>;

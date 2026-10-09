@@ -11,3 +11,5 @@ src-tauri/gen/schemas
 # Python agent
 __pycache__/
 .pytest_cache/
+release/
+filters.bin

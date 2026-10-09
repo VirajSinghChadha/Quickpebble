@@ -21,6 +21,27 @@ and an AI assistant that runs on your own machine.
 
 ---
 
+## Chromium edition (this branch)
+
+This branch replaces the system web view with **real Chromium** (via Electron), so pages render exactly as in Chrome: Google looks and behaves like it does in Chrome, Google accounts sign in normally, and PDFs, WebRTC and modern web APIs work. The React UI, AI assistant, Recall, workspaces and privacy features are carried over; the Rust backend is ported to `electron/`.
+
+```bash
+npm install
+npm run electron:dev     # app with hot reload
+npm start                # build the UI and run
+npm run dist             # installers in release/ (dmg, nsis, AppImage/deb)
+```
+
+- **GhostSearch (default search engine).** A private meta-search engine built into the browser (`ghost://search?q=…`), with no Google involved. It asks several independent sources at once (DuckDuckGo, Wikipedia, Marginalia, plus Brave Search if you add a key under Web research, plus your own SearXNG instance if you set one), merges them with reciprocal-rank fusion so pages the sources agree on rise to the top, removes tracking parameters from every link, and drops known ad/tracker domains. Requests carry no cookies, referrer or account; nothing is stored (results are kept in memory for two minutes so Back works); the page has no JavaScript and loads nothing from anywhere else (no remote fonts, favicons or images). `!w`, `!yt`, `!gh`, `!so`, `!mdn`, `!osm` jump straight to those sites, resolved locally. Honest limits: it does not have its own web index (nobody can afford one for free), DuckDuckGo's results themselves come partly from Bing, the sources still see your query and IP address (route through Tor in Settings to hide the IP), and sources that scrape or rate-limit can be unavailable at times, in which case the page says which ones answered.
+- **Native ad & tracker blocking.** Every network request is checked in the browser process, including ones the HTML parser starts before any page script runs. It combines the built-in tracker list with EasyList / EasyPrivacy / uBlock-style filter lists (via Ghostery's engine), cached on disk and refreshed daily. Strict mode also blocks third-party ad paths.
+- **Profiles.** Separate cookies, logins and site data per profile (Command palette → Profiles), so each can hold a different Google account. Private windows use an in-memory session.
+- **Proxy.** Settings → Profiles & network can route everything through a SOCKS5/HTTP proxy such as Tor (`socks5://127.0.0.1:9050`) or your own VPN's proxy port. Quick Pebble does **not** include a VPN: a real one needs servers someone pays for.
+- **Password manager.** Passwords are encrypted with AES-256-GCM under a key derived from your master password (scrypt, 128 MB), locked after 15 idle minutes, filled only on an exact https host match, and saved only after you agree. Imports CSV exports from Chrome, Firefox, Safari, 1Password, Bitwarden, LastPass and Dashlane.
+- **Chrome extensions** run on Chromium's real extension runtime (content scripts, background workers, `chrome.storage`, `chrome.runtime`, scripting…). Install from a Web Store link or a `.crx`; they start switched off. Toolbar popups and `webRequest` are not provided yet, so ad blockers that depend on them add nothing (the built-in blocker already covers that).
+- **Not ported yet:** Screen mode (the Python agent) and in-app auto-update (macOS can't auto-update unsigned apps; download new versions from Releases or `brew upgrade`). They show clear messages. The Tauri build still lives in `src-tauri/`.
+- **Google sign-in** works as in Chrome, but Google account *sync* (bookmarks, passwords across devices) is private to Google's own Chrome and cannot be offered by any other browser.
+- Quick checks: `QP_SMOKE=1 npx electron electron/main.mjs` runs a headless end-to-end test against a local site.
+
 ## Install
 
 ### macOS — Homebrew (recommended)
@@ -66,6 +87,7 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 |---|---|
 | **Pebble UI** | Refined new-tab dashboard, uncluttered toolbar, scrollable tabs and collapsible groups, keyboard focus handling, and reduced-motion support. |
 | **AI Assistant** | Side panel (`⌘J`) that answers questions about the page or operates the browser for you. |
+| **Recall** | Opt-in, on-device search over the text of pages you've read. Ask the assistant "what was that article about X?" and get cited answers from your own history. |
 | **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
 | **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
 | **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
@@ -84,6 +106,8 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 Open it with `⌘J` or the robot icon. **Ask** is the default. Answers use readable paragraphs, numbered citations, source cards, and a copy button. Choose up to four loaded tabs as evidence. With no selected tabs, the current page is used unless you turn that off. Answers without citations are labelled as general answers.
 
 For sources beyond open tabs, add a **Brave Search API key in Settings → Web research**, then enable **Search the web for sources** in chat. Your question is sent to Brave only when this option is enabled; result excerpts are passed to your chosen AI provider. Search sources are labelled as excerpts, not full articles. The key stays in your OS keychain. Search API usage is subject to your own Brave account plan. The app validates source IDs and uses URLs from retrieved metadata; this prevents invented citation links, but does not guarantee that the model interprets every source correctly.
+
+Type `/` in Ask mode for shortcuts: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare [topic]` and `/tabs` (both read up to four open pages), and `/recall <question>` (searches pages you've read). Answers offer follow-up questions, and the clipboard button exports the chat as Markdown.
 
 Two modes:
 

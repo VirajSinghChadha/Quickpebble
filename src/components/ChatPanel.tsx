@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Answer } from "./Answer";
-import { Bot, Check, CircleAlert, MousePointerClick, Send, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, CircleAlert, ClipboardCopy, MousePointerClick, Send, Square, Trash2, X } from "lucide-react";
 import { useOllama } from "../hooks/useOllama";
+import { ipc } from "../lib/ipc";
+import { chatToMarkdown } from "../lib/exportChat";
+import { slashMatches } from "../lib/slash";
 import { selectActive, useStore } from "../store/useStore";
 import { useChat } from "../store/useChat";
 import type { Scope, SitePerms } from "../lib/permissions";
@@ -9,11 +12,11 @@ import type { Scope, SitePerms } from "../lib/permissions";
 const SUGGESTIONS = {
   screen: ["Open Notes and write a shopping list", "Find my latest download in Finder", "Turn on dark mode in System Settings"],
   act: ["Open the first search result", "Find the pricing page on this site", "Close all YouTube tabs"],
-  ask: ["Summarize this page", "What are the key points?", "Explain this like I'm new to it"],
+  ask: ["Summarize this page", "/compare", "/recall what was I reading about last week?"],
 };
 
 export function ChatPanel() {
-  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
   const [showSources, setShowSources] = useState(false);
@@ -23,8 +26,20 @@ export function ChatPanel() {
   const hasPage = useStore((s) => !!selectActive(s).url);
   const { status } = useOllama(30000);
   const [text, setText] = useState("");
+  const [recallStats, setRecallStats] = useState<{ pages: number; enabled: boolean } | null>(null);
+  const [exported, setExported] = useState(false);
+  const slash = slashMatches(text);
   const end = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { if (mode === "ask") void ipc.recallStats().then(setRecallStats); }, [mode]);
+  const enableRecall = async () => {
+    await ipc.settingsSet("recall_enabled", "true");
+    setRecallStats(await ipc.recallStats());
+    setRecall(true);
+  };
+  const exportChat = async () => {
+    try { await navigator.clipboard.writeText(chatToMarkdown(items)); setExported(true); setTimeout(() => setExported(false), 1500); } catch { /* clipboard unavailable */ }
+  };
   useEffect(() => { if (follow.current) end.current?.scrollIntoView({ block: "end", behavior: "auto" }); }, [items, approval, busy]);
   useEffect(() => { if (composer.current) { composer.current.style.height = "auto"; composer.current.style.height = `${Math.min(composer.current.scrollHeight, 112)}px`; } }, [text]);
 
@@ -106,7 +121,10 @@ export function ChatPanel() {
             <option value="ask">Confirm every step</option>
           </select>
         )}
-        <button type="button" aria-label="Clear chat" title="Clear chat" onClick={clear} disabled={busy || items.length === 0} className="ml-auto grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary disabled:opacity-40">
+        <button type="button" aria-label="Copy conversation as Markdown" title={exported ? "Copied" : "Copy conversation as Markdown"} onClick={() => void exportChat()} disabled={items.length === 0} className="ml-auto grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary disabled:opacity-40">
+          {exported ? <Check size={14} /> : <ClipboardCopy size={14} />}
+        </button>
+        <button type="button" aria-label="Clear chat" title="Clear chat" onClick={clear} disabled={busy || items.length === 0} className="grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary disabled:opacity-40">
           <Trash2 size={14} />
         </button>
       </div>
@@ -114,6 +132,9 @@ export function ChatPanel() {
       {mode === "ask" && <div className="border-b border-border px-3 py-2">
         <button type="button" disabled={busy} onClick={() => setShowSources(!showSources)} aria-expanded={showSources} className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-surface-secondary"><span>Sources · {sourceTabIds.length ? `${sourceTabIds.length} selected pages` : hasPage && includeCurrentPage ? 'Current page' : 'No pages attached'}</span><span>{showSources ? 'Done' : 'Choose'}</span></button>
         <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-secondary"><input type="checkbox" disabled={busy} checked={webResearch} onChange={e => setWebResearch(e.target.checked)}/> Search the web for sources</label>
+        {recallStats?.enabled
+          ? <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-secondary"><input type="checkbox" disabled={busy} checked={recall} onChange={e => setRecall(e.target.checked)}/> Search pages I've read ({recallStats.pages} remembered)</label>
+          : recallStats && <div className="mt-1 px-2 text-xs text-text-secondary">Recall can answer from pages you've read before, stored only on this computer. <button type="button" onClick={() => void enableRecall()} className="font-medium text-primary underline-offset-2 hover:underline">Turn on Recall</button></div>}
         {webResearch && <p className="mt-1 px-2 text-[10px] leading-relaxed text-text-secondary">Sends your question to Brave Search. API key required in Settings. Results are search excerpts.</p>}
         {showSources && <div className="mt-2 space-y-1">
           <p className="px-2 pb-1 text-[11px] text-text-secondary">Choose up to four loaded pages. Only their text is used. With none selected, use the current page if enabled.</p>
@@ -201,6 +222,11 @@ export function ChatPanel() {
       </div>
 
       <div className="border-t border-border p-4">
+        {mode === "ask" && slash.length > 0 && (
+          <ul role="listbox" aria-label="Commands" className="mb-2 overflow-hidden rounded-xl border border-border bg-surface">
+            {slash.map((c) => <li key={c.name}><button type="button" role="option" aria-selected={false} onClick={() => { setText(`/${c.name} `); composer.current?.focus(); }} className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-surface-secondary"><span className="font-medium">/{c.name}</span><span className="text-[11.5px] text-text-secondary">{c.hint}</span></button></li>)}
+          </ul>
+        )}
         <div className="flex items-end gap-2 rounded-xl border border-border bg-surface px-3 py-2 focus-within:border-primary">
           <textarea
             ref={composer}
@@ -208,12 +234,13 @@ export function ChatPanel() {
             rows={1}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === "Tab" && mode === "ask" && slash.length > 0) { e.preventDefault(); setText(`/${slash[0].name} `); return; }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 submit();
               }
             }}
-            placeholder={mode !== "ask" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask a question…"}
+            placeholder={mode !== "ask" ? (hasPage ? "What should I do?" : "What should I open or do?") : "Ask a question, or type / for commands…"}
             aria-label="Message"
             className="max-h-28 min-h-5 flex-1 resize-none bg-transparent outline-none placeholder:text-text-secondary"
           />

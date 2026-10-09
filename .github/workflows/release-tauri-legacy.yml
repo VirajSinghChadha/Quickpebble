@@ -1,0 +1,151 @@
+name: Release (legacy Tauri build)
+
+# Push a tag like v1.2.0 to publish a release. This builds signed installers + updater metadata
+# (latest.json, which running apps read to show "Update available") and refreshes the Homebrew cask.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: App version to release (must match source versions)
+        required: true
+        default: "1.1.0"
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  # Create the release once up front so the parallel build jobs don't race to create it
+  # (that race causes "Not Found - get-a-release-asset" when uploading assets / latest.json).
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Use immutable tagged source when retrying
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$TAG"
+            git checkout --detach FETCH_HEAD
+          fi
+      - name: Validate release version and signing setup
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$SIGNING_KEY" || { echo "Missing TAURI_SIGNING_PRIVATE_KEY repository secret"; exit 1; }
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const version = process.env.TAG.replace(/^v/, '');
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
+          const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json'));
+          const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1];
+          if (![pkg.version, lock.version, lock.packages[''].version, config.version, cargo].every(v => v === version)) {
+            throw new Error(`Release tag ${process.env.TAG} must match all app versions`);
+          }
+          JS
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1 || \
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+          fi
+          # A draft release is listed under a temporary "untagged-…" tag until it is published, so look it up
+          # by its title as well as by tag. Reuse an existing draft instead of creating a duplicate.
+          find_id() {
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+              --jq ".[] | select(.tag_name == \"$TAG\" or .name == \"Quick Pebble $TAG\") | .id" | head -1
+          }
+          release_id=$(find_id)
+          if [ -z "$release_id" ]; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --draft --title "Quick Pebble $TAG" \
+              --notes-file CHANGELOG.md
+            sleep 3
+            release_id=$(find_id)
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          test -n "$release_id" || { echo "Could not resolve draft release ID"; exit 1; }
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.name }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS (Apple silicon), os: macos-15, target: aarch64-apple-darwin }
+          - { name: macOS (Intel), os: macos-15-intel, target: x86_64-apple-darwin }
+          - { name: Windows, os: windows-latest, target: "" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ needs.create-release.outputs.tag }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs update bundles; the matching public key is in src-tauri/tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+
+  publish:
+    name: Publish complete update
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish after every platform is ready
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.create-release.outputs.tag }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx latest.json
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  homebrew:
+    name: Update Homebrew cask
+    needs: [create-release, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - name: Regenerate cask
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/update_cask.sh "${{ needs.create-release.outputs.tag }}"
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/quick-pebble.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(brew): quick-pebble ${{ github.ref_name }}"
+          git pull --rebase origin main
+          git push origin HEAD:main

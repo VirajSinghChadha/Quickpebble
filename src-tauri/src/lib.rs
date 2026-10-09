@@ -8,6 +8,7 @@ mod database;
 mod extensions;
 mod home;
 mod memory_saver;
+mod recall;
 mod security;
 mod vault;
 mod vault_import;
@@ -116,6 +117,10 @@ pub fn run() {
             vault::qp_login_seen,
             vault::vault_save_pending,
             vault::vault_dismiss_pending,
+            recall::recall_search,
+            recall::recall_stats,
+            recall::recall_forget,
+            recall::recall_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Quick Pebble");

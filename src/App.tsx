@@ -11,6 +11,7 @@ import { BookmarksBar } from "./components/BookmarksBar";
 import { HttpsPrompt } from "./components/HttpsPrompt";
 import { ExtensionsPanel } from "./components/ExtensionsPanel";
 import { Library } from "./components/Library";
+import { ProfilesPanel } from "./components/ProfilesPanel";
 import { Sidebar } from "./components/Sidebar";
 import { QuickActions } from "./components/QuickActions";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -67,6 +68,7 @@ export default function App() {
         {overlay === "summary" && <SummaryDialog key="summary" />}
         {overlay === "extensions" && <ExtensionsPanel key="extensions" />}
         {overlay === "library" && <Library key="library" />}
+        {overlay === "profiles" && <ProfilesPanel key="profiles" />}
         {overlay === "https" && <HttpsPrompt key="https" />}
       </AnimatePresence>
       <UpdatePrompt />

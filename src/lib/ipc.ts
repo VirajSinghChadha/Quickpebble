@@ -1,16 +1,38 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+/** The bridge the Chromium shell's preload script exposes to Quick Pebble's own UI. */
+interface QpBridge {
+  label: string;
+  platform: string;
+  invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+  on: (event: string, cb: (payload: never) => void) => () => void;
+}
+declare global {
+  interface Window { qp?: QpBridge }
+}
+type UnlistenFn = () => void;
 
-/** True when running inside the Tauri shell (false in a plain browser, e.g. `npm run dev`). */
-export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** True when running inside the Quick Pebble shell (false in a plain browser, e.g. `npm run dev`). */
+export const isNative = typeof window !== "undefined" && !!window.qp;
+export const isTauri = isNative; // kept so older call sites keep working
 
-export const windowLabel = (): string => (isTauri ? getCurrentWindow().label : "main");
+const bridge = (): QpBridge | undefined => (typeof window === "undefined" ? undefined : window.qp);
+export const windowLabel = (): string => bridge()?.label ?? "main";
 export const isPrivateWindow = (): boolean => windowLabel().startsWith("private-");
 
 async function call<T>(cmd: string, args?: Record<string, unknown>, fallback?: T): Promise<T> {
-  if (!isTauri) return fallback as T;
-  return invoke<T>(cmd, args);
+  const b = bridge();
+  if (!b) return fallback as T;
+  try {
+    return (await b.invoke(cmd, args)) as T;
+  } catch (e) {
+    // Electron wraps errors as "Error invoking remote method 'qp:invoke': Error: <message>"; show just the message.
+    const msg = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, "") : String(e);
+    throw msg;
+  }
+}
+
+function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<UnlistenFn> {
+  const b = bridge();
+  return Promise.resolve(b ? b.on(event, ((payload: T) => cb({ payload })) as (p: never) => void) : () => {});
 }
 
 export interface TabEvent {
@@ -36,6 +58,17 @@ export interface HistoryEntry {
   title: string;
   visited_at: number;
   visit_count: number;
+}
+export interface Profile {
+  id: string;
+  name: string;
+  color: string;
+}
+export interface RecallHit {
+  url: string;
+  title: string;
+  snippet: string;
+  at: number;
 }
 export interface Bookmark {
   url: string;
@@ -151,11 +184,9 @@ export const ipc = {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
     return call<UpdateInfo | null>("update_check");
   },
-  updateInstall: async (onProgress: (progress: UpdateProgress) => void) => {
+  updateInstall: async (_onProgress: (progress: UpdateProgress) => void) => {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
-    const progress = new Channel<UpdateProgress>();
-    progress.onmessage = onProgress;
-    return call<void>("update_install", { progress });
+    return call<void>("update_install");
   },
   sidebarSet: (width: number) => call<void>("sidebar_set", { width }),
   tabZoom: (id: string, action: "in" | "out" | "reset" | `set:${number}`) => call<number | null>("tab_zoom", { id, action }, null),
@@ -208,6 +239,15 @@ export const ipc = {
   extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
   extensionSetEnabled: (id: string, enabled: boolean) => call<void>("extension_set_enabled", { id, enabled }),
   extensionRemove: (id: string) => call<void>("extension_remove", { id }),
+  recallSearch: (query: string, limit = 6) => call<RecallHit[]>("recall_search", { query, limit }, []),
+  recallStats: () => call<{ pages: number; enabled: boolean }>("recall_stats", undefined, { pages: 0, enabled: false }),
+  recallForget: (url: string) => call<void>("recall_forget", { url }),
+  recallClear: () => call<void>("recall_clear"),
+  profileList: () => call<Profile[]>("profile_list", undefined, []),
+  profileCreate: (name: string, color: string) => call<Profile>("profile_create", { name, color }),
+  profileDelete: (id: string) => call<void>("profile_delete", { id }),
+  windowNewProfile: (id: string) => call<void>("window_new_profile", { id }),
+  profileCurrent: () => call<{ id: string; private: boolean }>("profile_current", undefined, { id: "default", private: false }),
   windowControl: (action: "minimize" | "maximize" | "close" | "restore") => call<void>("window_control", { action }),
 };
 
@@ -227,6 +267,11 @@ export async function onHttpsFallback(cb: (e: { id: string; url: string }) => vo
   if (!isTauri) return () => {};
   const label = windowLabel();
   return listen<{ window: string; id: string; url: string }>("qp://https-fallback", (e) => e.payload.window === label && cb(e.payload));
+}
+
+/** A page asked to open a link in a new tab (target=_blank, window.open, "Open Link in New Tab"). */
+export async function onOpenUrl(cb: (e: { url: string }) => void): Promise<UnlistenFn> {
+  return listen<{ url: string }>("qp://open-url", (e) => cb(e.payload));
 }
 
 export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {

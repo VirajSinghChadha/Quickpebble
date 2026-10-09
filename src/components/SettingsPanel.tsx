@@ -7,7 +7,8 @@ import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 
-const ENGINES = ["google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
+const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
+const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
 const PROVIDERS = ["ollama", "openai", "anthropic", "gemini"];
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -28,10 +29,14 @@ export function SettingsPanel() {
   const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [recallOn, setRecallOn] = useState(false);
+  const [proxyMode, setProxyMode] = useState("direct");
+  const [proxyServer, setProxyServer] = useState("");
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [engine, setEngine] = useState("google");
+  const [engine, setEngine] = useState("ghostsearch");
+  const [searxUrl, setSearxUrl] = useState("");
   const [blockLevel, setBlockLevel] = useState("standard");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
@@ -54,7 +59,8 @@ export function SettingsPanel() {
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
-      setEngine(s.search_engine ?? "google");
+      setEngine(s.search_engine ?? "ghostsearch");
+      setSearxUrl(s.ghost_searx_url ?? "");
       setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
       setChromeUa(s.chrome_ua !== "false");
       setCookies(s.cookie_banners !== "false");
@@ -64,6 +70,9 @@ export function SettingsPanel() {
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
       setHttpsOnly(s.https_only !== "false");
       setAutoUpdate(s.auto_update_check !== "false");
+      setRecallOn(s.recall_enabled === "true");
+      setProxyMode(s.proxy_mode === "custom" ? "custom" : "direct");
+      setProxyServer(s.proxy_server ?? "");
     });
   }, []);
 
@@ -113,9 +122,15 @@ export function SettingsPanel() {
           </Row>
           <Row label="Search engine">
             <select className={selectCls} value={engine} onChange={(e) => { setEngine(e.target.value); void save("search_engine", e.target.value); }} aria-label="Search engine">
-              {ENGINES.map((e) => <option key={e} value={e}>{e[0].toUpperCase() + e.slice(1)}</option>)}
+              {ENGINES.map((e) => <option key={e} value={e}>{ENGINE_LABELS[e] ?? e[0].toUpperCase() + e.slice(1)}</option>)}
             </select>
           </Row>
+          {engine === "ghostsearch" && (
+            <div className="space-y-1.5 pb-2">
+              <p className="text-[12px] text-text-secondary">GhostSearch asks several independent sources at once (DuckDuckGo, Wikipedia, Marginalia, plus Brave Search if you add a key under Web research), strips tracking from the links and stores nothing. No Google. The sources see your query and IP address; use a proxy such as Tor (below) to hide the IP too.</p>
+              <input value={searxUrl} onChange={(e) => setSearxUrl(e.target.value)} onBlur={() => void save("ghost_searx_url", searxUrl.trim())} placeholder="Optional: your own SearXNG address, https://search.example.org" aria-label="SearXNG address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" />
+            </div>
+          )}
         </div>
 
         <div className="py-2">
@@ -168,6 +183,22 @@ export function SettingsPanel() {
         </div>
 
         <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Profiles &amp; network</h3>
+          <Row label="Profiles" hint="Separate logins and cookies, for example one Google account per profile.">
+            <button type="button" className={selectCls} onClick={() => useStore.getState().setOverlay("profiles")}>Manage profiles</button>
+          </Row>
+          <Row label="Connect through a proxy" hint="Send all browsing through a SOCKS5 or HTTP proxy such as Tor (socks5://127.0.0.1:9050) or your own VPN's proxy port. Quick Pebble does not run a VPN itself.">
+            <select className={selectCls} value={proxyMode} onChange={(e) => { setProxyMode(e.target.value); void save("proxy_mode", e.target.value); }} aria-label="Proxy mode">
+              <option value="direct">Direct</option><option value="custom">Custom proxy</option>
+            </select>
+          </Row>
+          {proxyMode === "custom" && (
+            <div className="pb-2"><input value={proxyServer} onChange={(e) => setProxyServer(e.target.value)} onBlur={() => void save("proxy_server", proxyServer)} placeholder="socks5://127.0.0.1:9050" aria-label="Proxy address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" /></div>
+          )}
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Recall</h3>
+          <Row label="Remember pages I read" hint="Keeps the text of pages you visit on this computer so you can search them and ask the assistant about them. Off by default. Never saved in private windows or for logins, payments and webmail. Cleared with history.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={recallOn} onChange={(e) => { setRecallOn(e.target.checked); void save("recall_enabled", String(e.target.checked)); }} aria-label="Remember pages I read" />
+          </Row>
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Memory Saver</h3>
           <Row label="Suspend idle tabs" hint="Never suspends the active tab, pinned tabs, audio, camera/mic, or downloads.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={mem.enabled} onChange={(e) => saveMem({ ...mem, enabled: e.target.checked })} aria-label="Memory Saver" />

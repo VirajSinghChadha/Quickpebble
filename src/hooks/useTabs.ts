@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ipc, onHttpsFallback, onTabEvent, onUpdate } from "../lib/ipc";
+import { ipc, onHttpsFallback, onOpenUrl, onTabEvent, onUpdate } from "../lib/ipc";
 import { useUpdater } from "../store/useUpdater";
 import { useStore } from "../store/useStore";
 
@@ -12,6 +12,7 @@ export function useTabs(): void {
     void useStore.getState().init();
     void onTabEvent((e) => useStore.getState().applyEvent(e)).then(keep);
     void onHttpsFallback((e) => useStore.getState().setHttpsPrompt(e)).then(keep);
+    void onOpenUrl((e) => void useStore.getState().newTab(e.url)).then(keep);
     void onUpdate((u) => useUpdater.getState().available(u)).then(keep);
     return () => {
       disposed = true;

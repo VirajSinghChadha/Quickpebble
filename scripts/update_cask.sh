@@ -12,18 +12,19 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 gh release download "$TAG" -R "$REPO" --pattern '*.dmg' --dir "$tmp"
 
-arm="$(ls "$tmp" | grep -E 'aarch64\.dmg$' | head -1 || true)"
+arm="$(ls "$tmp" | grep -E '(aarch64|arm64)\.dmg$' | head -1 || true)"
 intel="$(ls "$tmp" | grep -E '(x64|x86_64)\.dmg$' | head -1 || true)"
 [ -n "$arm" ] && [ -n "$intel" ] || { echo "Release $TAG needs both an Apple-silicon and an Intel DMG" >&2; exit 1; }
 
 sha() { shasum -a 256 "$tmp/$1" | cut -d' ' -f1; }
 prefix="${arm%%_${VERSION}_*}"          # e.g. "Quick.Pebble"
 intel_arch="${intel##*_${VERSION}_}"; intel_arch="${intel_arch%.dmg}"   # "x64"
+arm_arch="${arm##*_${VERSION}_}"; arm_arch="${arm_arch%.dmg}"   # "arm64" (or "aarch64" for old releases)
 
 mkdir -p Casks
 cat > Casks/quick-pebble.rb <<RUBY
 cask "quick-pebble" do
-  arch arm: "aarch64", intel: "${intel_arch}"
+  arch arm: "${arm_arch}", intel: "${intel_arch}"
 
   version "${VERSION}"
   sha256 arm:   "$(sha "$arm")",
@@ -39,8 +40,6 @@ cask "quick-pebble" do
     strategy :github_latest
   end
 
-  # The app updates itself (Settings → Updates), so Homebrew should not fight it.
-  auto_updates true
   depends_on macos: ">= :big_sur"
 
   app "Quick Pebble.app"
@@ -56,7 +55,6 @@ cask "quick-pebble" do
     "~/Library/Application Support/app.quickpebble.browser",
     "~/Library/Caches/app.quickpebble.browser",
     "~/Library/Preferences/app.quickpebble.browser.plist",
-    "~/Library/WebKit/app.quickpebble.browser",
   ]
 end
 RUBY

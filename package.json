@@ -1,8 +1,8 @@
 {
   "name": "quick-pebble",
-  "version": "1.2.2",
+  "version": "2.0.0",
   "private": true,
-  "description": "Quick Pebble — browse quicker. A privacy-first desktop browser with local AI.",
+  "description": "Quick Pebble \u2014 browse quicker. A privacy-first Chromium browser with local AI.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,10 +12,16 @@
     "test": "vitest run",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "start": "npm run build && electron .",
+    "electron:dev": "node scripts/electron-dev.mjs",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir"
   },
   "dependencies": {
+    "@ghostery/adblocker": "^2.18.2",
     "@tauri-apps/api": "^2.1.1",
+    "fflate": "^0.8.3",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
@@ -29,9 +35,69 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "vitest": "^2.1.8"
+  },
+  "main": "electron/main.mjs",
+  "author": {
+    "name": "Quick Pebble contributors"
+  },
+  "homepage": "https://github.com/VirajSinghChadha/Quickpebble",
+  "build": {
+    "appId": "app.quickpebble.browser",
+    "productName": "Quick Pebble",
+    "executableName": "Quick Pebble",
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json",
+      "!electron/**/*.test.mjs",
+      "!electron/**/smoke*.mjs"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src-tauri/icons/icon.icns",
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "src-tauri/icons/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "icon": "src-tauri/icons"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "VirajSinghChadha",
+        "repo": "Quickpebble",
+        "releaseType": "draft"
+      }
+    ],
+    "artifactName": "Quick.Pebble_${version}_${arch}.${ext}"
   }
 }
