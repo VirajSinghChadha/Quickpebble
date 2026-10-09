@@ -66,6 +66,7 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 |---|---|
 | **Pebble UI** | Refined new-tab dashboard, uncluttered toolbar, scrollable tabs and collapsible groups, keyboard focus handling, and reduced-motion support. |
 | **AI Assistant** | Side panel (`⌘J`) that answers questions about the page or operates the browser for you. |
+| **Recall** | Opt-in, on-device search over the text of pages you've read. Ask the assistant "what was that article about X?" and get cited answers from your own history. |
 | **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
 | **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
 | **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
@@ -84,6 +85,8 @@ Quick Pebble finds Ollama automatically. Change the model or provider in **Setti
 Open it with `⌘J` or the robot icon. **Ask** is the default. Answers use readable paragraphs, numbered citations, source cards, and a copy button. Choose up to four loaded tabs as evidence. With no selected tabs, the current page is used unless you turn that off. Answers without citations are labelled as general answers.
 
 For sources beyond open tabs, add a **Brave Search API key in Settings → Web research**, then enable **Search the web for sources** in chat. Your question is sent to Brave only when this option is enabled; result excerpts are passed to your chosen AI provider. Search sources are labelled as excerpts, not full articles. The key stays in your OS keychain. Search API usage is subject to your own Brave account plan. The app validates source IDs and uses URLs from retrieved metadata; this prevents invented citation links, but does not guarantee that the model interprets every source correctly.
+
+Type `/` in Ask mode for shortcuts: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare [topic]` and `/tabs` (both read up to four open pages), and `/recall <question>` (searches pages you've read). Answers offer follow-up questions, and the clipboard button exports the chat as Markdown.
 
 Two modes:
 

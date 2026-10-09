@@ -37,6 +37,12 @@ export interface HistoryEntry {
   visited_at: number;
   visit_count: number;
 }
+export interface RecallHit {
+  url: string;
+  title: string;
+  snippet: string;
+  at: number;
+}
 export interface Bookmark {
   url: string;
   title: string;
@@ -208,6 +214,10 @@ export const ipc = {
   extensionInstallFile: () => call<ExtensionInfo | null>("extension_install_file", undefined, null),
   extensionSetEnabled: (id: string, enabled: boolean) => call<void>("extension_set_enabled", { id, enabled }),
   extensionRemove: (id: string) => call<void>("extension_remove", { id }),
+  recallSearch: (query: string, limit = 6) => call<RecallHit[]>("recall_search", { query, limit }, []),
+  recallStats: () => call<{ pages: number; enabled: boolean }>("recall_stats", undefined, { pages: 0, enabled: false }),
+  recallForget: (url: string) => call<void>("recall_forget", { url }),
+  recallClear: () => call<void>("recall_clear"),
   windowControl: (action: "minimize" | "maximize" | "close" | "restore") => call<void>("window_control", { action }),
 };
 

@@ -13,6 +13,14 @@ pub struct HistoryEntry {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct RecallHit {
+    pub url: String,
+    pub title: String,
+    pub snippet: String,
+    pub at: i64,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct Bookmark {
     pub url: String,
     pub title: String,
@@ -71,6 +79,8 @@ impl Db {
                id INTEGER PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, path TEXT NOT NULL,
                ok INTEGER NOT NULL, started INTEGER NOT NULL, finished INTEGER NOT NULL, size INTEGER);
              CREATE TABLE IF NOT EXISTS vault_never (host TEXT PRIMARY KEY);
+             CREATE VIRTUAL TABLE IF NOT EXISTS recall_fts USING fts5(
+               url UNINDEXED, title, body, at UNINDEXED, tokenize = 'porter unicode61');
              CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_permissions (
                host TEXT NOT NULL, permission TEXT NOT NULL, policy TEXT NOT NULL,
@@ -119,6 +129,60 @@ impl Db {
 
     pub fn clear_history(&self) -> rusqlite::Result<()> {
         self.lock().execute("DELETE FROM history", [])?;
+        // Recall is derived from browsing, so clearing history clears it too.
+        self.recall_clear()
+    }
+
+    /// Stores (or refreshes) the readable text of a page for Recall. Pages indexed in the last
+    /// `REFRESH_SECS` are left alone so single-page apps that report often don't churn the index.
+    pub fn recall_put(&self, url: &str, title: &str, body: &str) -> rusqlite::Result<()> {
+        const REFRESH_SECS: i64 = 600;
+        const MAX_PAGES: i64 = 2000;
+        let conn = self.lock();
+        let recent: Option<i64> = conn
+            .query_row("SELECT at FROM recall_fts WHERE url = ?1", params![url], |r| r.get(0))
+            .ok();
+        if recent.is_some_and(|at| now() - at < REFRESH_SECS) {
+            return Ok(());
+        }
+        conn.execute("DELETE FROM recall_fts WHERE url = ?1", params![url])?;
+        conn.execute(
+            "INSERT INTO recall_fts (url, title, body, at) VALUES (?1, ?2, ?3, ?4)",
+            params![url, title, body, now()],
+        )?;
+        conn.execute(
+            "DELETE FROM recall_fts WHERE rowid IN
+               (SELECT rowid FROM recall_fts ORDER BY at ASC LIMIT max(0, (SELECT count(*) FROM recall_fts) - ?1))",
+            params![MAX_PAGES],
+        )?;
+        Ok(())
+    }
+
+    /// Full-text search over remembered pages, best match first. `match_expr` must come from
+    /// `recall::fts_query` (it is passed to FTS5 verbatim).
+    pub fn recall_search(&self, match_expr: &str, limit: usize) -> rusqlite::Result<Vec<RecallHit>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT url, title, snippet(recall_fts, 2, '', '', ' … ', 48), at FROM recall_fts
+             WHERE recall_fts MATCH ?1 ORDER BY bm25(recall_fts, 0.0, 5.0, 1.0, 0.0) LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![match_expr, limit as i64], |r| {
+            Ok(RecallHit { url: r.get(0)?, title: r.get(1)?, snippet: r.get(2)?, at: r.get(3)? })
+        })?;
+        rows.collect()
+    }
+
+    pub fn recall_count(&self) -> i64 {
+        self.lock().query_row("SELECT count(*) FROM recall_fts", [], |r| r.get(0)).unwrap_or(0)
+    }
+
+    pub fn recall_forget(&self, url: &str) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM recall_fts WHERE url = ?1", params![url])?;
+        Ok(())
+    }
+
+    pub fn recall_clear(&self) -> rusqlite::Result<()> {
+        self.lock().execute("DELETE FROM recall_fts", [])?;
         Ok(())
     }
 

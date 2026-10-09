@@ -28,6 +28,7 @@ export function SettingsPanel() {
   const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [recallOn, setRecallOn] = useState(false);
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
@@ -64,6 +65,7 @@ export function SettingsPanel() {
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
       setHttpsOnly(s.https_only !== "false");
       setAutoUpdate(s.auto_update_check !== "false");
+      setRecallOn(s.recall_enabled === "true");
     });
   }, []);
 
@@ -168,6 +170,10 @@ export function SettingsPanel() {
         </div>
 
         <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Recall</h3>
+          <Row label="Remember pages I read" hint="Keeps the text of pages you visit on this computer so you can search them and ask the assistant about them. Off by default. Never saved in private windows or for logins, payments and webmail. Cleared with history.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={recallOn} onChange={(e) => { setRecallOn(e.target.checked); void save("recall_enabled", String(e.target.checked)); }} aria-label="Remember pages I read" />
+          </Row>
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Memory Saver</h3>
           <Row label="Suspend idle tabs" hint="Never suspends the active tab, pinned tabs, audio, camera/mic, or downloads.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={mem.enabled} onChange={(e) => saveMem({ ...mem, enabled: e.target.checked })} aria-label="Memory Saver" />

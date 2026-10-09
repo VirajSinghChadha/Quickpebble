@@ -57,6 +57,7 @@ export function QuickActions() {
       { id: "therapist", title: "Open Tab Therapist", icon: HeartPulse, run: () => s.setSidebar("therapist") },
       { id: "extensions", title: "Manage Extensions", icon: Puzzle, run: () => s.setOverlay("extensions") },
       { id: "library", title: "Open History & Bookmarks", hint: `${modKey}Y`, icon: History, run: () => s.setOverlay("library") },
+      { id: "recall", title: "Search Pages I've Read (Recall)", icon: Brain, run: () => s.setOverlay("library") },
       { id: "reopen", title: "Reopen Closed Tab", hint: `${modKey}⇧T`, icon: RotateCcw, run: () => s.reopenTab() },
       { id: "find", title: "Find in Page", hint: `${modKey}F`, icon: Search, run: () => void ipc.tabFind(selectActive(useStore.getState()).id) },
       { id: "reader", title: "Toggle Reader Mode", hint: `${modKey}⇧R`, icon: BookOpen, run: () => void ipc.tabReader(selectActive(useStore.getState()).id) },
@@ -73,7 +74,7 @@ export function QuickActions() {
   const shown = commands.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase()));
   const run = (c: Cmd | undefined) => {
     if (!c) return;
-    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library"].includes(c.id);
+    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library", "recall"].includes(c.id);
     if (!keepOpen) close();
     void c.run();
   };
