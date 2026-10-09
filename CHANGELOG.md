@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- **Accounts.** Sign in with an emailed code (beta access code required at sign-up). Your Gemini key is saved encrypted to your account and comes back when you sign in, on any device, and you stay signed in across updates.
+- The macOS keychain is no longer used for API keys, so the "wants to use your confidential information" prompt after updates is gone. Keys saved there before need to be entered once more.
+- Screen mode sets up its own Python environment on first use.
+- Update checks run every 10 minutes and show a card at the top right; if the built-in updater can't connect, a backup check still finds the update.
+
 ## 1.2.3
 
 - Update checks run every 10 minutes and show a card at the top right of the window.

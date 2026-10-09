@@ -1,0 +1,28 @@
+{
+  "version": "5",
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.45.4": "1108d69216995335d057dbd15907caaf514a4d1ef082f097050573b9d589a57c"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@tailwindcss/vite@4",
+        "npm:@tauri-apps/api@^2.1.1",
+        "npm:@tauri-apps/cli@^2.1.0",
+        "npm:@types/node@^22.20.5",
+        "npm:@types/react-dom@^19.0.2",
+        "npm:@types/react@^19.0.2",
+        "npm:@vitejs/plugin-react@^4.3.4",
+        "npm:framer-motion@^11.15.0",
+        "npm:lucide-react@0.469",
+        "npm:react-dom@19",
+        "npm:react@19",
+        "npm:tailwindcss@4",
+        "npm:typescript@^5.7.2",
+        "npm:vite@^6.0.7",
+        "npm:vitest@^2.1.8",
+        "npm:zustand@^5.0.2"
+      ]
+    }
+  }
+}
