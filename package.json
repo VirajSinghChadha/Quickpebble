@@ -98,6 +98,17 @@
         "releaseType": "draft"
       }
     ],
-    "artifactName": "Quick.Pebble_${version}_${arch}.${ext}"
+    "artifactName": "Quick.Pebble_${version}_${arch}.${ext}",
+    "extraResources": [
+      {
+        "from": "agent",
+        "to": "agent",
+        "filter": [
+          "qp_agent/**/*.py",
+          "requirements.txt",
+          "!**/__pycache__/**"
+        ]
+      }
+    ]
   }
 }

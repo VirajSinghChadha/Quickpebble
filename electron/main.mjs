@@ -10,11 +10,12 @@ import { buildCommands } from "./commands.mjs";
 import { Filters } from "./filters.mjs";
 import { Vault } from "./vault.mjs";
 import { Extensions } from "./extensions.mjs";
+import { ScreenAgent } from "./screen.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SCREEN === "1";
 
 app.setName("Quick Pebble");
 registerGhostScheme();
@@ -23,7 +24,7 @@ if (smoke) app.setPath("userData", fs.mkdtempSync(path.join(app.getPath("temp"),
 // A second launch just focuses the first one.
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let browser, db, downloads, commands, filters, extensions;
+let browser, db, downloads, commands, filters, extensions, screen;
 
 function appUrl() {
   if (process.env.QP_DEV_URL) return process.env.QP_DEV_URL;
@@ -67,9 +68,11 @@ app.whenReady().then(async () => {
   browser.extraBlock = () => filters.matcher();
   const filtersReady = filters.start().catch(() => {});
   extensions = new Extensions(() => [...browser.sessions].filter((x) => x.storagePath));
+  screen = new ScreenAgent(db);
+  app.on("will-quit", () => screen.stop());
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions } });
+  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions, screen: screen.commands() } });
   session.defaultSession.setUserAgent(chromeUserAgent());
 
   ipcMain.handle("qp:invoke", async (event, cmd, args) => {
@@ -87,9 +90,9 @@ app.whenReady().then(async () => {
   setupMenu();
   browser.openWindow({ label: "main" });
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
-  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE: "smoke" };
+  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
-  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
+  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });
