@@ -2737,7 +2737,7 @@ dependencies = [
 
 [[package]]
 name = "quick-pebble"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "argon2",
  "chacha20poly1305",

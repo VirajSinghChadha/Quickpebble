@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ipc, defaultMemory, type MemoryConfig, type MemoryStats } from "../lib/ipc";
+import { useAccount } from "../store/useAccount";
 import { useUpdater } from "../store/useUpdater";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
@@ -25,6 +26,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
+  const account = useAccount();
   const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
@@ -146,6 +148,10 @@ export function SettingsPanel() {
         </div>
 
         <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Account</h3>
+          <Row label={account.profile?.name ?? "Signed in"} hint={account.profile?.email ?? ""}>
+            <button type="button" className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary" onClick={() => void useAccount.getState().signOut()}>Sign out</button>
+          </Row>
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Updates</h3>
           <Row label="Check for updates automatically" hint="Contacts GitHub Releases shortly after launch. Updates are signature-checked and never installed without your click.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={autoUpdate} onChange={(e) => { setAutoUpdate(e.target.checked); void save("auto_update_check", String(e.target.checked)); }} aria-label="Automatic update checks" />
@@ -200,10 +206,10 @@ export function SettingsPanel() {
               <input className={`${selectCls} w-56`} value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} onBlur={() => void save("ollama_url", ollamaUrl)} aria-label="Ollama address" />
             </Row>
           ) : (
-            <Row label="API key" hint={status?.has_key ? "A key is stored in your OS keychain." : "Stored in your OS keychain, never on disk."}>
+            <Row label="API key" hint={status?.has_key ? "Saved to your account. It comes back when you sign in." : "Saved encrypted to your account; kept only in memory on this computer."}>
               <div className="flex gap-2">
                 <input type="password" autoComplete="off" className={`${selectCls} w-44`} value={key} placeholder={status?.has_key ? "••••••••" : "paste key"} onChange={(e) => setKey(e.target.value)} aria-label="API key" />
-                <button type="button" className="rounded-lg bg-primary px-3 py-1.5 text-white transition-opacity duration-150 hover:opacity-90 dark:text-bg" onClick={async () => { try { await ipc.aiSetKey(provider, key); setKey(""); void refresh(); setMsg("Key saved"); } catch (e) { setMsg(String(e)); } }}>Save</button>
+                <button type="button" className="rounded-lg bg-primary px-3 py-1.5 text-white transition-opacity duration-150 hover:opacity-90 dark:text-bg" onClick={async () => { try { await ipc.aiSetKey(provider, key); try { await useAccount.getState().saveKey(provider, key); setMsg("Key saved to your account"); } catch (err) { setMsg(`Key works for now, but couldn't be saved to your account: ${err instanceof Error ? err.message : String(err)}`); } setKey(""); void refresh(); } catch (e) { setMsg(String(e)); } }}>Save</button>
               </div>
             </Row>
           )}
