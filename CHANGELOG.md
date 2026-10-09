@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Screen mode now installs its own Python packages the first time it runs, so there is no pip step (Python 3 itself is still required).
+- A popup offers new versions as soon as they are found; "Update now" installs and restarts. Updates are checked every hour.
+
 ## 1.2.0
 
 **First time opening it on a Mac or Windows PC?** The app isn't signed with a paid certificate yet, so your system asks you to confirm it once. Short guides: [macOS](https://github.com/VirajSinghChadha/Quickpebble/blob/main/docs/INSTALL-macOS.md) (System Settings → Privacy & Security → *Open Anyway*) and [Windows](https://github.com/VirajSinghChadha/Quickpebble/blob/main/docs/INSTALL-Windows.md) (*More info → Run anyway*). If you already have 1.1.0, this arrives through Settings → Updates.
