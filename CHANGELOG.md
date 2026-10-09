@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.3
+
+- Update checks run every 10 minutes and show a card at the top right of the window.
+- If the built-in updater cannot connect, a backup check still finds the new version and offers a download link; failures now show the real cause.
+
 ## 1.2.2
 
 - Screen mode's first-time setup now uses its own Python environment with an up-to-date pip, so it finishes in seconds instead of compiling packages for minutes.
