@@ -123,7 +123,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     recall_clear: () => db.recallClear(),
 
     // ---- privacy
-    privacy_stats: () => ({ blocked_total: blockStats.blocked, block_trackers: db.getSetting("block_trackers") !== "false" }),
+    privacy_stats: () => ({ blocked_total: blockStats.blocked, block_trackers: db.getSetting("block_trackers") !== "false", filter_lists: !!extras.filters?.ready }),
     privacy_permissions: () => db.permissions(),
     privacy_set_permission: (_w, { host, permission, policy }) => {
       if (!PERMISSIONS.includes(permission) || !POLICIES.includes(policy)) throw new Error("invalid permission or policy");

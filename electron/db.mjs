@@ -1,5 +1,7 @@
 // SQLite storage (port of database.rs) on Node's built-in sqlite. FTS5 powers Recall.
-import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
+// Loaded through require so bundlers and test runners that don't know "node:sqlite" leave it alone.
+const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
 const now = () => Math.floor(Date.now() / 1000);
 const like = (q) => `%${String(q).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;

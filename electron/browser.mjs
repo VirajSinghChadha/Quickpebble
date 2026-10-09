@@ -58,6 +58,7 @@ export class Browser {
   }
   prepareSession(ses) {
     ses.setUserAgent(chromeUserAgent());
+    this.onSession?.(ses);
     installBlocker(ses, (wc) => {
       const e = this.byContents.get(wc.id);
       if (!e) return null;

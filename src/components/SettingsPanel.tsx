@@ -29,6 +29,8 @@ export function SettingsPanel() {
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [recallOn, setRecallOn] = useState(false);
+  const [proxyMode, setProxyMode] = useState("direct");
+  const [proxyServer, setProxyServer] = useState("");
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
@@ -66,6 +68,8 @@ export function SettingsPanel() {
       setHttpsOnly(s.https_only !== "false");
       setAutoUpdate(s.auto_update_check !== "false");
       setRecallOn(s.recall_enabled === "true");
+      setProxyMode(s.proxy_mode === "custom" ? "custom" : "direct");
+      setProxyServer(s.proxy_server ?? "");
     });
   }, []);
 
@@ -170,6 +174,18 @@ export function SettingsPanel() {
         </div>
 
         <div className="py-2">
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Profiles &amp; network</h3>
+          <Row label="Profiles" hint="Separate logins and cookies, for example one Google account per profile.">
+            <button type="button" className={selectCls} onClick={() => useStore.getState().setOverlay("profiles")}>Manage profiles</button>
+          </Row>
+          <Row label="Connect through a proxy" hint="Send all browsing through a SOCKS5 or HTTP proxy such as Tor (socks5://127.0.0.1:9050) or your own VPN's proxy port. Quick Pebble does not run a VPN itself.">
+            <select className={selectCls} value={proxyMode} onChange={(e) => { setProxyMode(e.target.value); void save("proxy_mode", e.target.value); }} aria-label="Proxy mode">
+              <option value="direct">Direct</option><option value="custom">Custom proxy</option>
+            </select>
+          </Row>
+          {proxyMode === "custom" && (
+            <div className="pb-2"><input value={proxyServer} onChange={(e) => setProxyServer(e.target.value)} onBlur={() => void save("proxy_server", proxyServer)} placeholder="socks5://127.0.0.1:9050" aria-label="Proxy address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" /></div>
+          )}
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Recall</h3>
           <Row label="Remember pages I read" hint="Keeps the text of pages you visit on this computer so you can search them and ask the assistant about them. Off by default. Never saved in private windows or for logins, payments and webmail. Cleared with history.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={recallOn} onChange={(e) => { setRecallOn(e.target.checked); void save("recall_enabled", String(e.target.checked)); }} aria-label="Remember pages I read" />

@@ -15,5 +15,5 @@ export default defineConfig({
     watch: { ignored: ["**/src-tauri/**"] },
   },
   build: { target: "es2022", sourcemap: false },
-  test: { environment: "node", include: ["src/**/*.test.ts"] },
+  test: { environment: "node", include: ["src/**/*.test.ts", "electron/**/*.test.mjs"] },
 });

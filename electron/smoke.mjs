@@ -8,7 +8,10 @@ import { stats } from "./adblock.mjs";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (k, v) => console.log(`SMOKE ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
 
-export async function run({ browser, commands, db }) {
+export async function run({ browser, commands, db, filters, filtersReady }) {
+  await filtersReady;
+  const m = filters.matcher();
+  log("filterLists", { ready: filters.ready, adsense: m?.("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js", "", "script", "news.site"), analytics: m?.("https://www.google-analytics.com/analytics.js", "", "script", "news.site"), normal: m?.("https://news.site/app.js", "", "script", "news.site") });
   const hits = [];
   const server = http.createServer((req, res) => {
     hits.push(req.url);

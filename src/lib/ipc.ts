@@ -14,13 +14,15 @@ type UnlistenFn = () => void;
 export const isNative = typeof window !== "undefined" && !!window.qp;
 export const isTauri = isNative; // kept so older call sites keep working
 
-export const windowLabel = (): string => window.qp?.label ?? "main";
+const bridge = (): QpBridge | undefined => (typeof window === "undefined" ? undefined : window.qp);
+export const windowLabel = (): string => bridge()?.label ?? "main";
 export const isPrivateWindow = (): boolean => windowLabel().startsWith("private-");
 
 async function call<T>(cmd: string, args?: Record<string, unknown>, fallback?: T): Promise<T> {
-  if (!window.qp) return fallback as T;
+  const b = bridge();
+  if (!b) return fallback as T;
   try {
-    return (await window.qp.invoke(cmd, args)) as T;
+    return (await b.invoke(cmd, args)) as T;
   } catch (e) {
     // Electron wraps errors as "Error invoking remote method 'qp:invoke': Error: <message>"; show just the message.
     const msg = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, "") : String(e);
@@ -29,7 +31,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>, fallback?: T
 }
 
 function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<UnlistenFn> {
-  return Promise.resolve(window.qp ? window.qp.on(event, ((payload: T) => cb({ payload })) as (p: never) => void) : () => {});
+  const b = bridge();
+  return Promise.resolve(b ? b.on(event, ((payload: T) => cb({ payload })) as (p: never) => void) : () => {});
 }
 
 export interface TabEvent {
