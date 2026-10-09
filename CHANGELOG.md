@@ -3,6 +3,7 @@
 ## 1.2.1
 
 - Screen mode now installs its own Python packages the first time it runs, so there is no pip step (Python 3 itself is still required).
+- Saving a Gemini key now verifies it was stored, and a failed keychain read is no longer remembered as "no key".
 - A popup offers new versions as soon as they are found; "Update now" installs and restarts. Updates are checked every hour.
 
 ## 1.2.0
