@@ -52,38 +52,49 @@ fn python_command() -> String {
     std::env::var("QP_PYTHON").unwrap_or_else(|_| if cfg!(windows) { "python" } else { "python3" }.into())
 }
 
-/// Where the agent's Python packages are installed for this app (outside the signed app bundle).
-fn deps_dir(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_data_dir().ok().map(|d| d.join("agent-deps"))
+/// A private virtual environment for the agent's packages (outside the signed app bundle).
+fn venv_dir(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("agent-venv"))
 }
 
-/// Installs the agent's packages into `deps_dir` the first time they are needed, so users never run pip themselves.
-fn install_deps(python: &str, dir: &std::path::Path, target: &std::path::Path) -> Result<(), String> {
-    let mut cmd = Command::new(python);
-    cmd.args(["-m", "pip", "install", "--disable-pip-version-check", "--quiet", "--target"])
-        .arg(target)
-        .arg("-r")
-        .arg(dir.join("requirements.txt"));
+fn venv_python(venv: &std::path::Path) -> PathBuf {
+    if cfg!(windows) { venv.join("Scripts").join("python.exe") } else { venv.join("bin").join("python") }
+}
+
+fn run_quiet(cmd: &mut Command) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    let out = cmd.output().map_err(|e| format!("could not run pip: {e}"))?;
+    let out = cmd.output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(())
     } else {
-        let err = String::from_utf8_lossy(&out.stderr);
-        Err(err.lines().last().unwrap_or("pip failed").to_string())
+        Err(String::from_utf8_lossy(&out.stderr).lines().last().unwrap_or("failed").to_string())
     }
+}
+
+/// Creates the environment, upgrades pip (the one bundled with macOS is too old to pick prebuilt wheels,
+/// which makes it compile packages from source for minutes) and installs the agent's packages.
+fn install_deps(python: &str, dir: &std::path::Path, venv: &std::path::Path) -> Result<(), String> {
+    run_quiet(Command::new(python).args(["-m", "venv"]).arg(venv))?;
+    let vpy = venv_python(venv);
+    run_quiet(Command::new(&vpy).args(["-m", "pip", "install", "--disable-pip-version-check", "--quiet", "--upgrade", "pip"]))?;
+    run_quiet(
+        Command::new(&vpy)
+            .args(["-m", "pip", "install", "--disable-pip-version-check", "--quiet", "--prefer-binary", "-r"])
+            .arg(dir.join("requirements.txt")),
+    )
 }
 
 fn start(app: &AppHandle, model: &str, precision: &str) -> Result<Running, String> {
     match start_once(app, model, precision) {
         Err(e) if e.contains("NEEDS_DEPS") => {
             let dir = agent_dir(app)?;
-            let target = deps_dir(app).ok_or("No app data folder for the screen agent's packages")?;
-            install_deps(&python_command(), &dir, &target)
+            let venv = venv_dir(app).ok_or("No app data folder for the screen agent's packages")?;
+            let _ = std::fs::remove_dir_all(&venv);
+            install_deps(&python_command(), &dir, &venv)
                 .map_err(|e| format!("Setting up the screen agent failed ({e}). Check your internet connection and try again."))?;
             start_once(app, model, precision)
         }
@@ -94,19 +105,9 @@ fn start(app: &AppHandle, model: &str, precision: &str) -> Result<Running, Strin
 fn start_once(app: &AppHandle, model: &str, precision: &str) -> Result<Running, String> {
     let key = daemon::get_key("gemini").ok_or("Screen mode needs a Gemini API key. Add one in Settings → AI.")?;
     let dir = agent_dir(app)?;
-    let python = python_command();
+    let python = venv_dir(app).map(|v| venv_python(&v)).filter(|p| p.exists()).map(|p| p.display().to_string()).unwrap_or_else(python_command);
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "qp_agent.server"]).current_dir(&dir);
-    if let Some(deps) = deps_dir(app).filter(|d| d.exists()) {
-        let sep = if cfg!(windows) { ";" } else { ":" };
-        let existing = std::env::var("PYTHONPATH").unwrap_or_default();
-        cmd.env("PYTHONPATH", format!("{}{sep}{existing}", deps.display()));
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: don't flash a console
-    }
     let mut child = cmd
         .env("GEMINI_API_KEY", key)
         .env("QP_AGENT_MODEL", model)
