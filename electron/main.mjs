@@ -11,6 +11,7 @@ import { Filters } from "./filters.mjs";
 import { Vault } from "./vault.mjs";
 import { Extensions } from "./extensions.mjs";
 import { ScreenAgent } from "./screen.mjs";
+import { StatusBar } from "./overlay.mjs";
 import { Updater } from "./updater.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
@@ -70,8 +71,9 @@ app.whenReady().then(async () => {
   const filtersReady = filters.start().catch(() => {});
   extensions = new Extensions(() => [...browser.sessions].filter((x) => x.storagePath));
   updater = new Updater(db, (channel, payload) => { for (const w of browser.windows.values()) browser.emitUi(w, channel, payload); });
-  screen = new ScreenAgent(db);
-  app.on("will-quit", () => screen.stop());
+  const statusBar = new StatusBar(() => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://screen-stop", {}); });
+  screen = new ScreenAgent(db, statusBar);
+  app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
   commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });

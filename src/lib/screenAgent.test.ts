@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fallbackSite, parseGenerated } from "./permissions";
-import { isRisky, needsDoubleCheck, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
+import { describeScreenAction, isRisky, needsDoubleCheck, runScreenAgent, type Choice, type ScreenIO, type ScreenMode } from "./screenAgent";
 import type { ScreenAction, ScreenResponse } from "./ipc";
 
 const res = (action: ScreenAction, message = "m", thinking = "t"): ScreenResponse => ({ user: { thinking, message }, action });
@@ -175,5 +175,30 @@ describe("runScreenAgent", () => {
     const { io, acted } = make([res({ type: "click", cell: "A1" })]);
     await runScreenAgent("g", io, { aborted: true });
     expect(acted).toHaveLength(0);
+  });
+});
+
+
+describe("status bar updates", () => {
+  it("reports looking, thinking, acting and finishing, with what comes next", async () => {
+    const { io } = make([res({ type: "open_app", app: "Notes" }, "Opening Notes", "I see the desktop"), res({ type: "done" }, "Finished")]);
+    const seen: string[] = [];
+    io.onStatus = (s) => void seen.push(`${s.phase}${s.next ? `|${s.next}` : ""}${s.step ? `#${s.step}` : ""}`);
+    await runScreenAgent("g", io, { aborted: false });
+    expect(seen[0]).toBe("looking#1");
+    expect(seen).toContain("thinking|Open Notes: Opening Notes#1");
+    expect(seen).toContain("acting|Open Notes#1");
+    expect(seen.at(-1)).toMatch(/^done/);
+  });
+  it("says it is waiting when a risky step needs approval", async () => {
+    const { io } = make([res({ type: "click", cell: "A1", risk: "high" }, "Delete it"), res({ type: "done" }, "ok")], ["skip"]);
+    const seen: string[] = [];
+    io.onStatus = (s) => void seen.push(s.phase);
+    await runScreenAgent("g", io, { aborted: false });
+    expect(seen).toContain("waiting");
+  });
+  it("describes drag and open_app", () => {
+    expect(describeScreenAction({ type: "drag", cell: "B2", to_cell: "K9" })).toBe("Drag from B2 to K9");
+    expect(describeScreenAction({ type: "open_app", app: "Pages" })).toBe("Open Pages");
   });
 });

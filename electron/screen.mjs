@@ -40,7 +40,7 @@ async function installDeps(dir, venv) {
 }
 
 export class ScreenAgent {
-  constructor(db) { this.db = db; this.run = null; this.starting = null; }
+  constructor(db, overlay) { this.db = db; this.overlay = overlay; this.run = null; this.starting = null; }
 
   stop() { try { this.run?.child.kill(); } catch { /* already gone */ } this.run = null; }
 
@@ -105,6 +105,7 @@ export class ScreenAgent {
     return {
       screen_propose: async (_w, { goal, history, categories, pageText }) => { check(goal, history); return this.post(await this.connection(), "/propose", { goal, history, categories, page_text: pageText }); },
       screen_verify: async (_w, { goal, history, pending, pageText }) => { check(goal, history, String(pending).length > 300); return this.post(await this.connection(), "/verify", { goal, history, pending, page_text: pageText }); },
+      screen_overlay: async (_w, { state }) => { this.overlay?.update(state); return true; },
       screen_act: async (_w, { action }) => {
         if (!this.run) throw new Error("The screen agent is not running. Start a new task.");
         return this.post(this.run, "/act", { action });

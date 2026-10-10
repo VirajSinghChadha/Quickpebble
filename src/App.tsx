@@ -3,7 +3,8 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
 import { useEffect } from "react";
-import { ipc, isPrivateWindow, onDownloads, onLoginSeen } from "./lib/ipc";
+import { ipc, isPrivateWindow, onDownloads, onLoginSeen, onScreenStop } from "./lib/ipc";
+import { useChat } from "./store/useChat";
 import { BASE_CHROME, BOOKMARKS_BAR, selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
 import { PrivacyCenter } from "./components/PrivacyCenter";
@@ -30,6 +31,12 @@ export default function App() {
   useContentVisibility();
   const accountStatus = useAccount((s) => s.status);
   useEffect(() => { if (!isPrivateWindow()) void useAccount.getState().init(); else useAccount.setState({ status: "ready" }); }, []);
+  // The status bar's Stop button stops the running screen task.
+  useEffect(() => {
+    let off = () => {};
+    void onScreenStop(() => useChat.getState().stop()).then((u) => (off = u));
+    return () => off();
+  }, []);
   // Keep the downloads list live, and open the panel's badge when something starts.
   useEffect(() => {
     let off = () => {};

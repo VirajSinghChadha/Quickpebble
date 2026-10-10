@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Quick Pebble status</title>
+<style>
+:root{--bg:rgba(255,255,255,.88);--fg:#172033;--mut:#64748b;--line:rgba(15,23,42,.12);--acc:#2563eb;--stop:#e11d48}
+@media(prefers-color-scheme:dark){:root{--bg:rgba(20,28,44,.9);--fg:#f1f5f9;--mut:#9fb0c6;--line:rgba(255,255,255,.14);--acc:#60a5fa;--stop:#fb7185}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:transparent;overflow:hidden;font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+.bar{height:100%;display:flex;align-items:center;gap:14px;padding:14px 16px 14px 18px;border-radius:30px;background:var(--bg);border:1px solid var(--line);box-shadow:0 12px 40px rgba(2,8,23,.28);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);opacity:0;transform:translateY(10px);transition:opacity .25s ease,transform .3s cubic-bezier(.23,1,.32,1)}
+.bar.on{opacity:1;transform:none}
+.orb{flex:none;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#93c5fd,var(--acc) 60%,#1e3a8a);box-shadow:0 0 0 0 var(--acc);animation:pulse 1.8s ease-out infinite}
+.bar.done .orb{background:#10b981;animation:none}.bar.error .orb{background:var(--stop);animation:none}.bar.waiting .orb{background:#f59e0b}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 55%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+@media(prefers-reduced-motion:reduce){.orb{animation:none}.bar{transition:none}}
+.txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.title{font-weight:600;font-size:12px;letter-spacing:.02em;color:var(--mut);text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.count{font-weight:500;text-transform:none;opacity:.8}
+.think{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--fg)}
+.next{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mut)}.next b{color:var(--fg);font-weight:600}
+button{flex:none;border:0;cursor:pointer;font:600 12px/1 inherit;padding:10px 16px;border-radius:999px;color:#fff;background:var(--stop)}
+button:hover{filter:brightness(1.08)}button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.bar.done button,.bar.error button{display:none}
+</style></head>
+<body>
+<div class="bar" id="bar" role="status" aria-live="polite">
+  <div class="orb" aria-hidden="true"></div>
+  <div class="txt">
+    <div class="title"><span id="title">Pebble</span><span class="count" id="count"></span></div>
+    <div class="think" id="think"></div>
+    <div class="next" id="next"></div>
+  </div>
+  <button id="stop" type="button">Stop</button>
+</div>
+<script>
+const TITLES={looking:"Looking at your screen",thinking:"Thinking",acting:"Working",waiting:"Waiting for you",done:"Finished",error:"Stopped"};
+const bar=document.getElementById("bar"),$=(i)=>document.getElementById(i);
+overlay.onState((s)=>{
+  bar.className="bar on "+s.phase;
+  $("title").textContent=TITLES[s.phase]||"Pebble";
+  $("count").textContent=s.step?("step "+s.step+(s.max?" of "+s.max:"")):"";
+  $("think").textContent=s.thinking||(s.phase==="looking"?"Taking a screenshot and reading the screen…":"");
+  const n=$("next");n.textContent="";
+  if(s.next){const b=document.createElement("b");b.textContent="Next: ";n.append(b,document.createTextNode(s.next));}
+});
+const stop=$("stop");
+stop.addEventListener("mouseenter",()=>overlay.hover(true));
+stop.addEventListener("mouseleave",()=>overlay.hover(false));
+stop.addEventListener("click",()=>overlay.stop());
+</script></body></html>

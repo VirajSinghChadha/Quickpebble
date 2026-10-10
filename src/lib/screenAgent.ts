@@ -4,7 +4,7 @@
  *   action → the exact instruction for the backend
  * Routine actions run automatically ("smart" mode); only risky ones, or every step in "ask" mode, wait for the person.
  */
-import type { ScreenAction, ScreenResponse } from "./ipc";
+import type { ScreenAction, ScreenResponse, ScreenStatus } from "./ipc";
 import { categoryLabel, isAllowed, type SitePerms } from "./permissions";
 
 export const MAX_SCREEN_STEPS = 40;
@@ -41,6 +41,8 @@ export interface ScreenIO {
   setMode(m: ScreenMode): void;
   sleep(ms: number): Promise<void>;
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
+  /** Live progress for the on-screen status bar: what the agent sees, thinks and will do next. */
+  onStatus?(s: ScreenStatus): void;
 }
 
 export function describeScreenAction(a: ScreenAction): string {
@@ -51,6 +53,8 @@ export function describeScreenAction(a: ScreenAction): string {
     case "right_click": return `Right-click${at}`;
     case "type": return `Type “${(a.text ?? "").slice(0, 80)}”`;
     case "key": return `Press ${a.key}`;
+    case "drag": return `Drag from ${a.cell ?? "here"} to ${a.to_cell ?? "there"}`;
+    case "open_app": return `Open ${a.app ?? "the app"}`;
     case "scroll": return `Scroll ${a.direction ?? "down"}${at}`;
     case "wait": return "Wait for the screen to update";
     default: return a.type;
@@ -90,8 +94,10 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
   let verifyFails = 0;
   let unchanged = 0;
   for (let n = 0; n < maxSteps; n++) {
-    if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+    if (signal.aborted) { io.onStatus?.({ phase: "idle" }); return io.onEvent({ kind: "error", text: "Stopped." }); }
     await io.prepare?.().catch(() => {});
+    const status = (s: ScreenStatus) => io.onStatus?.({ step: n + 1, max: maxSteps, ...s });
+    status({ phase: "looking" });
     let res: ScreenResponse | undefined;
     for (let attempt = 1; attempt <= PROPOSE_ATTEMPTS && !res; attempt++) {
       try {
@@ -107,8 +113,9 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
     const { user, action } = res;
     if (user.thinking) io.onEvent({ kind: "say", text: user.thinking });
-    if (action.type === "done") return io.onEvent({ kind: "final", text: user.message || "Done." });
-    if (action.type === "ask") return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" });
+    if (action.type === "done") { status({ phase: "done", thinking: user.message || "Done." }); return io.onEvent({ kind: "final", text: user.message || "Done." }); }
+    if (action.type === "ask") { status({ phase: "waiting", thinking: user.message, next: "Waiting for your answer" }); return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" }); }
+    status({ phase: "thinking", thinking: user.thinking, next: `${describeScreenAction(action)}${user.message ? `: ${user.message}` : ""}` });
 
     // Same action again and again usually means it isn't working. Nudge the model to change approach instead
     // of quitting; only give up after many identical attempts. Waiting is allowed to repeat for longer.
@@ -154,6 +161,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     if (risky || doubtful || io.mode() === "ask") {
       const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(site, cat)}] ` : "";
       const warn = doubtful ? `⚠ Double-check is not confident: ${doubtful}. ` : "";
+      status({ phase: "waiting", thinking: user.thinking, next: `Waiting for your OK: ${desc}` });
       const choice = await io.choose(`${warn}${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky || !!doubtful);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
@@ -166,6 +174,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       }
       if (choice === "auto") io.setMode("auto");
     }
+    status({ phase: "acting", thinking: user.thinking, next: desc });
     try {
       const result = await io.act(action);
       failures = 0;
@@ -185,5 +194,6 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       await io.sleep(800);
     }
   }
+  io.onStatus?.({ phase: "error", thinking: `Stopped after ${maxSteps} steps.` });
   io.onEvent({ kind: "error", text: `Stopped after ${maxSteps} steps. Say “continue” to keep going.` });
 }

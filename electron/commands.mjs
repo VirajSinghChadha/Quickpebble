@@ -186,7 +186,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     update_skip: () => extras.updater.skip(),
 
     // ---- not yet ported
-    ...(extras.screen ?? { screen_propose: unsupported("Screen control"), screen_act: unsupported("Screen control"), screen_verify: unsupported("Screen control") }),
+    ...(extras.screen ?? { screen_propose: unsupported("Screen control"), screen_act: unsupported("Screen control"), screen_verify: unsupported("Screen control"), screen_overlay: unsupported("Screen control") }),
     extension_list: () => extras.extensions?.list() ?? [],
     extension_install_store: (_w, { input }) => extras.extensions ? extras.extensions.installStore(input) : unsupported("Extensions")(),
     extension_install_file: (w) => extras.extensions ? extras.extensions.installFile(w) : unsupported("Extensions")(),

@@ -319,6 +319,7 @@ export const useChat = create<ChatState>((set, get) => ({
           setMode: (m) => set({ screenApprovalMode: m }),
           sleep,
           onEvent: io.onEvent,
+          onStatus: (st) => void ipc.screenOverlay(st).catch(() => {}),
         }, runSignal, undefined, screenHistory);
       } else {
         await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
@@ -327,6 +328,7 @@ export const useChat = create<ChatState>((set, get) => ({
       if (!runSignal.aborted) add("error", String(e));
     } finally {
       get().approval?.resolve("stop");
+      void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
     get().permissionRequest?.resolve(null);
       set({ busy: false });
     }

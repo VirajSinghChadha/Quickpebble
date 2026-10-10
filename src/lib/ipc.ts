@@ -222,6 +222,8 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  /** Updates the status bar at the bottom of the screen (no-op outside the app). */
+  screenOverlay: (state: ScreenStatus) => call<boolean>("screen_overlay", { state }, false),
   weatherSearch: (query: string) => call<Place[]>("weather_search", { query }),
   weatherFetch: (lat: number, lon: number, fahrenheit: boolean) => call<Weather>("weather_fetch", { lat, lon, fahrenheit }),
   newsFetch: (source: string, count = 5) => call<Headline[]>("news_fetch", { source, count }),
@@ -291,8 +293,10 @@ export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<Unlisten
 
 /** Backend half of the agent's reply: executed exactly as given. `cell` is a grid label such as "M7". */
 export interface ScreenAction {
-  type: "click" | "double_click" | "right_click" | "type" | "key" | "scroll" | "wait" | "ask" | "done";
+  type: "click" | "double_click" | "right_click" | "drag" | "type" | "key" | "scroll" | "open_app" | "wait" | "ask" | "done";
   cell?: string;
+  to_cell?: string;
+  app?: string;
   fx?: number;
   fy?: number;
   text?: string;
@@ -341,6 +345,20 @@ export interface DownloadItem {
   finished: number | null;
   size: number | null;
   can_open: boolean;
+}
+
+export interface ScreenStatus {
+  phase: "looking" | "thinking" | "acting" | "waiting" | "done" | "error" | "idle";
+  thinking?: string;
+  next?: string;
+  step?: number;
+  max?: number;
+}
+
+/** The status bar's Stop button was pressed. */
+export async function onScreenStop(cb: () => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<unknown>("qp://screen-stop", () => cb());
 }
 
 export async function onDownloads(cb: (items: DownloadItem[]) => void): Promise<UnlistenFn> {
