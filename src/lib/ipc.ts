@@ -134,6 +134,7 @@ export interface UpdateInfo {
   version: string;
   current: string;
   notes: string | null;
+  manual?: boolean;
 }
 
 export interface UpdateProgress {
@@ -183,6 +184,9 @@ export const ipc = {
   updateCheck: async () => {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");
     return call<UpdateInfo | null>("update_check");
+  },
+  updateOpenPage: async () => {
+    if (isTauri) await call<void>("update_open_page");
   },
   updateInstall: async (onProgress: (progress: UpdateProgress) => void) => {
     if (!isTauri) throw new Error("Updates are available in the installed Quick Pebble app.");

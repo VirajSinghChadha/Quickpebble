@@ -16,6 +16,18 @@
 - **Slash commands** in Ask mode: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare`, `/tabs`, `/recall`. `/compare` and `/tabs` read up to four open pages at once.
 - Answers now suggest follow-up questions, and the whole conversation can be copied as Markdown with its sources.
 
+## 1.3.0
+
+- **Accounts.** Sign in with an emailed code (beta access code required at sign-up). Your Gemini key is saved encrypted to your account and comes back when you sign in, on any device, and you stay signed in across updates.
+- The macOS keychain is no longer used for API keys, so the "wants to use your confidential information" prompt after updates is gone. Keys saved there before need to be entered once more.
+- Screen mode sets up its own Python environment on first use.
+- Update checks run every 10 minutes and show a card at the top right; if the built-in updater can't connect, a backup check still finds the update.
+
+## 1.2.3
+
+- Update checks run every 10 minutes and show a card at the top right of the window.
+- If the built-in updater cannot connect, a backup check still finds the new version and offers a download link; failures now show the real cause.
+
 ## 1.2.2
 
 - Screen mode's first-time setup now uses its own Python environment with an up-to-date pip, so it finishes in seconds instead of compiling packages for minutes.

@@ -737,6 +737,7 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 }
 
 const SETTING_KEYS: &[&str] = &[
+    "account_session",
     "recall_enabled",
     "screen_precision",
     "home_weather",
