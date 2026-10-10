@@ -186,6 +186,7 @@ def test_drag_destination_must_be_in_the_grid():
         Action(type="drag", cell="A1", to_cell="Z99").check_cell(g)
 
 
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
 def test_open_app_launches_without_a_shell(monkeypatch):
     from qp_agent import executor
     calls = []
@@ -201,6 +202,7 @@ def test_open_app_launches_without_a_shell(monkeypatch):
     assert calls == [(["open", "-a", "Notes"], None)]
 
 
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
 def test_open_app_reports_a_missing_app(monkeypatch):
     from qp_agent import executor
 
