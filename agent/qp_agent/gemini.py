@@ -1,6 +1,6 @@
 """One Gemini call per step. The reply is forced into the schema, then validated; invalid replies are retried."""
-from __future__ import annotations
 
+from __future__ import annotations
 import json
 
 import requests

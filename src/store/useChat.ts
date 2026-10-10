@@ -2,8 +2,9 @@ import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
 import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent";
 import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
-import { answerPrompt, parseAnswer, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
+import { answerPrompt, parseAnswer, sourceFromRecall, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
+import { parseSlash } from "../lib/slash";
 import { rankUpgrades, wantsUpgrade, type ModelChoice } from "../lib/models";
 import { fallbackSite, hostOf, loadSite, parseGenerated, PERMISSION_PROMPT, saveSite, type Scope, type SitePerms } from "../lib/permissions";
 
@@ -15,6 +16,7 @@ export interface ChatItem {
   ok?: boolean;
   sources?: AnswerSource[];
   blocks?: AnswerBlock[];
+  followups?: string[];
 }
 
 interface ChatState {
@@ -25,6 +27,9 @@ interface ChatState {
   approvalMode: Mode;
   sourceTabIds: string[];
   webResearch: boolean;
+  /** Also search the on-device Recall index of pages the person has read. */
+  recall: boolean;
+  setRecall: (value: boolean) => void;
   includeCurrentPage: boolean;
   setIncludeCurrentPage: (value: boolean) => void;
   setWebResearch: (value: boolean) => void;
@@ -185,6 +190,8 @@ export const useChat = create<ChatState>((set, get) => ({
   mode: "ask",
   sourceTabIds: [],
   webResearch: false,
+  recall: false,
+  setRecall: (recall) => set({ recall }),
   includeCurrentPage: true,
   setIncludeCurrentPage: (includeCurrentPage) => set({ includeCurrentPage }),
   setWebResearch: (webResearch) => set({ webResearch }),
@@ -224,25 +231,38 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   send: async (text) => {
-    const goal = text.trim();
+    let goal = text.trim();
     if (!goal || get().busy) return;
+    // Slash commands are Ask-mode shortcuts; in the other modes they are sent as typed.
+    const slash = get().mode === "ask" ? parseSlash(goal) : null;
+    let slashTabs: string[] | null = null;
+    let slashRecall = false;
+    if (slash) {
+      goal = slash.prompt;
+      slashRecall = !!slash.recall;
+      if (slash.allTabs) {
+        slashTabs = useStore.getState().tabs.filter((t) => t.url && !t.suspended && !t.needsLoad).map((t) => t.id).slice(0, 4);
+        if (slashTabs.length < 2) return void add("error", "Open at least two loaded pages to compare them.");
+      }
+    }
     if (!upgradeOffered && wantsUpgrade(goal)) {
       upgradeOffered = true; // ask once per session so it never nags
       await offerUpgrade();
     }
     const prior = history(get().items);
-    add("user", goal);
+    add("user", slash ? text.trim() : goal);
     signal = { aborted: false };
     const runSignal = signal;
     const mode = get().mode;
-    const sourceIds = [...get().sourceTabIds];
+    const sourceIds = slashTabs ?? [...get().sourceTabIds];
     const webResearch = get().webResearch;
+    const recall = get().recall || slashRecall;
     const includeCurrentPage = get().includeCurrentPage;
     set({ busy: true });
     try {
       if (mode === "ask") {
         const tab = selectActive(useStore.getState());
-        const ids = sourceIds.length ? sourceIds : tab.url && includeCurrentPage ? [tab.id] : [];
+        const ids = sourceIds.length ? sourceIds : tab.url && includeCurrentPage && !slashRecall ? [tab.id] : [];
         const results = await Promise.allSettled(ids.map(async (id, index) => {
           const snapshot = await ipc.agentExec<PageSnapshot>(id, "snapshot");
           return sourceFromSnapshot(snapshot, index + 1);
@@ -256,6 +276,15 @@ export const useChat = create<ChatState>((set, get) => ({
             if (source && !sources.some(s => s.url === source.url)) sources.push({ ...source, kind: "search" });
           }
           if (runSignal.aborted) return;
+        }
+        if (recall) {
+          const hits = await ipc.recallSearch(goal, 5).catch(() => []);
+          for (const hit of hits) {
+            const source = sourceFromRecall(hit, Math.max(0, ...sources.map(s => s.id)) + 1);
+            if (source && !sources.some(s => s.url === source.url)) sources.push(source);
+          }
+          if (runSignal.aborted) return;
+          if (!hits.length && !sources.length) throw new Error("Nothing in your browsing memory matches that. Recall only remembers pages read after it was switched on in Settings.");
         }
         if (ids.length && !sources.length) throw new Error("Couldn't read your selected page sources. Reload the pages and try again, or remove them to ask without sources.");
         const reply = await ipc.aiChat(answerPrompt(sources), [...prior.slice(-10), { role: "user", content: goal }], true);

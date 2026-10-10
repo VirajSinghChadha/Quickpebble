@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recall-clear"
+description = "Enables the recall_clear command without any pre-configured scope."
+commands.allow = ["recall_clear"]
+
+[[permission]]
+identifier = "deny-recall-clear"
+description = "Denies the recall_clear command without any pre-configured scope."
+commands.deny = ["recall_clear"]

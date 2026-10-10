@@ -78,6 +78,10 @@ fn main() {
                 "qp_login_seen",
                 "vault_save_pending",
                 "vault_dismiss_pending",
+                "recall_search",
+                "recall_stats",
+                "recall_forget",
+                "recall_clear",
             ]),
         ),
     )

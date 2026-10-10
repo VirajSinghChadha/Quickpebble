@@ -143,3 +143,7 @@ html.dark[data-preset="sunrise"] { --color-primary: #fb923c; --color-bg: #1d130d
 html[data-preset="twilight"] { --color-primary: #4f46e5; --color-bg: #eef2ff; --color-surface: #ffffff; --color-surface-secondary: #e0e7ff; --color-border: #c7d2fe; --color-accent: #06b6d4; --qp-gradient: linear-gradient(135deg,#e0e7ff 0%,#cffafe 100%); }
 html.dark[data-preset="twilight"] { --color-primary: #818cf8; --color-bg: #0f1020; --color-surface: #171a33; --color-surface-secondary: #20254a; --color-border: #323a6b; --color-accent: #22d3ee; --qp-gradient: linear-gradient(135deg,#181a3d 0%,#0b2a35 100%); }
 .newtab { background-image: var(--qp-gradient, radial-gradient(ellipse at 50% 15%, color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 65%)); }
+
+/* Window dragging in the Chromium shell (the old shell used data-tauri-drag-region). */
+[data-tauri-drag-region] { -webkit-app-region: drag; }
+[data-tauri-drag-region] button, [data-tauri-drag-region] input, [data-tauri-drag-region] [role="tab"], [data-tauri-drag-region] a, [data-tauri-drag-region] select { -webkit-app-region: no-drag; }

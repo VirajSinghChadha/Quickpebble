@@ -42,7 +42,7 @@ export function PrivacyCenter() {
           <ShieldCheck size={30} className="text-primary" />
           <div className="flex-1">
             <p className="text-[15px] font-semibold">{stats?.blocked_total ?? 0} trackers blocked this session</p>
-            <p className="text-text-secondary">Known ad and analytics hosts are blocked in page requests and navigation. This is best-effort, not a full ad blocker.</p>
+            <p className="text-text-secondary">Ads and trackers are blocked on every network request with built-in lists plus EasyList and EasyPrivacy style filters, including the ones a page starts loading before any of its scripts run.</p>
           </div>
           <label className="flex cursor-pointer items-center gap-2">
             <input

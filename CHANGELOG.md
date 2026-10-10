@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.0
+
+- **Chromium engine.** The app now runs on Chromium (Electron) instead of the system web view. Pages, including Google, render as in Chrome.
+- **Native ad and tracker blocking** on every request with EasyList/EasyPrivacy-style filter lists, plus the built-in tracker list.
+- **Profiles** with separate logins and cookies (for example one Google account each), and a **proxy** setting.
+- **GhostSearch**: a private, Google-free meta-search engine built into the browser and set as the default. Combines independent sources, strips tracking from links, stores nothing. Change it in Settings → Search engine.
+- **Password manager** and **Chrome extensions** (real Chromium extension runtime) are back, ported to the new engine.
+- Releases now build installers for macOS (Apple silicon and Intel), Windows and Linux.
+- **Screen mode** is back (Python agent; now also works on the Python 3.9 that macOS ships).
+- **In-app updates** for unsigned builds (checksum, bundle id, version and signature checks; one click; relaunches).
+- A website in `site/` (GitHub Pages or Vercel) and screenshots in the README.
+
+- **Recall (opt-in):** an on-device full-text index of pages you read. Search it from Library → Memory, or tick "Search pages I've read" in the assistant to answer from it with citations. Off by default; never saved in private windows or for login, payment and webmail pages; cleared along with history; forget single pages any time.
+- **Slash commands** in Ask mode: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare`, `/tabs`, `/recall`. `/compare` and `/tabs` read up to four open pages at once.
+- Answers now suggest follow-up questions, and the whole conversation can be copied as Markdown with its sources.
+
 ## 1.3.0
 
 - **Accounts.** Sign in with an emailed code (beta access code required at sign-up). Your Gemini key is saved encrypted to your account and comes back when you sign in, on any device, and you stay signed in across updates.

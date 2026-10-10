@@ -208,6 +208,13 @@ pub fn ai_config(db: &Db) -> AiConfig {
 const CHROME_UA: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 
+/// What Safari itself sends. The bare WebKit view omits the "Version/… Safari/…" part, so Google
+/// treats it as an unknown embedded browser and serves its stripped-down page (no live
+/// suggestions); this makes Google, YouTube and Apple see the same browser Safari would be.
+#[cfg(target_os = "macos")]
+const SAFARI_UA: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15";
+
 fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, private: bool) -> Result<Webview, String> {
     let blocked: Vec<String> = url
         .host_str()
@@ -237,7 +244,9 @@ fn build_tab_webview(app: &AppHandle, window: &Window, label: &str, url: Url, pr
         .incognito(private);
     // macOS renders with WebKit, and some sites refuse anything that doesn't say it's Chrome.
     #[cfg(target_os = "macos")]
-    if setting(app, "chrome_ua").as_deref() != Some("false") && !security::skip_ua_spoof(&host) {
+    if security::skip_ua_spoof(&host) {
+        builder = builder.user_agent(SAFARI_UA);
+    } else if setting(app, "chrome_ua").as_deref() != Some("false") {
         builder = builder.user_agent(CHROME_UA);
     }
     // Content scripts of enabled Chrome extensions (not injected into private windows).
@@ -349,6 +358,7 @@ pub fn qp_report(app: AppHandle, webview: Webview, state: State<Browser>, db: St
         t.text = text.chars().take(MAX_TEXT).collect();
         if !t.private {
             let _ = db.record_visit(&t.url, &t.title);
+            crate::recall::remember(&db, &t.url, &t.title, &t.text);
         }
     } else if title_changed && !t.private {
         let _ = db.update_title(&t.url, &t.title);
@@ -728,6 +738,7 @@ pub fn suggest(db: State<Db>, query: String) -> Result<Vec<Suggestion>, String> 
 
 const SETTING_KEYS: &[&str] = &[
     "account_session",
+    "recall_enabled",
     "screen_precision",
     "home_weather",
     "home_weather_place",

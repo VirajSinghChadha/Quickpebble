@@ -1,5 +1,7 @@
 """Second, finer look before a click: crop the area around the chosen cell, zoom in, overlay a 12x12 grid and
 let Gemini name the exact sub-cell. Turns "somewhere in cell M7" into a precise point on the screen."""
+
+from __future__ import annotations
 from PIL import Image
 
 from .grid import Grid, draw_grid

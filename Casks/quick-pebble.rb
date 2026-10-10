@@ -1,9 +1,9 @@
 cask "quick-pebble" do
   arch arm: "aarch64", intel: "x64"
 
-  version "1.2.2"
-  sha256 arm:   "f62ff3c625ae95b05fcf1ec9f009d43c7eb0ccd7d16f95eefc9a5c266fe82387",
-         intel: "666ada8511356ce625f94a9b5870cb83c5b0d3d9dd773173669d65b1bd5fa956"
+  version "1.3.0"
+  sha256 arm:   "4b2aee58b0f250aa7f3d766c1119f0df80d70580314d649cc0df6bf8778e602b",
+         intel: "c9d0b8f6874bd673d3f156f7c657aa40c0b7c17f8a5ac4a12376ae0f19c8da8c"
 
   url "https://github.com/VirajSinghChadha/Quickpebble/releases/download/v#{version}/Quick.Pebble_#{version}_#{arch}.dmg"
   name "Quick Pebble"
@@ -15,8 +15,6 @@ cask "quick-pebble" do
     strategy :github_latest
   end
 
-  # The app updates itself (Settings → Updates), so Homebrew should not fight it.
-  auto_updates true
   depends_on macos: ">= :big_sur"
 
   app "Quick Pebble.app"
@@ -32,6 +30,5 @@ cask "quick-pebble" do
     "~/Library/Application Support/app.quickpebble.browser",
     "~/Library/Caches/app.quickpebble.browser",
     "~/Library/Preferences/app.quickpebble.browser.plist",
-    "~/Library/WebKit/app.quickpebble.browser",
   ]
 end

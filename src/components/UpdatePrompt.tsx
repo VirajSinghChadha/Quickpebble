@@ -1,29 +1,33 @@
-import { Download, X } from "lucide-react";
-import { useState } from "react";
+import { Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ipc } from "../lib/ipc";
 import { useUpdater } from "../store/useUpdater";
+import { Modal } from "./Modal";
 
-/** Small card at the top right when a new version is found; one click installs it and restarts. */
+/** Pops up when a new version is found; one click downloads it and restarts the app. */
 export function UpdatePrompt() {
   const { state, info, percent, error } = useUpdater();
   const [dismissed, setDismissed] = useState<string | null>(null);
+  useEffect(() => { if (state === "error") setDismissed(null); }, [state]);
   if (!info || (state !== "found" && state !== "installing" && state !== "error") || dismissed === info.version) return null;
   const busy = state === "installing";
   return (
-    <div role="alert" className="fixed right-3 top-2 z-50 flex w-80 items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Download size={18} /></span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold">Update {info.version} is ready</p>
-        {busy ? (
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-secondary"><div className="h-full bg-primary transition-all" style={{ width: `${percent ?? 15}%` }} /></div>
-        ) : error ? (
-          <p className="truncate text-[12px] text-red-500" title={error}>Failed. Try again.</p>
-        ) : (
-          <button type="button" onClick={() => void useUpdater.getState().install()} className="mt-0.5 text-[12px] font-medium text-primary hover:underline">
-            {info.manual ? "Download update" : "Update & restart"}
+    <Modal onClose={() => !busy && setDismissed(info.version)} label="Update available" width="max-w-md">
+      <div className="space-y-4 p-6">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Download size={20} /></span>
+          <h2 className="text-[15px] font-semibold">Quick Pebble {info.version} is ready</h2>
+        </div>
+        <p className="text-text-secondary">You&apos;re on {info.current}. It downloads from this project&apos;s GitHub releases, is checked, and replaces the app when you click. Quick Pebble restarts when it&apos;s done. “Later” skips this version until a newer one comes out.</p>
+        {busy && <div className="h-1.5 overflow-hidden rounded-full bg-surface-secondary"><div className="h-full bg-primary transition-all" style={{ width: `${percent ?? 15}%` }} /></div>}
+        {error && <p className="text-red-500">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" disabled={busy} onClick={() => { setDismissed(info.version); void ipc.updateSkip(); }} className="rounded-lg border border-border px-4 py-2 hover:bg-surface-secondary disabled:opacity-50">Later</button>
+          <button type="button" autoFocus disabled={busy} onClick={() => void useUpdater.getState().install()} className="rounded-lg bg-primary px-4 py-2 font-medium text-white disabled:opacity-60 dark:text-bg">
+            {busy ? "Updating…" : "Update now"}
           </button>
-        )}
+        </div>
       </div>
-      {!busy && <button type="button" aria-label="Dismiss" onClick={() => setDismissed(info.version)} className="shrink-0 text-text-secondary hover:text-text"><X size={14} /></button>}
-    </div>
+    </Modal>
   );
 }

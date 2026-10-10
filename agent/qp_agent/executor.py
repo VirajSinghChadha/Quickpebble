@@ -1,6 +1,6 @@
 """Turns a validated Action into real mouse and keyboard events. Needs macOS Accessibility + Screen Recording permission."""
-from __future__ import annotations
 
+from __future__ import annotations
 import base64
 import io
 import subprocess

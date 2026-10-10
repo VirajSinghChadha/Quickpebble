@@ -1,4 +1,5 @@
 export function hostOf(url: string): string {
+  if (url.startsWith("ghost:")) return ""; // GhostSearch's own pages aren't a website with permissions
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
@@ -9,6 +10,7 @@ export function hostOf(url: string): string {
 export function displayUrl(url: string): string {
   try {
     const u = new URL(url);
+    if (u.protocol === "ghost:") return u.searchParams.get("q") ? `GhostSearch · ${u.searchParams.get("q")}` : "GhostSearch";
     const path = u.pathname === "/" ? "" : u.pathname;
     return `${u.hostname.replace(/^www\./, "")}${path}${u.search}`;
   } catch {
@@ -17,6 +19,7 @@ export function displayUrl(url: string): string {
 }
 
 export function faviconFor(url: string): string {
+  if (url.startsWith("ghost:")) return "";
   try {
     return `${new URL(url).origin}/favicon.ico`;
   } catch {
