@@ -21,6 +21,21 @@ and an AI assistant that runs on your own machine.
 
 ---
 
+<p align="center"><img src="docs/screenshots/01-ghostsearch-results.png" alt="Quick Pebble showing GhostSearch results" width="860"></p>
+
+<details open><summary><b>Screenshots</b></summary>
+
+| | |
+|---|---|
+| ![GhostSearch home](docs/screenshots/02-ghostsearch-home.png)<br>**GhostSearch** home | ![Assistant](docs/screenshots/03-assistant-commands.png)<br>**Assistant** with slash commands |
+| ![Recall](docs/screenshots/06-recall-memory.png)<br>**Recall**: search the pages you've read | ![New tab](docs/screenshots/04-newtab.png)<br>**New tab** |
+| ![Settings](docs/screenshots/05-settings.png)<br>**Settings** | ![Profiles](docs/screenshots/07-profiles.png)<br>**Profiles** |
+| ![Privacy Center](docs/screenshots/09-privacy.png)<br>**Privacy Center** | |
+
+Website: <https://virajsinghchadha.github.io/Quickpebble/> (source in [`site/`](site/)). Regenerate the screenshots with `QP_SMOKE_SHOTS=1 npx electron electron/main.mjs && python3 scripts/compose-screenshots.py`.
+
+</details>
+
 ## Chromium edition (this branch)
 
 This branch replaces the system web view with **real Chromium** (via Electron), so pages render exactly as in Chrome: Google looks and behaves like it does in Chrome, Google accounts sign in normally, and PDFs, WebRTC and modern web APIs work. The React UI, AI assistant, Recall, workspaces and privacy features are carried over; the Rust backend is ported to `electron/`.
@@ -38,7 +53,9 @@ npm run dist             # installers in release/ (dmg, nsis, AppImage/deb)
 - **Proxy.** Settings → Profiles & network can route everything through a SOCKS5/HTTP proxy such as Tor (`socks5://127.0.0.1:9050`) or your own VPN's proxy port. Quick Pebble does **not** include a VPN: a real one needs servers someone pays for.
 - **Password manager.** Passwords are encrypted with AES-256-GCM under a key derived from your master password (scrypt, 128 MB), locked after 15 idle minutes, filled only on an exact https host match, and saved only after you agree. Imports CSV exports from Chrome, Firefox, Safari, 1Password, Bitwarden, LastPass and Dashlane.
 - **Chrome extensions** run on Chromium's real extension runtime (content scripts, background workers, `chrome.storage`, `chrome.runtime`, scripting…). Install from a Web Store link or a `.crx`; they start switched off. Toolbar popups and `webRequest` are not provided yet, so ad blockers that depend on them add nothing (the built-in blocker already covers that).
-- **Not ported yet:** Screen mode (the Python agent) and in-app auto-update (macOS can't auto-update unsigned apps; download new versions from Releases or `brew upgrade`). They show clear messages. The Tauri build still lives in `src-tauri/`.
+- **Screen mode** (Gemini operates your mouse and keyboard) runs through the Python agent in `agent/`; on first use it creates a private virtual environment and installs its packages. Needs Python 3.9+, a Gemini key, and macOS Screen Recording + Accessibility permission.
+- **In-app updates** follow the same protocol as the NotchApples app, which works for apps without a paid certificate: it reads this repo's GitHub releases list, keeps only releases that carry an installer for your platform and CPU, and announces a newer one without installing anything. "Update" downloads from github.com, verifies the sha512 from the release's `latest*.yml`, then (macOS) mounts the DMG, checks bundle ID, version and code signature, stages a copy, and a small script swaps it in after quit and relaunches. "Later" skips that version. CI builds are ad-hoc signed so they pass the same check. Covered by an end-to-end test on a real packaged app (`node scripts/test-update-e2e.mjs`). Windows runs the NSIS installer; Linux replaces the AppImage; both are written but only the Mac path has been run.
+- The Tauri build still lives in `src-tauri/` for reference.
 - **Google sign-in** works as in Chrome, but Google account *sync* (bookmarks, passwords across devices) is private to Google's own Chrome and cannot be offered by any other browser.
 - Quick checks: `QP_SMOKE=1 npx electron electron/main.mjs` runs a headless end-to-end test against a local site.
 
@@ -167,11 +184,11 @@ Every update is verified against an Ed25519 public key embedded in the app befor
 ## Privacy and security
 
 - **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to it, and the app tells you so. API keys live in the OS keychain, never in the database.
-- **Tracker blocking** has two layers. Navigations to known ad/analytics hosts are refused natively. Inside pages, a script injected before page code blocks `fetch`, `XMLHttpRequest`, `sendBeacon` and dynamically added `<script>`/`<img>`/`<iframe>` elements for those hosts and hides common ad containers. System webviews expose no request-interception API, so this is **best-effort**: resources the HTML parser loads before the script runs can still get through. It is not uBlock Origin.
+- **Ad and tracker blocking** (Chromium build) runs natively on every network request in the browser process, including ones the HTML parser starts before any page script, using the built-in tracker list plus EasyList/EasyPrivacy-style filter lists (cached, refreshed daily). Navigations to tracker hosts are refused. Per-site exceptions live in the Site panel. It is not a replacement for a full uBlock Origin configuration, but it blocks at the same layer.
 - **HTTPS-only** upgrades `http://` navigations (not localhost, private IPs or `.local`). It first checks the HTTPS site responds; if not, you choose whether to continue over HTTP for that site for the session.
 - **Navigation policy.** Only `http`, `https` and `about:blank` load; `javascript:`, `file:`, `data:` and custom schemes are refused.
 - **Pages get almost no IPC.** A web page can call only three commands (report its own state, forward a shortcut, return an agent result). The calling tab is identified from the webview label, never from the payload. The UI webview has a separate capability.
-- **Site permissions.** "Block" rules override `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run (best-effort, applied on next load). "Ask"/"Allow" use the web engine's own behaviour.
+- **Site permissions.** "Block" rules override `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run "Ask" shows a native prompt with a "remember" option; "Allow"/"Block" are applied by the browser itself.
 - **Private windows** use non-persistent webview storage, record no history, save no tab session, and don't load extensions.
 - **The SQLite database is not encrypted.** It sits in your OS app-data folder, protected by your user account. Use full-disk encryption if you need encryption at rest.
 

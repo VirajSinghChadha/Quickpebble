@@ -71,6 +71,8 @@ export function normalizeInput(input, engine = "ghostsearch") {
   const direct = parseUrl(s);
   if (direct && (direct.protocol === "http:" || direct.protocol === "https:") && direct.hostname) return direct;
   if (s === "about:blank") return new URL(s);
+  // GhostSearch's own pages, e.g. from the address bar, a bookmark or a link: open them, don't search for the text.
+  if (direct && direct.protocol === "ghost:" && (direct.hostname === "home" || direct.hostname === "search")) return direct;
   const looksLikeHost = !/\s/.test(s) && (s.includes(".") || s.startsWith("localhost") || /^\d+\.\d+\.\d+\.\d+/.test(s));
   if (looksLikeHost) {
     const scheme = s.startsWith("localhost") || s.startsWith("127.") ? "http" : "https";

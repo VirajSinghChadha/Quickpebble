@@ -162,7 +162,7 @@ export function SettingsPanel() {
 
         <div className="py-2">
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Updates</h3>
-          <Row label="Check for updates automatically" hint="Contacts GitHub Releases shortly after launch. Updates are signature-checked and never installed without your click.">
+          <Row label="Check for updates automatically" hint="Looks at this project's GitHub Releases shortly after launch and every 15 minutes (an anonymous request, nothing else is sent). New versions are checked for integrity and never installed without your click.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={autoUpdate} onChange={(e) => { setAutoUpdate(e.target.checked); void save("auto_update_check", String(e.target.checked)); }} aria-label="Automatic update checks" />
           </Row>
           <p className="pb-2 text-[12px] text-text-secondary">Install updates here without downloading a new installer. Your saved tabs and settings stay on this device.</p>

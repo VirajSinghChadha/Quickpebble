@@ -13,6 +13,9 @@ describe("security", () => {
     expect(normalizeInput("example.com").href).toBe("https://example.com/");
     expect(normalizeInput("localhost:3000").href).toBe("http://localhost:3000/");
     expect(normalizeInput("   ")).toBeNull();
+    expect(normalizeInput("ghost://search?q=cats+and+dogs").searchParams.get("q")).toBe("cats and dogs");
+    expect(normalizeInput("ghost://home").protocol).toBe("ghost:");
+    expect(normalizeInput("ghost://elsewhere/x", "duckduckgo").href).toMatch(/^https:\/\/duckduckgo\.com\/\?q=/); // unknown ghost pages are just text
     expect(normalizeInput("javascript:alert(1)", "duckduckgo").href).toMatch(/^https:\/\/duckduckgo\.com\/\?q=/);
   });
   it("matches trackers on label boundaries", () => {
