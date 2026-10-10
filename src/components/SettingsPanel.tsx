@@ -7,6 +7,7 @@ import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
+import { StoragePanel } from "./StoragePanel";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -201,6 +202,8 @@ export function SettingsPanel() {
           {proxyMode === "custom" && (
             <div className="pb-2"><input value={proxyServer} onChange={(e) => setProxyServer(e.target.value)} onBlur={() => void save("proxy_server", proxyServer)} placeholder="socks5://127.0.0.1:9050" aria-label="Proxy address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" /></div>
           )}
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Storage</h3>
+          <StoragePanel />
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Recall</h3>
           <Row label="Remember pages I read" hint="Keeps the text of pages you visit on this computer so you can search them and ask the assistant about them. Off by default. Never saved in private windows or for logins, payments and webmail. Cleared with history.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={recallOn} onChange={(e) => { setRecallOn(e.target.checked); void save("recall_enabled", String(e.target.checked)); }} aria-label="Remember pages I read" />

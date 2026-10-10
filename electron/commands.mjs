@@ -10,7 +10,7 @@ import { PERMISSIONS, POLICIES, SEARCH_ENGINES, parseUrl } from "./security.mjs"
 import { stats as blockStats } from "./adblock.mjs";
 import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
 
-const SETTING_KEYS = new Set(["recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url"]);
+const SETTING_KEYS = new Set(["recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -186,6 +186,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     update_skip: () => extras.updater.skip(),
 
     // ---- not yet ported
+    ...(extras.context ?? {}),
     ...(extras.screen ?? { screen_propose: unsupported("Screen control"), screen_act: unsupported("Screen control"), screen_verify: unsupported("Screen control"), screen_overlay: unsupported("Screen control") }),
     extension_list: () => extras.extensions?.list() ?? [],
     extension_install_store: (_w, { input }) => extras.extensions ? extras.extensions.installStore(input) : unsupported("Extensions")(),

@@ -12,6 +12,7 @@ import { Vault } from "./vault.mjs";
 import { Extensions } from "./extensions.mjs";
 import { ScreenAgent } from "./screen.mjs";
 import { StatusBar } from "./overlay.mjs";
+import { ContextStore } from "./context.mjs";
 import { Updater } from "./updater.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
@@ -76,7 +77,7 @@ app.whenReady().then(async () => {
   app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
+  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
   session.defaultSession.setUserAgent(chromeUserAgent());
 
   ipcMain.handle("qp:invoke", async (event, cmd, args) => {
