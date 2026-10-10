@@ -158,3 +158,57 @@ def test_non_ascii_text_is_pasted_on_windows(monkeypatch):
     monkeypatch.setattr(executor.pyautogui, "hotkey", lambda *k: calls.append(("keys", k)))
     executor._paste("héllo 你好")
     assert calls == [("clip", "héllo 你好"), ("keys", ("ctrl", "v"))]
+
+
+def test_open_app_and_drag_shapes():
+    from qp_agent.schema import Action
+    assert Action(type="open_app", app="Notes").app == "Notes"
+    assert Action(type="open_app", app="System Settings").app == "System Settings"
+    for bad in ("../../bin/sh", "Notes; rm -rf /", "a" * 80, "", "$(whoami)"):
+        with pytest.raises(Exception):
+            Action(type="open_app", app=bad)
+    with pytest.raises(Exception):
+        Action(type="open_app")
+    ok = Action(type="drag", cell="B2", to_cell="K9")
+    assert ok.to_cell == "K9"
+    with pytest.raises(Exception):
+        Action(type="drag", cell="B2")
+    with pytest.raises(Exception):
+        Action(type="drag", cell="B2", to_cell="not a cell")
+
+
+def test_drag_destination_must_be_in_the_grid():
+    from qp_agent.schema import Action
+    from qp_agent.grid import Grid
+    g = Grid(cols=26, rows=16)
+    Action(type="drag", cell="A1", to_cell="Z16").check_cell(g)
+    with pytest.raises(ValueError):
+        Action(type="drag", cell="A1", to_cell="Z99").check_cell(g)
+
+
+def test_open_app_launches_without_a_shell(monkeypatch):
+    from qp_agent import executor
+    calls = []
+
+    class Done:
+        returncode = 0
+        stderr = ""
+
+    monkeypatch.setattr(executor.sys, "platform", "darwin")
+    monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: calls.append((args, kw.get("shell"))) or Done())
+    monkeypatch.setattr(executor.time, "sleep", lambda s: None)
+    executor.open_app("Notes")
+    assert calls == [(["open", "-a", "Notes"], None)]
+
+
+def test_open_app_reports_a_missing_app(monkeypatch):
+    from qp_agent import executor
+
+    class Fail:
+        returncode = 1
+        stderr = "Unable to find application"
+
+    monkeypatch.setattr(executor.sys, "platform", "darwin")
+    monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: Fail())
+    with pytest.raises(RuntimeError, match="Is it installed"):
+        executor.open_app("NoSuchApp")

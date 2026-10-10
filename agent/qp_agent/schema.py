@@ -12,8 +12,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .grid import Grid
 
-ActionType = Literal["click", "double_click", "right_click", "type", "key", "scroll", "wait", "ask", "done"]
-POINTER = {"click", "double_click", "right_click", "scroll"}
+ActionType = Literal["click", "double_click", "right_click", "drag", "type", "key", "scroll", "open_app", "wait", "ask", "done"]
+POINTER = {"click", "double_click", "right_click", "scroll", "drag"}
+# Application names: letters, digits, spaces and a few harmless symbols. No path separators or shell characters.
+APP_RE = re.compile(r"^[\w][\w .&+()'-]{0,59}$", re.UNICODE)
 KEY_RE = re.compile(r"^[A-Za-z0-9]$|^(cmd|ctrl|alt|option|shift)(\+(cmd|ctrl|alt|option|shift))*\+[A-Za-z0-9]$"
                     r"|^(enter|return|tab|escape|esc|backspace|delete|space|up|down|left|right)$"
                     r"|^(cmd|ctrl|alt|option|shift)(\+(cmd|ctrl|alt|option|shift))*\+(enter|return|tab|escape|esc|backspace|delete|space|up|down|left|right)$",
@@ -29,7 +31,9 @@ class UserPart(BaseModel):
 class Action(BaseModel):
     """Everything the backend executes. Nothing here is free-form prose."""
     type: ActionType
-    cell: Optional[str] = None               # grid cell label such as "M7"
+    cell: Optional[str] = None               # grid cell label such as "M7" (for drag: where the drag starts)
+    to_cell: Optional[str] = None            # drag only: grid cell where the drag ends
+    app: Optional[str] = None                # open_app only: the application's name, e.g. "Notes"
     fx: float = 0.5                          # position inside the cell, 0 = left edge, 1 = right edge
     fy: float = 0.5                          # position inside the cell, 0 = top edge, 1 = bottom edge
     text: Optional[str] = Field(default=None, max_length=500)
@@ -57,6 +61,10 @@ class Action(BaseModel):
     def _shape(self) -> "Action":
         if self.type in POINTER and not (self.cell and re.fullmatch(r"[A-Z][0-9]{1,2}", self.cell)):
             raise ValueError(f"{self.type} needs a grid cell like 'M7'")
+        if self.type == "drag" and not (self.to_cell and re.fullmatch(r"[A-Z][0-9]{1,2}", self.to_cell)):
+            raise ValueError("drag needs a destination grid cell 'to_cell' like 'M7'")
+        if self.type == "open_app" and not (self.app and APP_RE.match(self.app)):
+            raise ValueError("open_app needs the application's plain name, e.g. 'Notes'")
         if self.type == "type" and not self.text:
             raise ValueError("type needs text")
         if self.type == "key" and not (self.key and KEY_RE.match(self.key)):
@@ -66,8 +74,9 @@ class Action(BaseModel):
         return self
 
     def check_cell(self, grid: Grid) -> None:
-        if self.cell:
-            grid.parse(self.cell)  # raises ValueError if outside the grid
+        for label in (self.cell, self.to_cell):
+            if label:
+                grid.parse(label)  # raises ValueError if outside the grid
 
 
 class AgentResponse(BaseModel):
@@ -89,6 +98,8 @@ GEMINI_SCHEMA = {
             "properties": {
                 "type": {"type": "STRING", "enum": list(ActionType.__args__)},
                 "cell": {"type": "STRING", "nullable": True},
+                "to_cell": {"type": "STRING", "nullable": True},
+                "app": {"type": "STRING", "nullable": True},
                 "fx": {"type": "NUMBER"},
                 "fy": {"type": "NUMBER"},
                 "text": {"type": "STRING", "nullable": True},

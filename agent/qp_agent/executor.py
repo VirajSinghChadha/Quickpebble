@@ -123,9 +123,27 @@ def screen_changed(before: list[int] | None, after: list[int] | None) -> bool | 
     return sum(abs(a - b) for a, b in zip(before, after)) / (len(before) * 255) > 0.004
 
 
+def open_app(name: str) -> None:
+    """Launch (or bring forward) an application by name. The name was validated by the schema; no shell is involved."""
+    if sys.platform == "darwin":
+        result = subprocess.run(["open", "-a", name], capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError(f"Could not open the app \"{name}\". Is it installed?")
+    elif sys.platform == "win32":
+        result = subprocess.run(["powershell", "-NoProfile", "-Command", "Start-Process", "-FilePath", name], capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError(f"Could not open \"{name}\". Is it installed?")
+    else:
+        raise RuntimeError("Opening apps is supported on macOS and Windows.")
+    time.sleep(1.5)   # let the window appear before the next screenshot
+
+
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
-    if action.type in ("click", "double_click", "right_click", "scroll"):
+    if action.type == "open_app":
+        open_app(action.app)
+        return
+    if action.type in ("click", "double_click", "right_click", "scroll", "drag"):
         if action.ax is not None and action.ay is not None:   # exact point found by the zoomed second look
             x, y = min(width - 1, int(action.ax * width)), min(height - 1, int(action.ay * height))
         else:
@@ -138,6 +156,9 @@ def perform(action: Action, grid: Grid) -> None:
             pyautogui.doubleClick()
         elif action.type == "right_click":
             pyautogui.rightClick()
+        elif action.type == "drag":
+            ex, ey = grid.to_screen(action.to_cell, 0.5, 0.5, width, height)
+            pyautogui.dragTo(ex, ey, duration=0.6, button="left")
         else:
             pyautogui.scroll(action.amount * (-1 if action.direction == "down" else 1) * 5)
     elif action.type == "type":
