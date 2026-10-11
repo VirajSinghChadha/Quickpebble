@@ -264,6 +264,13 @@ export const ipc = {
   routineImport: () => call<{ file: string; token?: string; routine?: Omit<import("./routines").Routine, "id">; problems?: string[] } | null>("routine_import"),
   routineImportConfirm: (token: string) => call<number>("routine_import_confirm", { token }),
   routineOpenApp: (app: string) => call<boolean>("routine_open_app", { app }),
+  pricesConfig: () => call<PriceConfig>("prices_config"),
+  pricesSetCountry: (country: string) => call<PriceConfig>("prices_set_country", { country }),
+  pricesShopAdd: (shop: { name: string; search: string }) => call<PriceConfig>("prices_shop_add", { shop }),
+  pricesShopRemove: (name: string) => call<PriceConfig>("prices_shop_remove", { name }),
+  pricesShopsReset: () => call<PriceConfig>("prices_shops_reset"),
+  pricesCheck: (query: string, shops: string[]) => call<{ query: string; rows: PriceRow[]; currency: string; cancelled?: boolean }>("prices_check", { query, shops }),
+  pricesCancel: () => call<void>("prices_cancel"),
   cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
   cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
   cleanInstallers: () => call<TaskView>("clean_installers"),
@@ -360,6 +367,10 @@ export async function onRoutineDue(cb: (e: { id: number }) => void): Promise<Unl
   return listen<{ id: number }>("qp://routine-due", (e) => cb(e.payload));
 }
 
+export async function onPricesProgress(cb: (e: { done: number; total: number; shop: string }) => void): Promise<UnlistenFn> {
+  return listen<{ done: number; total: number; shop: string }>("qp://prices-progress", (e) => cb(e.payload));
+}
+
 export async function onShortcut(cb: (action: string) => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   const label = windowLabel();
@@ -421,6 +432,8 @@ export interface ScreenResponse {
 export interface FileFolder { path: string; files: number; indexed_at: number | null; skipped: number }
 export interface FileHit { path: string; name: string; snippet: string }
 export interface TimelineEvent { at: number; kind: "page" | "task" | "download" | "chat" | "change"; title: string; detail: string; site?: string; count?: number }
+export interface PriceConfig { country: string; currency: string; countries: { code: string; name: string }[]; shops: { name: string; search: string; custom?: boolean }[] }
+export interface PriceRow { shop: string; status: "ok" | "blocked" | "no_results" | "error"; note?: string; checkedAt: number; searchUrl: string; title?: string; price: number | null; currency?: string; inStock?: boolean | null; condition?: string; delivery?: string; url?: string; match?: "same" | "unsure" | "different"; why?: string; priceNote?: string; cheapest?: boolean }
 export interface DiskItem { path: string; size: number; note: string }
 export interface DiskReport { total: number; partial: boolean; scanned: number; folders: { path: string; size: number }[]; groups: { id: string; title: string; count: number; bytes: number; top: DiskItem[] }[] }
 export interface ForgottenApp { name: string; path: string; lastUsed: number | null; size: number | null; leftovers: number; leftoverBytes: number }

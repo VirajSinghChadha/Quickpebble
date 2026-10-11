@@ -44,6 +44,13 @@
 - **"Do this for me" from any app** (Ctrl+Shift+Space on Mac, Ctrl+Alt+Space on Windows): copy text anywhere, press the shortcut, say what to do ("reply politely", "turn these notes into a table"). You see what will be sent; the draft is only copied, or pasted where your cursor is after a separate click. It never sends anything.
 - The assistant now names fields by their visible label (for example "Search term") rather than a hidden form name, so routines and page tasks find the right field.
 
+### Compare prices (command palette → Compare prices). Never buys.
+- "Find the cheapest of this in five shops": checks the search pages of the major shops in your country and puts what they show in one table: price and currency, shop, stock, delivery note if shown, a link, and when it was checked.
+- Shops come from a data file per country (UAE: Sharaf DG, Amazon.ae, Noon, Jumbo, Carrefour, Lulu, Virgin Megastore, Emax; plus Saudi Arabia, UK, US, India, Germany, France, Canada, Australia and Singapore). Pick the country in the panel, and add or remove shops.
+- Read-only by design: each shop is opened in a hidden window with an empty session (no account, no cookies, no cart), pop-ups, downloads and links to other sites are refused, and nothing is clicked.
+- Honest results: a price is only shown if that number is really on the shop's page; otherwise it says it couldn't be read. Shops that ask for a robot check are listed as unreadable. Used, refurbished, accessories and different editions are flagged, and "Cheapest match" only counts new offers that look like the same product.
+- You see what will be sent to the AI (each page's text and the product name) before it runs.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.

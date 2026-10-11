@@ -5,6 +5,7 @@ import { SchoolPanel } from "./components/SchoolPanel";
 import { useSchool } from "./store/useSchool";
 import { onRoutineDue, onStudyReminder } from "./lib/ipc";
 import { RoutinesPanel, TeachingBar } from "./components/RoutinesPanel";
+import { PricesPanel } from "./components/PricesPanel";
 import { useRoutines } from "./store/useRoutines";
 import { ReviewDialog } from "./components/ReviewDialog";
 import { useShortcuts } from "./hooks/useShortcuts";
@@ -123,6 +124,7 @@ export default function App() {
         {overlay === "cleanup" && <CleanupPanel key="cleanup" />}
         {overlay === "school" && <SchoolPanel key="school" />}
         {overlay === "routines" && <RoutinesPanel key="routines" />}
+        {overlay === "prices" && <PricesPanel key="prices" />}
       </AnimatePresence>
       <UpdatePrompt />
       {accountStatus !== "ready" && <AuthGate />}

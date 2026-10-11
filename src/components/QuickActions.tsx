@@ -62,6 +62,7 @@ export function QuickActions() {
       { id: "library", title: "Open History & Bookmarks", hint: `${modKey}Y`, icon: History, run: () => s.setOverlay("library") },
       { id: "recall", title: "Search Pages I've Read (Recall)", icon: Brain, run: () => s.setOverlay("library") },
       { id: "changes", title: "Recent Changes and Undo", icon: History, run: () => s.setOverlay("changes") },
+      { id: "prices", title: "Compare Prices in Local Shops", icon: History, run: () => s.setOverlay("prices") },
       { id: "routines", title: "Routines: Teach, Run, Share", icon: History, run: () => s.setOverlay("routines") },
       { id: "school", title: "School: Study Pack, Timetable, Assignments, Slides, Submit-Checker", icon: History, run: () => s.setOverlay("school") },
       { id: "cleanup", title: "Clean Up Your Mac (disk, apps, tidy-up, speed)", icon: History, run: () => s.setOverlay("cleanup") },
@@ -85,7 +86,7 @@ export function QuickActions() {
   const shown = commands.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase()));
   const run = (c: Cmd | undefined) => {
     if (!c) return;
-    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library", "recall", "profiles", "changes", "cleanup", "school", "routines"].includes(c.id);
+    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library", "recall", "profiles", "changes", "cleanup", "school", "routines", "prices"].includes(c.id);
     if (!keepOpen) close();
     void c.run();
   };

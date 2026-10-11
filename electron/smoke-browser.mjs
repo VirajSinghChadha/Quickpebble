@@ -27,6 +27,10 @@ export async function run({ browser, commands, routines, quickdo }) {
     <body><article><h2>Lose 10 kg in a week</h2><span>Sponsored</span></article><a rel="sponsored" href="https://shop.example/x">Buy now</a>
     <img src="https://www.google-analytics.com/collect?v=1" width="1" height="1"><footer>© 2019 Example Health Media. All rights reserved.</footer></body>`;
   const server = http.createServer((req, res) => { if (req.url === "/slides.pdf") { res.writeHead(200, { "content-type": "application/pdf" }); return res.end(tinyPdf("Lecture 3: Cell respiration makes ATP")); } res.writeHead(200, { "content-type": "text/html" }); if (req.url === "/form") return res.end(`<!doctype html><title>Search form</title><form action="/result"><label>Search term <input name="q"></label> <button>Go</button></form><button>Submit order</button>`);
+    if (req.url.startsWith("/shop?")) return res.end(`<!doctype html><title>Search</title><script type="application/ld+json">{"@type":"ItemList","itemListElement":[{"@type":"ListItem","item":{"@type":"Product","name":"Sony PlayStation 5 Slim Console Disc Edition","url":"${"http://127.0.0.1:" + server.address().port}/p/ps5","offers":{"@type":"Offer","price":"1899.00","priceCurrency":"AED","availability":"https://schema.org/InStock"}}}]}</script>
+      <p id="c">COOKIE:[<script>document.write(document.cookie)</script>]</p><script>document.cookie = "seen=1"; try { window.open("https://evil.example/popup"); } catch (e) {}</script>
+      <ul><li><a href="/p/ps5">Sony PlayStation 5 Slim Console Disc Edition, 1TB, White</a> AED 1,899.00. In stock. Free delivery tomorrow.</li><li><a href="/p/cover">Silicone cover skin for PS5 Slim controller, black</a> AED 49.00</li></ul><a href="https://other.example/away">Elsewhere</a>`);
+    if (req.url.startsWith("/robot?")) return res.end(`<!doctype html><title>Robot check</title>Please verify you are human. Complete the captcha to continue.`);
     if (req.url.startsWith("/result")) return res.end(`<!doctype html><title>Result ${new URL(req.url, "http://x").searchParams.get("q")}</title>Done`);
     res.end(req.url === "/dodgy" ? DODGY : `<!doctype html><title>Page ${req.url}</title><body style="margin:0"><div style="height:6000px">Hello ${req.url}</div></body>`); });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -37,6 +41,7 @@ export async function run({ browser, commands, routines, quickdo }) {
   await waitFor(async () => !!win.active, 10000);
   const id = win.active;
   const tab = () => win.tabs.get(id);
+  tab()?.view?.webContents.setBackgroundThrottling(false);
 
   await commands.tab_navigate(win, { id, input: `${base}/one`, allowHttp: true });
   check("a page loads in the active tab", await waitFor(async () => tab().title === "Page /one"), tab().title);
@@ -123,7 +128,7 @@ export async function run({ browser, commands, routines, quickdo }) {
   const tr = commands.page_trackers(win, { id });
   check("the tracker the page tried to load is listed, and was blocked", tr.some((t) => t.host === "www.google-analytics.com" && t.blocked), JSON.stringify(tr));
   const today = new Date().toLocaleDateString("sv-SE");
-  check("the timeline has the page read today", commands.timeline_day(win, { day: today }).events.some((e) => e.kind === "page" && e.title === "Miracle diet"));
+  check("the timeline has the page read today", await waitFor(async () => commands.timeline_day(win, { day: today }).events.some((e) => e.kind === "page" && e.title === "Miracle diet"), 5000));
   await ui.executeJavaScript(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === "This site's settings")?.click()`);
   await waitFor(async () => ui.executeJavaScript(`!!document.querySelector('section[aria-label="Check this page"] button')`));
   await ui.executeJavaScript(`document.querySelector('section[aria-label="Check this page"] button').click()`);
@@ -148,6 +153,7 @@ export async function run({ browser, commands, routines, quickdo }) {
   const centre = async (sel) => page.executeJavaScript(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
   const clickAt = async (sel) => { const { x, y } = await centre(sel); page.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 }); page.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 }); await sleep(250); };
   await clickAt("input[name=q]");
+  await page.executeJavaScript(`document.querySelector("input[name=q]").focus()`);   // a covered window may not get focus from the click
   await page.insertText("volcano");   // like typing, but doesn't depend on which app macOS has in front
   await sleep(150);
   await clickAt("form button");
@@ -186,6 +192,31 @@ export async function run({ browser, commands, routines, quickdo }) {
   check("its shortcut is registered", (await import("electron")).globalShortcut.isRegistered(process.platform === "darwin" ? "Control+Shift+Space" : "Control+Alt+Space"));
   quickdo.hide();
   clipboard.writeText(clipBefore);
+  // ---- compare prices: a sealed, read-only hidden window, and a real comparison through the local AI (Ollama, if running)
+  const { readShopPage } = await import("./prices.mjs");
+  const winsBefore = (await import("electron")).BrowserWindow.getAllWindows().length;
+  const first = await readShopPage(`${base}/shop?q=ps5`);
+  const second = await readShopPage(`${base}/shop?q=ps5`);
+  check("the shop page is read, including its product data", first.ld.some((p) => p.price === "1899.00" && /Disc Edition/.test(p.name)) && /AED 1,899\.00/.test(first.text), JSON.stringify(first.ld));
+  check("each check starts with no cookies or account", /COOKIE:\[\]/.test(second.text), second.text.slice(0, 60));
+  check("pop-ups and extra windows are refused", (await import("electron")).BrowserWindow.getAllWindows().length === winsBefore);
+  commands.prices_set_country(win, { country: "AE" });
+  commands.prices_shop_add(win, { shop: { name: "Local Shop", search: `${base}/shop?q={q}` } });
+  const cfgP = commands.prices_shop_add(win, { shop: { name: "Robot Shop", search: `${base}/robot?q={q}` } });
+  check("shops can be added for the country", cfgP.country === "AE" && cfgP.currency === "AED" && cfgP.shops.some((s) => s.name === "Local Shop") && cfgP.shops.some((s) => s.name === "Noon"));
+  check("an unsafe shop address is refused", (() => { try { commands.prices_shop_add(win, { shop: { name: "Evil", search: "http://evil.example/?q={q}" } }); return false; } catch { return true; } })());
+  const ollamaUp = await fetch("http://localhost:11434/api/tags").then((r) => r.ok).catch(() => false);
+  if (ollamaUp) {
+    commands.settings_set(win, { key: "ai_provider", value: "ollama" });
+    commands.settings_set(win, { key: "ai_model", value: "llama3" });
+    const res = await commands.prices_check(win, { query: "PS5 Slim disc edition", shops: ["Local Shop", "Robot Shop"] });
+    const local = res.rows.find((r) => r.shop === "Local Shop" && r.price != null);
+    check("a real comparison (local AI) finds the price on the page and marks the cheapest match", !!local && local.price === 1899 && local.currency === "AED" && res.rows[0].shop === "Local Shop", JSON.stringify(res.rows.map((r) => [r.shop, r.title, r.price, r.match, r.status])));
+    check("a shop that shows a robot check is reported as unreadable, not guessed", res.rows.some((r) => r.shop === "Robot Shop" && r.status === "blocked" && r.price == null));
+    check("an accessory is never called the cheapest match", !res.rows.some((r) => r.cheapest && /cover/i.test(r.title ?? "")));
+    commands.settings_set(win, { key: "ai_model", value: "" });
+  } else console.log("SKIP  real price comparison (Ollama isn't running on this computer)");
+  commands.prices_shops_reset(win);
   commands.timeline_clear(win);
   check("clearing the timeline empties the day", commands.timeline_day(win, { day: today }).events.length === 0);
   commands.settings_set(win, { key: "timeline_enabled", value: "0" });

@@ -18,7 +18,7 @@ export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site" | 
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
 export const BOOKMARKS_BAR = 34;
-export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary" | "extensions" | "library" | "https" | "profiles" | "changes" | "cleanup" | "school" | "routines";
+export type Overlay = null | "palette" | "tabsearch" | "privacy" | "settings" | "summary" | "extensions" | "library" | "https" | "profiles" | "changes" | "cleanup" | "school" | "routines" | "prices";
 export type Theme = "light" | "dark" | "system";
 export type Layout = "classic" | "minimal" | "productivity";
 
