@@ -10,7 +10,7 @@ import { parseSlash } from "../lib/slash";
 import { rankUpgrades, wantsUpgrade, type ModelChoice } from "../lib/models";
 import { fallbackSite, hostOf, loadSite, parseGenerated, PERMISSION_PROMPT, saveSite, type Scope, type SitePerms } from "../lib/permissions";
 
-export type ChatKind = "user" | "assistant" | "say" | "step" | "error" | "question";
+export type ChatKind = "user" | "assistant" | "say" | "step" | "error" | "question" | "summary";
 export interface ChatItem {
   id: number;
   kind: ChatKind;
@@ -147,8 +147,8 @@ async function offerUpgrade(): Promise<void> {
 /** Plain conversation turns only (no step logs), for model context. */
 function history(items: ChatItem[]): ChatMsg[] {
   return items
-    .filter((i) => i.kind === "user" || i.kind === "assistant" || i.kind === "question")
-    .map((i) => ({ role: i.kind === "user" ? ("user" as const) : ("assistant" as const), content: i.text }));
+    .filter((i) => i.kind === "user" || i.kind === "assistant" || i.kind === "question" || i.kind === "summary")
+    .map((i) => ({ role: i.kind === "user" ? ("user" as const) : ("assistant" as const), content: i.kind === "summary" ? `(Summary of the earlier part of this conversation: ${i.text})` : i.text }));
 }
 
 /** Screen mode starts a fresh run per message, so earlier turns (including its own questions) go into the goal. */

@@ -22,6 +22,9 @@ import { TabStrip } from "./components/TabStrip";
 import { Toolbar } from "./components/Toolbar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { AuthGate } from "./components/AuthGate";
+import { Tour } from "./components/Tour";
+import { ReportDialog } from "./components/ReportDialog";
+import { useTour } from "./store/useTour";
 import { useAccount } from "./store/useAccount";
 
 export default function App() {
@@ -31,6 +34,8 @@ export default function App() {
   useContentVisibility();
   const accountStatus = useAccount((s) => s.status);
   useEffect(() => { if (!isPrivateWindow()) void useAccount.getState().init(); else useAccount.setState({ status: "ready" }); }, []);
+  // Once signed in (or in a private window), find out whether the first-run tour is due.
+  useEffect(() => { if (accountStatus === "ready") void useTour.getState().init(); }, [accountStatus]);
   // The status bar's Stop button stops the running screen task.
   useEffect(() => {
     let off = () => {};
@@ -100,6 +105,8 @@ export default function App() {
       </AnimatePresence>
       <UpdatePrompt />
       {accountStatus !== "ready" && <AuthGate />}
+      {accountStatus === "ready" && <Tour />}
+      <ReportDialog />
     </div>
     </MotionConfig>
   );

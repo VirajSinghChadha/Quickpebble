@@ -15,6 +15,7 @@ interface AccountState {
   redeem: (code: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   saveKey: (provider: string, key: string) => Promise<void>;
+  sendReport: (report: { message: string; log: string | null; version: string; platform: string }) => Promise<void>;
 }
 
 async function persist(session: Session | null, profile: Profile | null) {
@@ -111,6 +112,17 @@ export const useAccount = create<AccountState>((set, get) => ({
     await persist(null, null);
     for (const provider of PROVIDERS) { try { await ipc.aiSetKey(provider, ""); } catch { /* ignore */ } }
     set({ status: "signed-out", session: null, profile: null });
+  },
+
+  sendReport: async (report) => {
+    let session = get().session;
+    if (!session) throw new Error("Sign in to send a report.");
+    if (session.expires_at - 60 < Date.now() / 1000) {
+      session = await account.refresh(session.refresh_token);
+      await persist(session, get().profile);
+      set({ session });
+    }
+    await account.call(session, "report", report);
   },
 
   saveKey: async (provider, key) => {

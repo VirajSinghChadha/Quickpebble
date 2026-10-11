@@ -23,10 +23,11 @@ Deno.serve(async (req) => {
   const action = String(body.action ?? "");
 
   if (action === "overview") {
-    const [{ data: codes }, { data: profiles }, { data: keys }] = await Promise.all([
+    const [{ data: codes }, { data: profiles }, { data: keys }, { data: reports }] = await Promise.all([
       admin.from("access_codes").select("*").order("created_at", { ascending: false }),
       admin.from("profiles").select("*").order("created_at", { ascending: false }),
       admin.from("user_keys").select("id,user_id,provider,last4,updated_at"),
+      admin.from("reports").select("id,email,message,log,app_version,platform,created_at").order("created_at", { ascending: false }).limit(100),
     ]);
     const signIns = new Map<string, string | null>();
     for (let page = 1; page <= 20; page++) {
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
       code_label: codeById.get(p.code_id)?.label ?? null,
       keys: (keys ?? []).filter((k) => k.user_id === p.user_id).map((k) => ({ id: k.id, provider: k.provider, last4: k.last4 })),
     }));
-    return json({ codes, users });
+    return json({ codes, users, reports: reports ?? [] });
   }
   if (action === "create_code") {
     const label = String(body.label ?? "").slice(0, 80);
@@ -65,6 +66,10 @@ Deno.serve(async (req) => {
   }
   if (action === "delete_key") {
     await admin.from("user_keys").delete().eq("id", Number(body.id));
+    return json({ ok: true });
+  }
+  if (action === "delete_report") {
+    await admin.from("reports").delete().eq("id", Number(body.id));
     return json({ ok: true });
   }
   if (action === "delete_user") {

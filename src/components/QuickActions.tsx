@@ -1,3 +1,5 @@
+import { useTour } from "../store/useTour";
+import { useReport } from "../store/useReport";
 import { useMemo, useState } from "react";
 import { UserRound, BookOpen, Bot, Brain, Bookmark, Download, EyeOff, FileText, HeartPulse, History, Layers, Moon, Palette, Plus, Puzzle, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { ipc } from "../lib/ipc";
@@ -65,6 +67,8 @@ export function QuickActions() {
       { id: "bar", title: "Toggle Bookmarks Bar", hint: `${modKey}⇧B`, icon: Bookmark, run: () => s.toggleBookmarksBar() },
       { id: "update", title: "Check for Updates", icon: Download, run: () => s.setOverlay("settings") },
       { id: "privacy", title: "Open Privacy Center", icon: ShieldCheck, run: () => s.setOverlay("privacy") },
+      { id: "report", title: "Report a Problem", icon: HeartPulse, run: () => useReport.getState().show() },
+      { id: "tour", title: "Take the Quick Pebble Tour", icon: Sparkles, run: () => useTour.getState().show() },
       { id: "settings", title: "Open Settings", icon: Settings, run: () => s.setOverlay("settings") },
       { id: "ai", title: "Toggle AI Address Suggestions", icon: Brain, run: () => s.setAiAutocomplete(!useStore.getState().aiAutocomplete) },
     ],

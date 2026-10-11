@@ -14,6 +14,7 @@ import { ScreenAgent } from "./screen.mjs";
 import { StatusBar } from "./overlay.mjs";
 import { ContextStore } from "./context.mjs";
 import { initUsage } from "./usage.mjs";
+import { installDiagnostics } from "./diagnostics.mjs";
 import { Updater } from "./updater.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
@@ -60,6 +61,8 @@ function senderWindow(event) {
   return w;
 }
 
+installDiagnostics();
+
 app.whenReady().then(async () => {
   db = new Db(path.join(app.getPath("userData"), "pebble.db"));
   initUsage(db);
@@ -89,7 +92,8 @@ app.whenReady().then(async () => {
     // Only the browser's own UI may call commands; web pages use the separate allow-listed channel below.
     const win = browser.uiByContents.get(event.sender.id);
     if (!win) throw new Error("not permitted");
-    return fn(win, args ?? {});
+    try { return await fn(win, args ?? {}); }
+    catch (e) { console.warn(`[${cmd}] ${e?.message ?? e}`); throw e; }   // recorded (redacted) so a problem report can include it
   });
   ipcMain.handle("qp:page", (event, cmd, args) => browser.pageCommand(event.sender.id, cmd, args));
   ipcMain.on("qp:page-script", (event) => { event.returnValue = browser.pageScript(event.sender.id); });

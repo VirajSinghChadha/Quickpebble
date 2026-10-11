@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Bookmark, Clock, Command, Cpu, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bookmark, Clock, Command, Cpu, FolderKanban, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { ipc, type Bookmark as Bm, type HistoryEntry, type MemoryStats } from "../lib/ipc";
 import { useOllama } from "../hooks/useOllama";
 import { useElementHeight } from "../hooks/useElementHeight";
 import { planHome } from "../lib/homeLayout";
 import { displayUrl, hostOf } from "../lib/url";
 import { modKey } from "../lib/actions";
+import { projectBrief } from "../lib/context";
+import { useChat } from "../store/useChat";
 import { selectActive, useStore } from "../store/useStore";
 import { Favicon } from "./Favicon";
 import { HomeCustomize } from "./home/HomeCustomize";
@@ -33,6 +35,28 @@ function SearchHint() {
   return (
     <button type="button" onClick={() => useStore.getState().focusAddress()} className="mx-auto flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] text-text-secondary shadow-pebble transition-transform duration-150 hover:-translate-y-0.5">
       <Search size={14} /> Type in the address bar to search or go anywhere
+    </button>
+  );
+}
+
+/** "Science fair · 3 chats · last worked Tuesday": one tap goes back to the project and its latest chat. */
+function ProjectBrief() {
+  const projects = useChat((s) => s.projects);
+  const chats = useChat((s) => s.chats);
+  const projectId = useChat((s) => s.projectId);
+  const p = projects.find((x) => x.id === projectId) ?? projects[0];
+  if (!p) return null;
+  const go = async () => {
+    await useChat.getState().setProject(p.id);
+    useStore.getState().setSidebar("assistant");
+    const last = chats.filter((c) => c.project_id === p.id).sort((a, b) => b.last_used - a.last_used)[0];
+    if (last) await useChat.getState().openChat(last.id, true);
+  };
+  return (
+    <button type="button" onClick={() => void go()} className="home-card mx-auto w-full max-w-3xl py-3" aria-label={`Continue project: ${projectBrief(p)}`}>
+      <span className="home-card-icon"><FolderKanban size={18} /></span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{projectBrief(p)}</span>
+      <span className="flex items-center gap-1 text-[12px] text-primary">Continue <ArrowUpRight size={14} /></span>
     </button>
   );
 }
@@ -74,7 +98,8 @@ function Classic({ height }: { height: number }) {
   const home = useStore((s) => s.home);
   const bookmarksVersion = useStore((s) => s.bookmarksVersion);
   useEffect(() => { let active = true; void ipc.bookmarkList().then((b) => { if (active) setMarks(b.slice(0, 6)); }); return () => { active = false; }; }, [bookmarksVersion]);
-  const plan = planHome(height, home);
+  const hasProject = useChat((s) => s.projects.length > 0);
+  const plan = planHome(height, { ...home, brief: hasProject });
   return (
     <div data-plan-height={height} className={`newtab-content mx-auto flex min-h-full max-w-4xl flex-col justify-center px-8 ${plan.compact ? "gap-3 py-3" : "gap-5 py-5"}`}>
       <div className="flex items-center justify-between text-xs text-text-secondary"><span className="flex items-center gap-2 font-medium"><Logo size={24} /> QUICK PEBBLE</span><span>{new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span></div>
@@ -86,6 +111,7 @@ function Classic({ height }: { height: number }) {
       <SearchHint />
       {plan.tiles && <Tiles items={marks.length ? marks.map((b) => ({ name: b.title || hostOf(b.url), url: b.url })) : QUICK_LINKS} />}
       {plan.widgets && <Widgets count={plan.newsCount} />}
+      {plan.brief && <ProjectBrief />}
       {plan.cards && (
         <div className="newtab-actions grid gap-3 sm:grid-cols-3">
           <button type="button" className="home-card" onClick={() => useStore.getState().setSidebar("assistant")}><span className="home-card-icon"><Sparkles size={19} /></span><span className="min-w-0 flex-1"><strong className="block text-[13px] font-medium">Ask Pebble</strong><span className="mt-1 block text-xs text-text-secondary">Answers with page sources</span></span><ArrowUpRight size={15} className="text-text-secondary" /></button>
@@ -172,6 +198,7 @@ export function NewTabPage() {
   const layout = useStore((s) => s.layout);
   const [ref, height] = useElementHeight<HTMLElement>();
   useEffect(() => void useStore.getState().loadHome(), []);
+  useEffect(() => void useChat.getState().refreshContext(), []);
   return (
     <div className="relative h-full">
       <main ref={ref} className="newtab h-full overflow-y-auto bg-bg" aria-label="New tab">

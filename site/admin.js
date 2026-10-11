@@ -34,7 +34,27 @@ async function act(fn) {
   catch (e) { $("status").textContent = e.message; $("status").className = "tag err"; }
 }
 
-function render({ codes, users }) {
+function renderReports(reports) {
+  const rb = $("reports");
+  rb.replaceChildren();
+  if (!reports.length) rb.append(el("tr", {}, el("td", { colSpan: 5, textContent: "No reports yet." })));
+  for (const r of reports) {
+    const text = el("td", {}, el("div", { textContent: r.message, style: "white-space:pre-wrap;max-width:420px" }));
+    if (r.log) {
+      const d = el("details", {}, el("summary", { textContent: "Attached log" }), el("pre", { textContent: r.log, className: "mono", style: "white-space:pre-wrap;max-height:240px;overflow:auto;font-size:12px" }));
+      text.append(d);
+    }
+    rb.append(el("tr", {},
+      el("td", { textContent: when(r.created_at) }),
+      el("td", { textContent: r.email }),
+      el("td", { textContent: `${r.app_version} ${r.platform}`.trim() }),
+      text,
+      el("td", {}, button("Delete", "danger", () => confirm("Delete this report?") && act(() => call("delete_report", { id: r.id }))))));
+  }
+}
+
+function render({ codes, users, reports }) {
+  renderReports(reports || []);
   const cb = $("codes");
   cb.replaceChildren();
   for (const c of codes) {
