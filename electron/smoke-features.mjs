@@ -1,6 +1,6 @@
 // QP_SMOKE_FEATURES=1: checks the assistant features inside the real app: status bar window, project memory, single-search home page,
 // project picker and Storage settings. Prints PASS/FAIL lines and exits non-zero if anything fails.
-import { app, screen as display } from "electron";
+import { app, globalShortcut, screen as display } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { getSecret } from "./secrets.mjs";
@@ -64,6 +64,12 @@ export async function run({ browser, commands, statusBar }) {
   check("shortcut tiles are round", await js(`[...document.querySelectorAll('.quick-tiles span')].some(e => getComputedStyle(e).borderRadius.includes('9999') || parseFloat(getComputedStyle(e).borderRadius) >= 28)`));
   await js(`[...document.querySelectorAll('button')].find(b => /assistant/i.test(b.getAttribute('aria-label') || b.title || ''))?.click()`);
   await sleep(1200);
+  check("global shortcut for the assistant is registered", globalShortcut.isRegistered("CommandOrControl+Shift+Space"));
+  await js(`document.querySelector('button[aria-label="Close side panel"]')?.click()`);
+  await sleep(500);
+  browser.emitUi(win, "qp://assistant", {});
+  await sleep(900);
+  check("the shortcut opens the assistant with the cursor in its box", await js(`!!document.querySelector('aside textarea') && document.activeElement === document.querySelector('aside textarea')`));
   check("assistant shows the project picker", await js(`!!document.querySelector('select[aria-label^="Project the assistant"]')`));
   check("assistant shows new chat and past chats buttons", await js(`!!document.querySelector('button[aria-label="New chat"]') && !!document.querySelector('button[aria-label="Past chats"]')`));
   check("saved project appears in the picker", await js(`[...document.querySelectorAll('select[aria-label^="Project the assistant"] option')].some(o => o.textContent === 'Smoke project')`));
