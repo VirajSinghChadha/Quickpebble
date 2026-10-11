@@ -1,5 +1,5 @@
 // Quick Pebble (Chromium edition): Electron main process.
-import { app, ipcMain, Menu, session, dialog } from "electron";
+import { app, ipcMain, Menu, session, dialog, globalShortcut } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -95,6 +95,19 @@ app.whenReady().then(async () => {
   setupMenu();
   browser.openWindow({ label: "main" });
   updater.start();
+  // Talk to the assistant from any app: bring the browser forward with the assistant open and the cursor in its box.
+  const HOTKEY = "CommandOrControl+Shift+Space";
+  try {
+    globalShortcut.register(HOTKEY, () => {
+      const w = browser.windows.get("main") ?? [...browser.windows.values()][0];
+      if (!w) return;
+      if (w.win.isMinimized()) w.win.restore();
+      w.win.show();
+      w.win.focus();
+      browser.emitUi(w, "qp://assistant", {});
+    });
+  } catch { /* another app owns the shortcut; the assistant is still one click away */ }
+  app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
   const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");

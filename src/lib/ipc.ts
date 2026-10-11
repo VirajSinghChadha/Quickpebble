@@ -373,6 +373,12 @@ export interface ScreenStatus {
   max?: number;
 }
 
+/** The global shortcut (⌘⇧Space) asked for the assistant. */
+export async function onAssistantHotkey(cb: () => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<unknown>("qp://assistant", () => cb());
+}
+
 /** The status bar's Stop button was pressed. */
 export async function onScreenStop(cb: () => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};

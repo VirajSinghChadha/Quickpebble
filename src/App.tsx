@@ -3,7 +3,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
 import { useEffect } from "react";
-import { ipc, isPrivateWindow, onDownloads, onLoginSeen, onScreenStop } from "./lib/ipc";
+import { ipc, isPrivateWindow, onDownloads, onAssistantHotkey, onLoginSeen, onScreenStop } from "./lib/ipc";
 import { useChat } from "./store/useChat";
 import { BASE_CHROME, BOOKMARKS_BAR, selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
@@ -35,6 +35,16 @@ export default function App() {
   useEffect(() => {
     let off = () => {};
     void onScreenStop(() => useChat.getState().stop()).then((u) => (off = u));
+    return () => off();
+  }, []);
+  // ⌘⇧Space from any app opens the assistant with the cursor in its message box.
+  useEffect(() => {
+    let off = () => {};
+    void onAssistantHotkey(() => {
+      useStore.getState().setOverlay(null);
+      useStore.getState().setSidebar("assistant");
+      setTimeout(() => document.querySelector<HTMLTextAreaElement>("aside textarea")?.focus(), 120);
+    }).then((u) => (off = u));
     return () => off();
   }, []);
   // Keep the downloads list live, and open the panel's badge when something starts.
