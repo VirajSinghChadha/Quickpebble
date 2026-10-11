@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.0
+
+- **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.
+- **Preview the plan** before a computer task starts, and a daily **AI usage meter**.
+- **Project memory.** A project brief on the home page, squash old chats into short summaries instead of deleting them, and a guided clean-up that lists what will be changed and asks you to confirm.
+- **First-run tour** and a **Report a problem** button that attaches a log only if you tick it.
+- **Task manager**, sleeping tabs, and **crash recovery** that restores your tabs and scroll positions.
+- **Import from Chrome and Safari:** history, bookmarks, open tabs and Chrome extensions (Safari needs Full Disk Access).
+- **Tab hover previews** and **link hover previews** (titles are an opt-in setting).
+- **AI tab search** ("find the tab where I read about volcanoes") and sorting tabs into groups the AI can name.
+- Optional **download sorting** into folders with undo, and suggested names for unclear files.
+- **Wallpapers** that match the ten colour themes.
+- Defaults: Google search in English, and Gemini as the AI with a pictured guide for getting a key. **Cmd+L now opens the assistant**; the address bar is Cmd+Shift+L.
+
 ## 2.0.0
 
 - **Chromium engine.** The app now runs on Chromium (Electron) instead of the system web view. Pages, including Google, render as in Chrome.
