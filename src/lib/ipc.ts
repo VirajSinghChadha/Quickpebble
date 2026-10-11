@@ -222,6 +222,20 @@ export const ipc = {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
   },
+  ctxProjects: () => call<Project[]>("ctx_projects", undefined, []),
+  ctxProjectSave: (project: { id?: number; name: string; notes: string }) => call<number>("ctx_project_save", { project }),
+  ctxProjectDelete: (id: number) => call<boolean>("ctx_project_delete", { id }),
+  ctxProjectTouch: (id: number) => call<void>("ctx_project_touch", { id }),
+  ctxChats: () => call<ChatSummary[]>("ctx_chats", undefined, []),
+  ctxChatNew: (title: string, projectId: number | null) => call<number>("ctx_chat_new", { title, projectId }),
+  ctxChatLoad: (id: number) => call<{ id: number; title: string; project_id: number | null; items: { kind: string; text: string }[] }>("ctx_chat_load", { id }),
+  ctxChatAppend: (id: number, items: { kind: string; text: string }[]) => call<void>("ctx_chat_append", { id, items }),
+  ctxChatProject: (id: number, projectId: number | null) => call<void>("ctx_chat_project", { id, projectId }),
+  ctxUsage: () => call<ContextUsage>("ctx_usage", undefined, { chats: 0, messages: 0, projects: 0, bytes: 0 }),
+  ctxStale: (days: number) => call<StaleReport>("ctx_stale", { days }, { days, chats: [], projects: [] }),
+  ctxClear: (chatIds: number[], projectIds: number[]) => call<{ chats: number; projects: number }>("ctx_clear", { chatIds, projectIds }),
+  /** Updates the status bar at the bottom of the screen (no-op outside the app). */
+  screenOverlay: (state: ScreenStatus) => call<boolean>("screen_overlay", { state }, false),
   weatherSearch: (query: string) => call<Place[]>("weather_search", { query }),
   weatherFetch: (lat: number, lon: number, fahrenheit: boolean) => call<Weather>("weather_fetch", { lat, lon, fahrenheit }),
   newsFetch: (source: string, count = 5) => call<Headline[]>("news_fetch", { source, count }),
@@ -291,8 +305,13 @@ export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<Unlisten
 
 /** Backend half of the agent's reply: executed exactly as given. `cell` is a grid label such as "M7". */
 export interface ScreenAction {
-  type: "click" | "double_click" | "right_click" | "type" | "key" | "scroll" | "wait" | "ask" | "done";
+  type: "click" | "double_click" | "right_click" | "drag" | "type" | "key" | "scroll" | "open_app" | "wait" | "ask" | "done";
   cell?: string;
+  to_cell?: string;
+  /** Where to act, as [y, x] integers 0..1000 across the screen (y first). */
+  point?: number[];
+  to_point?: number[];
+  app?: string;
   fx?: number;
   fy?: number;
   text?: string;
@@ -341,6 +360,32 @@ export interface DownloadItem {
   finished: number | null;
   size: number | null;
   can_open: boolean;
+}
+
+export interface Project { id: number; name: string; notes: string; created: number; last_used: number; bytes: number }
+export interface ChatSummary { id: number; title: string; project_id: number | null; created: number; last_used: number; messages: number; bytes: number }
+export interface StaleRow { id: number; title: string; last_used: number; bytes: number; messages?: number }
+export interface StaleReport { days: number; chats: StaleRow[]; projects: StaleRow[] }
+export interface ContextUsage { chats: number; messages: number; projects: number; bytes: number }
+
+export interface ScreenStatus {
+  phase: "looking" | "thinking" | "acting" | "waiting" | "done" | "error" | "idle";
+  thinking?: string;
+  next?: string;
+  step?: number;
+  max?: number;
+}
+
+/** The global shortcut (⌘⇧Space) asked for the assistant. */
+export async function onAssistantHotkey(cb: () => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<unknown>("qp://assistant", () => cb());
+}
+
+/** The status bar's Stop button was pressed. */
+export async function onScreenStop(cb: () => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<unknown>("qp://screen-stop", () => cb());
 }
 
 export async function onDownloads(cb: (items: DownloadItem[]) => void): Promise<UnlistenFn> {

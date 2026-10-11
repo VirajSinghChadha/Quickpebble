@@ -10,8 +10,15 @@ FINE = Grid(cols=12, rows=12)
 MIN_CROP_WIDTH = 960
 
 
-def crop_around(raw: Image.Image, grid: Grid, cell: str, pad: int = 1) -> tuple[Image.Image, tuple[float, float, float, float]]:
+def _dense(grid: Grid) -> float:
+    """The zoom steps were tuned for ~55 px cells. A denser grid has smaller cells, so distances counted in cells scale up
+    to keep covering the same real area (the first look can be a cell or two off)."""
+    return 1.6 if grid.cols > 30 else 1.0
+
+
+def crop_around(raw: Image.Image, grid: Grid, cell: str, pad: int | None = None) -> tuple[Image.Image, tuple[float, float, float, float]]:
     """The cell plus `pad` cells on every side, upscaled. Returns the image and its bounds as screen fractions."""
+    pad = pad if pad is not None else (3 if _dense(grid) > 1 else 1)
     col, row = grid.parse(cell)
     c0, c1 = max(0, col - pad), min(grid.cols, col + pad + 1)
     r0, r1 = max(0, row - pad), min(grid.rows, row + pad + 1)
@@ -43,8 +50,9 @@ SPAN_CELLS = 1.2          # stage-2 crop is about one coarse cell wide (roughly 
 MAX_JUMP_CELLS = 0.6      # a correction bigger than this is treated as a mistake and ignored
 
 
-def crop_square_around(raw: Image.Image, grid: Grid, ax: float, ay: float, span_cells: float = SPAN_CELLS) -> tuple[Image.Image, tuple[float, float, float, float]]:
+def crop_square_around(raw: Image.Image, grid: Grid, ax: float, ay: float, span_cells: float | None = None) -> tuple[Image.Image, tuple[float, float, float, float]]:
     """A crop about `span_cells` coarse cells wide, centred on a screen point (kept inside the screen), upscaled."""
+    span_cells = span_cells if span_cells is not None else SPAN_CELLS * _dense(grid)
     w_frac, h_frac = span_cells / grid.cols, span_cells / grid.rows
     x0 = min(max(ax - w_frac / 2, 0.0), 1 - w_frac)
     y0 = min(max(ay - h_frac / 2, 0.0), 1 - h_frac)
@@ -84,4 +92,32 @@ def to_screen(grid_: Grid, fine_cell: str, fx: float, fy: float, bounds: tuple[f
 
 def accept_correction(p1: tuple[float, float], p2: tuple[float, float], grid: Grid) -> bool:
     """Stage 2 may nudge the point, but never leap far from where stage 1 put it."""
-    return abs(p2[0] - p1[0]) * grid.cols <= MAX_JUMP_CELLS and abs(p2[1] - p1[1]) * grid.rows <= MAX_JUMP_CELLS
+    limit = MAX_JUMP_CELLS * _dense(grid)
+    return abs(p2[0] - p1[0]) * grid.cols <= limit and abs(p2[1] - p1[1]) * grid.rows <= limit
+
+
+# ---- pointing mode: one zoomed look around the model's own point --------------------------------------------
+
+ZOOM_W, ZOOM_H = 0.28, 0.28   # a crop about 400 x 250 px at the usual screenshot size, centred on the first point
+ZOOM_MAX_JUMP = 0.042         # the zoomed look may nudge the point by up to ~60 px; a bigger "correction" is ignored
+
+
+def zoom_crop(raw: Image.Image, ax: float, ay: float) -> tuple[Image.Image, tuple[float, float, float, float]]:
+    """A crop around a screen point (kept inside the screen), upscaled 3x so small buttons are easy to place. Bounds as screen fractions."""
+    x0 = min(max(ax - ZOOM_W / 2, 0.0), 1 - ZOOM_W)
+    y0 = min(max(ay - ZOOM_H / 2, 0.0), 1 - ZOOM_H)
+    bounds = (x0, y0, x0 + ZOOM_W, y0 + ZOOM_H)
+    w, h = raw.size
+    crop = raw.crop((round(bounds[0] * w), round(bounds[1] * h), round(bounds[2] * w), round(bounds[3] * h)))
+    scale = max(1.0, 1200 / max(1, crop.width))
+    return crop.resize((max(1, round(crop.width * scale)), max(1, round(crop.height * scale))), Image.LANCZOS), bounds
+
+
+def zoom_to_screen(yx: tuple[float, float], bounds: tuple[float, float, float, float]) -> tuple[float, float]:
+    """(y, x) fractions inside the crop -> (x, y) fractions of the whole screen."""
+    x0, y0, x1, y1 = bounds
+    return x0 + yx[1] * (x1 - x0), y0 + yx[0] * (y1 - y0)
+
+
+def accept_zoom(first: tuple[float, float], second: tuple[float, float]) -> bool:
+    return abs(second[0] - first[0]) <= ZOOM_MAX_JUMP and abs(second[1] - first[1]) <= ZOOM_MAX_JUMP * 1.6

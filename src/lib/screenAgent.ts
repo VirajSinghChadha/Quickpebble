@@ -4,7 +4,7 @@
  *   action → the exact instruction for the backend
  * Routine actions run automatically ("smart" mode); only risky ones, or every step in "ask" mode, wait for the person.
  */
-import type { ScreenAction, ScreenResponse } from "./ipc";
+import type { ScreenAction, ScreenResponse, ScreenStatus } from "./ipc";
 import { categoryLabel, isAllowed, type SitePerms } from "./permissions";
 
 export const MAX_SCREEN_STEPS = 40;
@@ -41,16 +41,20 @@ export interface ScreenIO {
   setMode(m: ScreenMode): void;
   sleep(ms: number): Promise<void>;
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
+  /** Live progress for the on-screen status bar: what the agent sees, thinks and will do next. */
+  onStatus?(s: ScreenStatus): void;
 }
 
 export function describeScreenAction(a: ScreenAction): string {
-  const at = a.cell ? ` in cell ${a.cell}` : "";
+  const at = a.point ? ` at ${Math.round(a.point[1] / 10)}% across, ${Math.round(a.point[0] / 10)}% down` : a.cell ? ` in cell ${a.cell}` : "";
   switch (a.type) {
     case "click": return `Click${at}`;
     case "double_click": return `Double-click${at}`;
     case "right_click": return `Right-click${at}`;
     case "type": return `Type “${(a.text ?? "").slice(0, 80)}”`;
     case "key": return `Press ${a.key}`;
+    case "drag": return a.point && a.to_point ? `Drag from ${Math.round(a.point[1] / 10)}%,${Math.round(a.point[0] / 10)}% to ${Math.round(a.to_point[1] / 10)}%,${Math.round(a.to_point[0] / 10)}%` : `Drag from ${a.cell ?? "here"} to ${a.to_cell ?? "there"}`;
+    case "open_app": return `Open ${a.app ?? "the app"}`;
     case "scroll": return `Scroll ${a.direction ?? "down"}${at}`;
     case "wait": return "Wait for the screen to update";
     default: return a.type;
@@ -84,41 +88,46 @@ export function isRisky(res: ScreenResponse, site: SitePerms): boolean {
 }
 
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
+  // Every way of failing also tells the status bar, so it never stays on screen showing a stale "working" state.
+  const fail = (text: string) => { io.onStatus?.({ phase: text === "Stopped." ? "idle" : "error", thinking: text }); io.onEvent({ kind: "error", text }); };
   let lastKey = "";
   let repeats = 0;
   let failures = 0;
   let verifyFails = 0;
   let unchanged = 0;
   for (let n = 0; n < maxSteps; n++) {
-    if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+    if (signal.aborted) return fail("Stopped.");
     await io.prepare?.().catch(() => {});
+    const status = (s: ScreenStatus) => io.onStatus?.({ step: n + 1, max: maxSteps, ...s });
+    status({ phase: "looking" });
     let res: ScreenResponse | undefined;
     for (let attempt = 1; attempt <= PROPOSE_ATTEMPTS && !res; attempt++) {
       try {
         res = await io.propose(goal, history.slice(-12));
       } catch (e) {
-        if (attempt === PROPOSE_ATTEMPTS || !TRANSIENT.test(String(e))) return io.onEvent({ kind: "error", text: String(e) });
+        if (attempt === PROPOSE_ATTEMPTS || !TRANSIENT.test(String(e))) return fail(String(e));
         io.onEvent({ kind: "say", text: `Temporary problem, retrying (${attempt}/${PROPOSE_ATTEMPTS - 1})…` });
         await io.sleep(1500 * attempt);
-        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+        if (signal.aborted) return fail("Stopped.");
       }
     }
     if (!res) return;
-    if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+    if (signal.aborted) return fail("Stopped.");
     const { user, action } = res;
     if (user.thinking) io.onEvent({ kind: "say", text: user.thinking });
-    if (action.type === "done") return io.onEvent({ kind: "final", text: user.message || "Done." });
-    if (action.type === "ask") return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" });
+    if (action.type === "done") { status({ phase: "done", thinking: user.message || "Done." }); return io.onEvent({ kind: "final", text: user.message || "Done." }); }
+    if (action.type === "ask") { status({ phase: "waiting", thinking: user.message, next: "Waiting for your answer" }); return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" }); }
+    status({ phase: "thinking", thinking: user.thinking, next: `${describeScreenAction(action)}${user.message ? `: ${user.message}` : ""}` });
 
     // Same action again and again usually means it isn't working. Nudge the model to change approach instead
     // of quitting; only give up after many identical attempts. Waiting is allowed to repeat for longer.
-    const key = JSON.stringify([action.type, action.cell, action.fx, action.fy, action.text, action.key]);
+    const key = JSON.stringify([action.type, action.cell, action.point, action.fx, action.fy, action.text, action.key]);
     repeats = key === lastKey ? repeats + 1 : 0;
     lastKey = key;
     const limit = action.type === "wait" ? MAX_WAITS_IN_A_ROW : HARD_STOP_REPEATS;
-    if (repeats >= limit) return io.onEvent({ kind: "error", text: "I tried the same thing several times without progress, so I stopped. Try rephrasing the task." });
+    if (repeats >= limit) return fail("I tried the same thing several times without progress, so I stopped. Try rephrasing the task.");
     if (repeats >= NUDGE_AFTER_REPEATS && action.type !== "wait") {
-      history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different cell, an offset inside the cell, a keyboard key, or scrolling)`);
+      history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different spot on the target, a keyboard key, or scrolling)`);
     }
 
     const desc = describeScreenAction(action);
@@ -129,7 +138,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       io.onEvent({ kind: "say", text: action.type === "type" ? "Double-checking the answer before I enter it…" : "Double-checking before I submit…" });
       try {
         const v = await io.verify(goal, history.slice(-12), desc);
-        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+        if (signal.aborted) return fail("Stopped.");
         if (v.ok) {
           verifyFails = 0;
           io.onEvent({ kind: "step", text: "Double-check passed", ok: true });
@@ -154,9 +163,11 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     if (risky || doubtful || io.mode() === "ask") {
       const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(site, cat)}] ` : "";
       const warn = doubtful ? `⚠ Double-check is not confident: ${doubtful}. ` : "";
+      status({ phase: "waiting", thinking: user.thinking, next: `Waiting for your OK: ${desc}` });
       const choice = await io.choose(`${warn}${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky || !!doubtful);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
+        io.onStatus?.({ phase: "idle" });
         return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });
       }
       if (choice === "skip") {
@@ -166,6 +177,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       }
       if (choice === "auto") io.setMode("auto");
     }
+    status({ phase: "acting", thinking: user.thinking, next: desc });
     try {
       const result = await io.act(action);
       failures = 0;
@@ -177,13 +189,13 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
           ? `${history.length + 1}. ${desc} (WARNING: the screen did not change after this click. The target was probably missed or is covered${unchanged >= 2 ? ", or the window may be hidden or minimized" : ""}. Try a different position or offset, or scroll it into view.)`
           : `${history.length + 1}. ${desc}`,
       );
-      if (action.type !== "wait") await io.sleep(500);
+      if (action.type !== "wait") await io.sleep(250);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
-      if (++failures >= MAX_ACTION_FAILURES) return io.onEvent({ kind: "error", text: String(e) });
+      if (++failures >= MAX_ACTION_FAILURES) return fail(String(e));
       history.push(`${history.length + 1}. (failed: ${desc} — ${String(e).slice(0, 120)}) — try something else`);
       await io.sleep(800);
     }
   }
-  io.onEvent({ kind: "error", text: `Stopped after ${maxSteps} steps. Say “continue” to keep going.` });
+  fail(`Stopped after ${maxSteps} steps. Say “continue” to keep going.`);
 }

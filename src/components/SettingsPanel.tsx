@@ -7,6 +7,7 @@ import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
+import { StoragePanel } from "./StoragePanel";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -39,10 +40,10 @@ export function SettingsPanel() {
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [engine, setEngine] = useState("ghostsearch");
   const [searxUrl, setSearxUrl] = useState("");
-  const [blockLevel, setBlockLevel] = useState("standard");
+  const [blockLevel, setBlockLevel] = useState("high");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
-  const [precision, setPrecision] = useState("high");
+  const [precision, setPrecision] = useState("standard");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -201,6 +202,8 @@ export function SettingsPanel() {
           {proxyMode === "custom" && (
             <div className="pb-2"><input value={proxyServer} onChange={(e) => setProxyServer(e.target.value)} onBlur={() => void save("proxy_server", proxyServer)} placeholder="socks5://127.0.0.1:9050" aria-label="Proxy address" className="h-9 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary" /></div>
           )}
+          <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Storage</h3>
+          <StoragePanel />
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Recall</h3>
           <Row label="Remember pages I read" hint="Keeps the text of pages you visit on this computer so you can search them and ask the assistant about them. Off by default. Never saved in private windows or for logins, payments and webmail. Cleared with history.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={recallOn} onChange={(e) => { setRecallOn(e.target.checked); void save("recall_enabled", String(e.target.checked)); }} aria-label="Remember pages I read" />
@@ -227,9 +230,9 @@ export function SettingsPanel() {
           <Row label="Model" hint={status?.models.length ? `Installed: ${status.models.slice(0, 4).join(", ")}` : undefined}>
             <input className={`${selectCls} w-44`} value={model} placeholder={provider === "ollama" ? "llama3" : "default"} onChange={(e) => setModel(e.target.value)} onBlur={() => void save("ai_model", model)} aria-label="Model" />
           </Row>
-          <Row label="Screen control precision" hint="High adds a second, much tighter zoom with a crosshair before each click. It clicks the exact center far more reliably but takes one extra AI call (a second or two) per click.">
+          <Row label="Screen control precision" hint="Accurate: the AI points at the target, then takes one zoomed second look before each click (about 9 in 10 land within a few pixels). Fast: one look only, about 2 seconds quicker per click.">
             <select className={selectCls} value={precision} onChange={(e) => { setPrecision(e.target.value); void save("screen_precision", e.target.value); }} aria-label="Screen control precision">
-              <option value="high">High (most precise)</option><option value="standard">Standard (faster)</option>
+              <option value="high">Accurate (zoom on clicks)</option><option value="standard">Fast (one look)</option>
             </select>
           </Row>
           {provider === "ollama" ? (

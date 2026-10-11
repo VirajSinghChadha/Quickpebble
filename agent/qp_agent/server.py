@@ -72,6 +72,20 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass   # keep whatever position was found so far
 
+    def _zoom(self, resp, raw, key: str, model: str) -> None:
+        """High precision in pointing mode: one zoomed look around the model's own point; small nudges only."""
+        try:
+            first = (resp.action.ax, resp.action.ay)
+            crop, bounds = refine.zoom_crop(raw, *first)
+            yx = gemini.locate(key, model, f"{resp.action.type.replace('_', ' ')}: {resp.user.message}", executor.jpeg_b64(crop, 86))
+            if not yx:
+                return
+            second = refine.zoom_to_screen(yx, bounds)
+            if refine.accept_zoom(first, second):
+                resp.action.ax, resp.action.ay = second
+        except Exception:
+            pass   # keep the first point
+
     def do_GET(self):
         if not self._authorised():
             return self._send(403, {"error": "forbidden"})
@@ -98,7 +112,11 @@ class Handler(BaseHTTPRequestHandler):
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
                 page_text = str(body.get("page_text") or "")[:6000] or None
                 resp = gemini.propose(key, model, GRID, goal, history, shot, cats, page_text)
-                if resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_REFINE", "1") != "0":
+                if resp.action.point:   # the model pointed straight at the target: that is the position (exact, not a cell)
+                    resp.action.ax, resp.action.ay = resp.action.point[1] / 1000, resp.action.point[0] / 1000
+                    if resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_PRECISION", "high") == "high":
+                        self._zoom(resp, raw, key, model)
+                elif resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_REFINE", "1") != "0":
                     self._refine(resp, raw, key, model)
                 self._send(200, resp.model_dump(exclude_none=True))
             elif self.path == "/verify":

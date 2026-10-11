@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
 import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent";
-import { ipc, type ChatMsg, type PageSnapshot } from "../lib/ipc";
+import { ipc, isPrivateWindow, type ChatMsg, type ChatSummary, type PageSnapshot, type Project } from "../lib/ipc";
+import { chatTitle, projectContext } from "../lib/context";
 import { answerPrompt, parseAnswer, sourceFromRecall, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
 import { parseSlash } from "../lib/slash";
@@ -45,6 +46,16 @@ interface ChatState {
   modelOffer: { current: string; models: ModelChoice[]; resolve: (model: string | null) => void } | null;
   editPermissions: () => Promise<void>;
   approval: { description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
+  /** Saved chat this conversation is stored in (null until the first message), the active project, and the lists for the pickers. */
+  chatId: number | null;
+  projectId: number | null;
+  projects: Project[];
+  chats: ChatSummary[];
+  initContext: () => Promise<void>;
+  refreshContext: () => Promise<void>;
+  openChat: (id: number, quiet?: boolean) => Promise<void>;
+  newChat: () => void;
+  setProject: (id: number | null) => Promise<void>;
   setMode: (m: "ask" | "act" | "screen") => void;
   setApprovalMode: (m: Mode) => void;
   send: (text: string) => Promise<void>;
@@ -136,11 +147,12 @@ function history(items: ChatItem[]): ChatMsg[] {
 }
 
 /** Screen mode starts a fresh run per message, so earlier turns (including its own questions) go into the goal. */
-function screenGoal(prior: ChatMsg[], latest: string): string {
-  if (!prior.length) return latest;
+function screenGoal(prior: ChatMsg[], latest: string, context = ""): string {
+  const withContext = (body: string) => (context ? `${context}\n\n${body.length > 3800 - context.length ? body.slice(-(3800 - context.length)) : body}` : body);
+  if (!prior.length) return withContext(latest);
   const lines = prior.slice(-8).map((m) => `${m.role === "user" ? "Person" : "You"}: ${m.content.slice(0, 400)}`).join("\n");
   const goal = `Conversation so far:\n${lines}\n\nLatest message from the person: ${latest}\n\nContinue the task using everything above. Do not ask again for anything the person already told you.`;
-  return goal.length > 3800 ? goal.slice(-3800) : goal;
+  return context ? withContext(goal) : goal.length > 3800 ? goal.slice(-3800) : goal;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -184,14 +196,86 @@ function makeIO(): AgentIO {
   };
 }
 
+/** Only these are worth keeping between sessions; steps and thinking are bulky and not needed to continue a conversation. */
+const KEPT: ChatKind[] = ["user", "assistant", "question", "error"];
+let lastPersistedId = 0;
+let persisting: Promise<void> = Promise.resolve();
+function persistNew(): void {
+  if (isPrivateWindow()) return;
+  const fresh = useChat.getState().items.filter((i) => i.id > lastPersistedId);
+  if (!fresh.length) return;
+  lastPersistedId = fresh[fresh.length - 1].id;
+  const keep = fresh.filter((i) => KEPT.includes(i.kind) && i.text.trim());
+  if (!keep.length) return;
+  persisting = persisting.then(async () => {
+    let id = useChat.getState().chatId;
+    if (!id) {
+      id = await ipc.ctxChatNew(chatTitle(keep.find((i) => i.kind === "user")?.text ?? ""), useChat.getState().projectId);
+      if (!id) return; // not running inside the app
+      useChat.setState({ chatId: id });
+      void ipc.settingsSet("active_chat", String(id)).catch(() => {});
+    }
+    await ipc.ctxChatAppend(id, keep.map((i) => ({ kind: i.kind, text: i.text })));
+  }).catch(() => {});
+}
+
+function activeContext(): string {
+  const { projects, projectId } = useChat.getState();
+  return projectContext(projects.find((p) => p.id === projectId));
+}
+
 export const useChat = create<ChatState>((set, get) => ({
   items: [],
+  chatId: null,
+  projectId: null,
+  projects: [],
+  chats: [],
   busy: false,
   mode: "ask",
   sourceTabIds: [],
   webResearch: false,
   recall: false,
   setRecall: (recall) => set({ recall }),
+  refreshContext: async () => {
+    const [projects, chats] = await Promise.all([ipc.ctxProjects().catch(() => []), ipc.ctxChats().catch(() => [])]);
+    set((s) => ({ projects, chats, projectId: projects.some((p) => p.id === s.projectId) ? s.projectId : null }));
+  },
+  initContext: async () => {
+    if (isPrivateWindow()) return;
+    const settings = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+    set({ projectId: Number(settings.active_project) || null });
+    await get().refreshContext();
+    const chatId = Number(settings.active_chat) || 0;
+    if (chatId && get().chats.some((c) => c.id === chatId) && get().items.length === 0) await get().openChat(chatId, true);
+  },
+  openChat: async (id, quiet) => {
+    if (get().busy) return;
+    try {
+      const chat = await ipc.ctxChatLoad(id);
+      const items = chat.items.map((i) => ({ id: nextId++, kind: i.kind as ChatKind, text: i.text }));
+      lastPersistedId = nextId - 1; // already stored: don't write them again
+      screenHistory.length = 0;
+      set({ items, chatId: chat.id, ...(chat.project_id && get().projects.some((p) => p.id === chat.project_id) ? { projectId: chat.project_id } : {}) });
+      void ipc.settingsSet("active_chat", String(chat.id)).catch(() => {});
+    } catch (e) {
+      if (!quiet) add("error", String(e));
+    }
+  },
+  newChat: () => {
+    if (get().busy) return;
+    screenHistory.length = 0;
+    sessionPerms.clear();
+    lastPersistedId = nextId - 1;
+    set({ items: [], chatId: null });
+    void ipc.settingsSet("active_chat", "").catch(() => {});
+  },
+  setProject: async (id) => {
+    set({ projectId: id });
+    void ipc.settingsSet("active_project", id ? String(id) : "").catch(() => {});
+    if (id) void ipc.ctxProjectTouch(id).catch(() => {});
+    const chatId = get().chatId;
+    if (chatId) void ipc.ctxChatProject(chatId, id).catch(() => {});
+  },
   includeCurrentPage: true,
   setIncludeCurrentPage: (includeCurrentPage) => set({ includeCurrentPage }),
   setWebResearch: (webResearch) => set({ webResearch }),
@@ -220,7 +304,9 @@ export const useChat = create<ChatState>((set, get) => ({
     screenHistory.length = 0;
     sessionPerms.clear();
     upgradeOffered = false;
-    set({ items: [] });
+    lastPersistedId = nextId - 1;
+    set({ items: [], chatId: null });
+    void ipc.settingsSet("active_chat", "").catch(() => {});
   },
 
   stop: () => {
@@ -287,7 +373,8 @@ export const useChat = create<ChatState>((set, get) => ({
           if (!hits.length && !sources.length) throw new Error("Nothing in your browsing memory matches that. Recall only remembers pages read after it was switched on in Settings.");
         }
         if (ids.length && !sources.length) throw new Error("Couldn't read your selected page sources. Reload the pages and try again, or remove them to ask without sources.");
-        const reply = await ipc.aiChat(answerPrompt(sources), [...prior.slice(-10), { role: "user", content: goal }], true);
+        const ctx = activeContext();
+        const reply = await ipc.aiChat(ctx ? `${answerPrompt(sources)}\n\n${ctx}` : answerPrompt(sources), [...prior.slice(-10), { role: "user", content: goal }], true);
         if (runSignal.aborted) return;
         const answer = parseAnswer(reply, sources);
         set(s => ({ items: [...s.items, { id: nextId++, kind: "assistant", ...answer }] }));
@@ -307,7 +394,7 @@ export const useChat = create<ChatState>((set, get) => ({
         activePerms = perms;
         if (runSignal.aborted) return;
         const io = makeIO();
-        await runScreenAgent(screenGoal(prior, goal), {
+        await runScreenAgent(screenGoal(prior, goal, activeContext()), {
           propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText()),
           verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),
           act: ipc.screenAct,
@@ -319,16 +406,21 @@ export const useChat = create<ChatState>((set, get) => ({
           setMode: (m) => set({ screenApprovalMode: m }),
           sleep,
           onEvent: io.onEvent,
+          onStatus: (st) => void ipc.screenOverlay(st).catch(() => {}),
         }, runSignal, undefined, screenHistory);
       } else {
-        await runAgent(goal, prior, makeIO(), { mode: get().approvalMode, signal });
+        const ctx = activeContext();
+        await runAgent(ctx ? `${ctx}\n\nTask: ${goal}` : goal, prior, makeIO(), { mode: get().approvalMode, signal });
       }
     } catch (e) {
       if (!runSignal.aborted) add("error", String(e));
     } finally {
       get().approval?.resolve("stop");
+      void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
     get().permissionRequest?.resolve(null);
       set({ busy: false });
     }
   },
 }));
+
+useChat.subscribe(persistNew);

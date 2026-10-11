@@ -27,20 +27,13 @@ function greeting(): string {
   return h < 5 ? "Burning the midnight oil" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
 
-function SearchBox({ big }: { big?: boolean }) {
-  const tab = useStore(selectActive);
-  const [q, setQ] = useState("");
+/** The address bar is the one search box. A new tab puts the cursor there; this is just a gentle pointer to it. */
+function SearchHint() {
+  useEffect(() => { useStore.getState().focusAddress(); }, []);
   return (
-    <form
-      className={`mx-auto flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-4 shadow-pebble transition-shadow duration-150 focus-within:border-primary ${big ? "h-14 max-w-2xl" : "h-12 max-w-xl"}`}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (q.trim()) void useStore.getState().navigate(tab.id, q);
-      }}
-    >
-      <Search size={18} className="text-text-secondary" />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or enter a website" aria-label="Search the web" className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-text-secondary" />
-    </form>
+    <button type="button" onClick={() => useStore.getState().focusAddress()} className="mx-auto flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] text-text-secondary shadow-pebble transition-transform duration-150 hover:-translate-y-0.5">
+      <Search size={14} /> Type in the address bar to search or go anywhere
+    </button>
   );
 }
 
@@ -57,9 +50,9 @@ function Tiles({ items }: { items: { name: string; url: string }[] }) {
           key={l.url}
           type="button"
           onClick={() => void useStore.getState().navigate(tab.id, l.url)}
-          className="group flex flex-col items-center gap-2 rounded-2xl p-3 transition-colors duration-150 hover:bg-surface"
+          className="group flex flex-col items-center gap-2 rounded-3xl p-3 transition-colors duration-150 hover:bg-surface"
         >
-          <span className="grid size-12 place-items-center rounded-xl bg-surface shadow-pebble transition-transform duration-150 group-hover:-translate-y-0.5">
+          <span className="grid size-14 place-items-center rounded-full bg-surface shadow-pebble transition-transform duration-150 group-hover:-translate-y-0.5">
             <Favicon src={`${new URL(l.url).origin}/favicon.ico`} url={l.url} size={22} />
           </span>
           <span className="max-w-full truncate text-[12px] text-text-secondary">{l.name}</span>
@@ -90,7 +83,7 @@ function Classic({ height }: { height: number }) {
         <h1 className={`${plan.compact ? "text-[26px]" : "mt-3 text-[clamp(30px,3.6vw,44px)]"} font-semibold leading-tight tracking-[-0.045em]`}>A clearer view of the web.</h1>
         {!plan.compact && <p className="mt-2 text-sm text-text-secondary">Less noise. More room for what matters.</p>}
       </div>
-      <SearchBox big />
+      <SearchHint />
       {plan.tiles && <Tiles items={marks.length ? marks.map((b) => ({ name: b.title || hostOf(b.url), url: b.url })) : QUICK_LINKS} />}
       {plan.widgets && <Widgets count={plan.newsCount} />}
       {plan.cards && (
@@ -110,7 +103,7 @@ function Minimal({ height }: { height: number }) {
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center gap-6 px-6 py-4">
       <Logo size={48} />
-      <SearchBox big />
+      <SearchHint />
       {plan.widgets && <div className="w-full"><Widgets count={Math.min(plan.newsCount, 3)} stack /></div>}
       <p className="text-[12px] text-text-secondary">Press {modKey}⇧P for quick actions</p>
     </div>
@@ -131,7 +124,7 @@ function Productivity({ height }: { height: number }) {
     void ipc.memoryStats().then(setMem);
   }, []);
   const open = (u: string) => void useStore.getState().navigate(tab.id, u);
-  const card = "rounded-2xl border border-border bg-surface p-4";
+  const card = "rounded-3xl border border-border bg-surface p-4";
   const widgets = home.weather || home.news;
   // Rows per list: whatever fits under the header, search box and (when shown) the weather and news row.
   const rows = Math.max(2, Math.min(8, Math.floor((height - 250 - (widgets ? 190 : 0)) / 34)));
@@ -156,7 +149,7 @@ function Productivity({ height }: { height: number }) {
         <div><p className="text-text-secondary">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p><h1 className="text-2xl font-semibold tracking-tight">{greeting()}</h1></div>
         <Logo size={40} />
       </div>
-      <SearchBox />
+      <SearchHint />
       <div className="grid gap-4 md:grid-cols-2">
         {home.weather && <WeatherCard />}
         {home.news && <NewsCard count={Math.max(1, Math.min(4, Math.floor((height - 300) / 160)))} />}

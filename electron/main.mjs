@@ -1,5 +1,5 @@
 // Quick Pebble (Chromium edition): Electron main process.
-import { app, ipcMain, Menu, session, dialog } from "electron";
+import { app, ipcMain, Menu, session, dialog, globalShortcut } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,12 +11,14 @@ import { Filters } from "./filters.mjs";
 import { Vault } from "./vault.mjs";
 import { Extensions } from "./extensions.mjs";
 import { ScreenAgent } from "./screen.mjs";
+import { StatusBar } from "./overlay.mjs";
+import { ContextStore } from "./context.mjs";
 import { Updater } from "./updater.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1" || process.env.QP_SMOKE_FEATURES === "1" || process.env.QP_SMOKE_AGENT === "1";
 
 app.setName("Quick Pebble");
 registerGhostScheme();
@@ -70,11 +72,12 @@ app.whenReady().then(async () => {
   const filtersReady = filters.start().catch(() => {});
   extensions = new Extensions(() => [...browser.sessions].filter((x) => x.storagePath));
   updater = new Updater(db, (channel, payload) => { for (const w of browser.windows.values()) browser.emitUi(w, channel, payload); });
-  screen = new ScreenAgent(db);
-  app.on("will-quit", () => screen.stop());
+  const statusBar = new StatusBar(() => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://screen-stop", {}); });
+  screen = new ScreenAgent(db, statusBar);
+  app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
+  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
   session.defaultSession.setUserAgent(chromeUserAgent());
 
   ipcMain.handle("qp:invoke", async (event, cmd, args) => {
@@ -92,10 +95,23 @@ app.whenReady().then(async () => {
   setupMenu();
   browser.openWindow({ label: "main" });
   updater.start();
+  // Talk to the assistant from any app: bring the browser forward with the assistant open and the cursor in its box.
+  const HOTKEY = "CommandOrControl+Shift+Space";
+  try {
+    globalShortcut.register(HOTKEY, () => {
+      const w = browser.windows.get("main") ?? [...browser.windows.values()][0];
+      if (!w) return;
+      if (w.win.isMinimized()) w.win.restore();
+      w.win.show();
+      w.win.focus();
+      browser.emitUi(w, "qp://assistant", {});
+    });
+  } catch { /* another app owns the shortcut; the assistant is still one click away */ }
+  app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
-  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE: "smoke" };
+  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
-  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
+  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });

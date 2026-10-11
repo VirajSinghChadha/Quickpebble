@@ -1,3 +1,4 @@
+import { ContextBar } from "./ContextBar";
 import { useEffect, useRef, useState } from "react";
 import { Answer } from "./Answer";
 import { Bot, Check, CircleAlert, ClipboardCopy, MousePointerClick, Send, Square, Trash2, X } from "lucide-react";
@@ -78,6 +79,7 @@ export function ChatPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <ContextBar />
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <div className="flex rounded-lg bg-surface-secondary p-0.5" role="tablist" aria-label="Assistant mode">
           {(["act", "ask", "screen"] as const).map((m) => (
