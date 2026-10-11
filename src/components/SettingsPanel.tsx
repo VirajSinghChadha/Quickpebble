@@ -33,7 +33,7 @@ const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 
 export function SettingsPanel() {
   const account = useAccount();
-  const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
+  const { theme, presetLight, presetDark, setPreset, layout, aiAutocomplete, wallpaper, setWallpaper, setTheme, setLayout, setAiAutocomplete, bookmarksBar, toggleBookmarksBar } = useStore();
   const [httpsOnly, setHttpsOnly] = useState(true);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [recallOn, setRecallOn] = useState(false);
@@ -127,6 +127,9 @@ export function SettingsPanel() {
                 <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetDark === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("dark", p.id)} />
               ))}
             </div>
+          </Row>
+          <Row label="Wallpaper" hint="A quiet pattern on the new tab page that matches your color theme.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={wallpaper} onChange={(e) => setWallpaper(e.target.checked)} aria-label="Wallpaper" />
           </Row>
           <Row label="New tab layout">
             <select className={selectCls} value={layout} onChange={(e) => setLayout(e.target.value as Layout)} aria-label="New tab layout">

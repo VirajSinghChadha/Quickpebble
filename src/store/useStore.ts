@@ -80,6 +80,8 @@ interface State {
   setPreset: (mode: "light" | "dark", p: string) => void;
   layout: Layout;
   aiAutocomplete: boolean;
+  wallpaper: boolean;
+  setWallpaper: (v: boolean) => void;
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
@@ -176,6 +178,8 @@ export const useStore = create<State>((set, get) => ({
   },
   layout: (safeGet("qp.layout") as Layout) || "classic",
   aiAutocomplete: safeGet("qp.aiAutocomplete") === "1",
+  wallpaper: safeGet("qp.wallpaper") !== "0",
+  setWallpaper: (v) => { safeSet("qp.wallpaper", v ? "1" : "0"); set({ wallpaper: v }); },
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
