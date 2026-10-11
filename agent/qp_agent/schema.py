@@ -6,7 +6,7 @@
 }
 """
 import re
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -33,6 +33,8 @@ class Action(BaseModel):
     type: ActionType
     cell: Optional[str] = None               # grid cell label such as "M7" (for drag: where the drag starts)
     to_cell: Optional[str] = None            # drag only: grid cell where the drag ends
+    point: Optional[List[int]] = None        # [y, x] of the target, each 0..1000 across the screenshot (y first, like Gemini's own pointing)
+    to_point: Optional[List[int]] = None     # drag only: where the drag ends, same format
     app: Optional[str] = None                # open_app only: the application's name, e.g. "Notes"
     fx: float = 0.5                          # position inside the cell, 0 = left edge, 1 = right edge
     fy: float = 0.5                          # position inside the cell, 0 = top edge, 1 = bottom edge
@@ -52,6 +54,15 @@ class Action(BaseModel):
             raise ValueError("must be a number")
         return min(1.0, max(0.0, v))
 
+    @field_validator("point", "to_point", mode="before")
+    @classmethod
+    def _point(cls, v):
+        if v is None:
+            return None
+        if not isinstance(v, (list, tuple)) or len(v) != 2 or any(isinstance(n, bool) or not isinstance(n, (int, float)) or n != n for n in v):
+            raise ValueError("a point is [y, x], two numbers from 0 to 1000")
+        return [min(1000, max(0, int(round(n)))) for n in v]
+
     @field_validator("amount")
     @classmethod
     def _amount(cls, v: int) -> int:
@@ -59,10 +70,10 @@ class Action(BaseModel):
 
     @model_validator(mode="after")
     def _shape(self) -> "Action":
-        if self.type in POINTER and not (self.cell and re.fullmatch(r"[A-Z][0-9]{1,2}", self.cell)):
-            raise ValueError(f"{self.type} needs a grid cell like 'M7'")
-        if self.type == "drag" and not (self.to_cell and re.fullmatch(r"[A-Z][0-9]{1,2}", self.to_cell)):
-            raise ValueError("drag needs a destination grid cell 'to_cell' like 'M7'")
+        if self.type in POINTER and not (self.point or (self.cell and re.fullmatch(r"[A-Z]{1,2}[0-9]{1,2}", self.cell))):
+            raise ValueError(f"{self.type} needs a 'point' [y, x] (or a grid cell like 'M7')")
+        if self.type == "drag" and not (self.to_point or (self.to_cell and re.fullmatch(r"[A-Z]{1,2}[0-9]{1,2}", self.to_cell))):
+            raise ValueError("drag needs a destination 'to_point' [y, x] (or a 'to_cell' like 'M7')")
         if self.type == "open_app" and not (self.app and APP_RE.match(self.app)):
             raise ValueError("open_app needs the application's plain name, e.g. 'Notes'")
         if self.type == "type" and not self.text:
@@ -99,6 +110,8 @@ GEMINI_SCHEMA = {
                 "type": {"type": "STRING", "enum": list(ActionType.__args__)},
                 "cell": {"type": "STRING", "nullable": True},
                 "to_cell": {"type": "STRING", "nullable": True},
+                "point": {"type": "ARRAY", "items": {"type": "INTEGER"}, "nullable": True},
+                "to_point": {"type": "ARRAY", "items": {"type": "INTEGER"}, "nullable": True},
                 "app": {"type": "STRING", "nullable": True},
                 "fx": {"type": "NUMBER"},
                 "fy": {"type": "NUMBER"},

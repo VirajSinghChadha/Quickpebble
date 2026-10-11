@@ -242,7 +242,7 @@ def test_unsafe_or_malformed_model_replies_are_rejected(bad):
 def test_the_prompt_teaches_the_new_actions_and_the_risk_rules():
     from qp_agent.prompt import system_prompt
     p = system_prompt(G)
-    for needle in ("open_app", "drag", "to_cell", "Terminal or PowerShell", "whole computer"):
+    for needle in ("open_app", "drag", "to_point", "[y, x]", "Terminal or PowerShell", "whole computer"):
         assert needle in p, needle
 
 
@@ -269,3 +269,113 @@ def test_key_actions_go_through_press_keys(monkeypatch):
     monkeypatch.setattr(executor, "press_keys", lambda keys: seen.append(keys))
     executor.perform(Action(type="key", key="cmd+shift+s"), Grid(cols=26, rows=16))
     assert seen == [["command", "shift", "s"]]
+
+
+def test_default_grid_is_dense_with_two_letter_columns():
+    from qp_agent.grid import Grid, col_index, col_name
+    g = Grid()
+    assert (g.cols, g.rows) == (40, 25)
+    assert [col_name(c) for c in (0, 25, 26, 27, 39)] == ["A", "Z", "AA", "AB", "AN"]
+    assert all(col_index(col_name(c)) == c for c in range(60))
+    assert g.parse("AN25") == (39, 24) and g.parse("A1") == (0, 0)
+    assert g.label(26, 0) == "AA1"
+    for outside in ("AO1", "A26", "ZZ1", "AA0"):
+        with pytest.raises(ValueError):
+            g.parse(outside)
+    assert "AA-AN" in g.describe()
+
+
+def test_two_letter_cells_map_to_the_right_screen_spot():
+    from qp_agent.grid import Grid
+    g = Grid()
+    x, y = g.to_screen("AA13", 0.5, 0.5, 1440, 900)
+    assert abs(x - 26.5 / 40 * 1440) < 2 and abs(y - 12.5 / 25 * 900) < 2
+    r = parse_reply(reply(type="click", cell="AC12", category="none", risk="low"), g)
+    assert r.action.cell == "AC12"
+    r = parse_reply(reply(type="drag", cell="B2", to_cell="AN25", category="none", risk="low"), g)
+    assert r.action.to_cell == "AN25"
+
+
+def test_dense_grid_overlay_stays_legible_and_keeps_size():
+    from qp_agent.grid import Grid, draw_grid
+    img = Image.new("RGB", (1440, 900), "white")
+    out = draw_grid(img, Grid())
+    assert out.size == img.size
+    assert out.getpixel((36 * 5, 450)) != (255, 255, 255)   # a heavier line every fifth column
+
+
+def test_zoom_steps_cover_the_same_real_area_on_the_dense_grid():
+    from qp_agent import refine
+    from qp_agent.grid import Grid
+    raw = Image.new("RGB", (1440, 900), "white")
+    _, b = refine.crop_around(raw, Grid(), "T12")                 # dense default grid
+    assert (b[2] - b[0]) * 1440 >= 240 and (b[3] - b[1]) * 900 >= 150
+    _, old = refine.crop_around(raw, Grid(cols=26, rows=16), "M8")  # the old grid keeps its old behaviour
+    assert 160 <= (old[2] - old[0]) * 1440 <= 180
+    _, t = refine.crop_square_around(raw, Grid(), 0.5, 0.5)
+    assert 55 <= (t[2] - t[0]) * 1440 <= 80
+    assert refine.accept_correction((0.5, 0.5), (0.5 + 0.9 / 40, 0.5), Grid()) is True
+    assert refine.accept_correction((0.5, 0.5), (0.5 + 2.0 / 40, 0.5), Grid()) is False
+
+
+def test_models_point_straight_at_targets_and_points_are_validated():
+    r = parse_reply(reply(type="click", point=[500, 250], category="none", risk="low"), G)
+    assert r.action.point == [500, 250] and r.action.cell is None
+    r = parse_reply(reply(type="click", point=[1000.4, -3], category="none", risk="low"), G)
+    assert r.action.point == [1000, 0]                    # clamped, never off screen
+    r = parse_reply(reply(type="drag", point=[100, 100], to_point=[900, 800], category="none", risk="low"), G)
+    assert r.action.to_point == [900, 800]
+    for bad in (dict(type="click", point=[5]), dict(type="click", point="top left"), dict(type="click", point=[1, 2, 3]),
+                dict(type="click", point=[True, 5]), dict(type="drag", point=[1, 2]), dict(type="click")):
+        with pytest.raises(ValueError):
+            parse_reply(reply(category="none", risk="low", **bad), G)
+
+
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
+def test_click_position_order_of_trust():
+    from qp_agent import executor
+    g = Grid()
+    a = Action(type="click", cell="B2", point=[500, 250], ax=0.1, ay=0.2)
+    assert executor.target_pixel(a, g, 1000, 500) == (100, 100)          # the zoomed look wins
+    a = Action(type="click", cell="B2", point=[500, 250])
+    assert executor.target_pixel(a, g, 1000, 500) == (250, 250)          # then the model's own point
+    a = Action(type="click", cell="A1", fx=0.5, fy=0.5)
+    x, y = executor.target_pixel(a, g, 1000, 500)
+    assert (x, y) == (12, 10)                                            # finally the grid cell
+
+
+def test_zoom_look_stays_on_screen_and_ignores_big_jumps():
+    from qp_agent import refine
+    raw = Image.new("RGB", (1440, 900), "white")
+    for ax, ay in ((0.0, 0.0), (1.0, 1.0), (0.5, 0.5)):
+        _, b = refine.zoom_crop(raw, ax, ay)
+        assert 0 <= b[0] and b[2] <= 1 and 0 <= b[1] and b[3] <= 1
+    _, b = refine.zoom_crop(raw, 0.5, 0.5)
+    x, y = refine.zoom_to_screen((0.5, 0.5), b)
+    assert abs(x - 0.5) < 1e-6 and abs(y - 0.5) < 1e-6
+    assert refine.accept_zoom((0.5, 0.5), (0.52, 0.51)) is True
+    assert refine.accept_zoom((0.5, 0.5), (0.6, 0.5)) is False
+
+
+def test_network_hiccups_are_retried_but_real_errors_are_not(monkeypatch):
+    import requests
+    from qp_agent import gemini
+    calls = []
+
+    class Ok:
+        ok = True
+        status_code = 200
+
+    def flaky(*a, **k):
+        calls.append(1)
+        if len(calls) < 3:
+            raise requests.ConnectionError("dropped")
+        return Ok()
+
+    monkeypatch.setattr(gemini.HTTP, "post", flaky)
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: None)
+    assert gemini.post("m", "k", {}, 5).ok and len(calls) == 3
+    calls.clear()
+    monkeypatch.setattr(gemini.HTTP, "post", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("down")))
+    with pytest.raises(requests.ConnectionError):
+        gemini.post("m", "k", {}, 5)

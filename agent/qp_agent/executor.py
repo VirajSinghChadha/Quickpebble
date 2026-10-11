@@ -3,6 +3,7 @@
 from __future__ import annotations
 import base64
 import io
+import os
 import subprocess
 import sys
 import time
@@ -14,12 +15,15 @@ from .grid import Grid, draw_grid
 from .schema import Action
 
 pyautogui.FAILSAFE = True   # slam the mouse into a screen corner to abort
-pyautogui.PAUSE = 0.05
+pyautogui.PAUSE = 0.02
 
 KEY_NAMES = {"cmd": "command", "ctrl": "ctrl", "alt": "option", "option": "option", "shift": "shift", "enter": "enter",
              "return": "enter", "tab": "tab", "escape": "esc", "esc": "esc", "backspace": "backspace", "delete": "delete",
              "space": "space", "up": "up", "down": "down", "left": "left", "right": "right"}
-MAX_EDGE = 1600
+MAX_EDGE = 1440
+# The model points straight at things (about 2x more accurate than reading grid labels, in tests), so the screenshot is sent plain.
+# Set QP_AGENT_GRID=1 to draw the labeled grid again.
+USE_GRID = os.environ.get("QP_AGENT_GRID") == "1"
 
 
 def capture(grid: Grid) -> tuple[Image.Image, str]:
@@ -31,10 +35,10 @@ def capture(grid: Grid) -> tuple[Image.Image, str]:
     scale = MAX_EDGE / max(img.size)
     small = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS) if scale < 1 else img
     # The model sees the reduced, gridded copy; the zoomed second looks are cut from the full-resolution original.
-    return img, jpeg_b64(draw_grid(small, grid))
+    return img, jpeg_b64(draw_grid(small, grid) if USE_GRID else small)
 
 
-def jpeg_b64(img: Image.Image, quality: int = 82) -> str:
+def jpeg_b64(img: Image.Image, quality: int = 74) -> str:
     buf = io.BytesIO()
     img.convert("RGB").save(buf, "JPEG", quality=quality)
     return base64.b64encode(buf.getvalue()).decode()
@@ -173,18 +177,24 @@ def open_app(name: str) -> None:
     time.sleep(1.5)   # let the window appear before the next screenshot
 
 
+def target_pixel(action: Action, grid: Grid, width: int, height: int) -> tuple[int, int]:
+    """Where to click, in screen points. Order of trust: the zoomed second look, then the model's own point, then its grid cell."""
+    if action.ax is not None and action.ay is not None:
+        return min(width - 1, int(action.ax * width)), min(height - 1, int(action.ay * height))
+    if action.point:
+        return min(width - 1, int(action.point[1] / 1000 * width)), min(height - 1, int(action.point[0] / 1000 * height))
+    return grid.to_screen(action.cell, action.fx, action.fy, width, height)
+
+
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
     if action.type == "open_app":
         open_app(action.app)
         return
     if action.type in ("click", "double_click", "right_click", "scroll", "drag"):
-        if action.ax is not None and action.ay is not None:   # exact point found by the zoomed second look
-            x, y = min(width - 1, int(action.ax * width)), min(height - 1, int(action.ay * height))
-        else:
-            x, y = grid.to_screen(action.cell, action.fx, action.fy, width, height)
-        pyautogui.moveTo(x, y, duration=0.25)
-        time.sleep(0.1)
+        x, y = target_pixel(action, grid, width, height)
+        pyautogui.moveTo(x, y, duration=0.12)
+        time.sleep(0.04)
         if action.type == "click":
             pyautogui.click()
         elif action.type == "double_click":
@@ -192,7 +202,10 @@ def perform(action: Action, grid: Grid) -> None:
         elif action.type == "right_click":
             pyautogui.rightClick()
         elif action.type == "drag":
-            ex, ey = grid.to_screen(action.to_cell, 0.5, 0.5, width, height)
+            if action.to_point:
+                ex, ey = min(width - 1, int(action.to_point[1] / 1000 * width)), min(height - 1, int(action.to_point[0] / 1000 * height))
+            else:
+                ex, ey = grid.to_screen(action.to_cell, 0.5, 0.5, width, height)
             pyautogui.dragTo(ex, ey, duration=0.6, button="left")
         else:
             pyautogui.scroll(action.amount * (-1 if action.direction == "down" else 1) * 5)

@@ -1,24 +1,33 @@
-"""A labeled grid over the screenshot. Gemini names a cell (e.g. "M7") plus an offset inside it;
-we turn that into exact screen coordinates. Columns are letters A.., rows are numbers 1.."""
+"""A labeled grid over the screenshot. Gemini names a cell (e.g. "M7" or "AC12") plus an offset inside it;
+we turn that into exact screen coordinates. Columns are letters A..Z then AA..AZ, rows are numbers 1.."""
 import re
 from dataclasses import dataclass
 
 from PIL import Image, ImageDraw, ImageFont
 
 
+def col_name(c: int) -> str:
+    """0 -> A, 25 -> Z, 26 -> AA, 39 -> AN."""
+    return chr(65 + c) if c < 26 else chr(65 + c // 26 - 1) + chr(65 + c % 26)
+
+
+def col_index(name: str) -> int:
+    return ord(name) - 65 if len(name) == 1 else (ord(name[0]) - 64) * 26 + ord(name[1]) - 65
+
+
 @dataclass(frozen=True)
 class Grid:
-    cols: int = 26
-    rows: int = 16
+    cols: int = 40   # about 36 px per cell on the screenshot Gemini sees: precise enough that one look usually lands the click
+    rows: int = 25
 
     def label(self, col: int, row: int) -> str:
-        return f"{chr(ord('A') + col)}{row + 1}"
+        return f"{col_name(col)}{row + 1}"
 
     def parse(self, cell: str) -> tuple[int, int]:
-        m = re.fullmatch(r"([A-Z])([0-9]{1,2})", cell.strip().upper())
+        m = re.fullmatch(r"([A-Z]{1,2})([0-9]{1,2})", cell.strip().upper())
         if not m:
             raise ValueError(f"bad cell '{cell}'")
-        col, row = ord(m.group(1)) - ord("A"), int(m.group(2)) - 1
+        col, row = col_index(m.group(1)), int(m.group(2)) - 1
         if not (0 <= col < self.cols and 0 <= row < self.rows):
             raise ValueError(f"cell '{cell}' is outside the {self.cols}x{self.rows} grid (A1..{self.label(self.cols - 1, self.rows - 1)})")
         return col, row
@@ -33,7 +42,9 @@ class Grid:
         return min(width - 1, int(x * width)), min(height - 1, int(y * height))
 
     def describe(self) -> str:
-        return f"{self.cols} columns (A-{chr(ord('A') + self.cols - 1)}, left to right) by {self.rows} rows (1-{self.rows}, top to bottom)"
+        last = col_name(self.cols - 1)
+        names = f"A-{last}" if self.cols <= 26 else f"A-Z then AA-{last}"
+        return f"{self.cols} columns ({names}, left to right) by {self.rows} rows (1-{self.rows}, top to bottom)"
 
 
 def _font(size: int):
@@ -52,11 +63,14 @@ def draw_grid(img: Image.Image, grid: Grid) -> Image.Image:
     d = ImageDraw.Draw(overlay)
     w, h = out.size
     cw, ch = w / grid.cols, h / grid.rows
-    font = _font(max(9, int(min(cw, ch) / 4.2)))
+    font = _font(max(8, int(min(cw, ch) / (3.6 if grid.cols > 30 else 4.2))))
+    dense = grid.cols > 30
     for c in range(grid.cols + 1):
-        d.line([(round(c * cw), 0), (round(c * cw), h)], fill=(255, 0, 80, 150), width=1)
+        major = dense and c % 5 == 0
+        d.line([(round(c * cw), 0), (round(c * cw), h)], fill=(255, 0, 80, 210 if major else (95 if dense else 150)), width=2 if major else 1)
     for r in range(grid.rows + 1):
-        d.line([(0, round(r * ch)), (w, round(r * ch))], fill=(255, 0, 80, 150), width=1)
+        major = dense and r % 5 == 0
+        d.line([(0, round(r * ch)), (w, round(r * ch))], fill=(255, 0, 80, 210 if major else (95 if dense else 150)), width=2 if major else 1)
     for c in range(grid.cols):
         for r in range(grid.rows):
             x, y = round(c * cw) + 2, round(r * ch) + 1

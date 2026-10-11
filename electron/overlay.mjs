@@ -27,7 +27,7 @@ export class StatusBar {
     });
     win.setAlwaysOnTop(true, "screen-saver");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); // keeps the Dock icon as it is
-    win.setContentProtection(true);                       // keeps the bar out of the agent's own screenshots
+    if (process.env.QP_OVERLAY_CAPTURABLE !== "1") win.setContentProtection(true); // keeps the bar out of the agent's own screenshots (the env switch is for testing)
     win.setIgnoreMouseEvents(true, { forward: true });    // click-through except over the Stop button
     win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     win.webContents.on("will-navigate", (e) => e.preventDefault());

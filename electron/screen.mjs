@@ -81,7 +81,7 @@ export class ScreenAgent {
   async connection() {
     const cfg = aiConfig(this.db);
     const model = this.db.getSetting("screen_model") || (cfg.provider === "gemini" ? cfg.model : "");
-    const precision = this.db.getSetting("screen_precision") === "standard" ? "standard" : "high";
+    const precision = this.db.getSetting("screen_precision") === "standard" ? "standard" : "high"; // accurate by default: one zoomed look after the model points
     const alive = this.run && this.run.model === model && this.run.precision === precision && this.run.child.exitCode === null;
     if (!alive) {
       this.stop();

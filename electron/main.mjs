@@ -18,7 +18,7 @@ import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1" || process.env.QP_SMOKE_FEATURES === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1" || process.env.QP_SMOKE_FEATURES === "1" || process.env.QP_SMOKE_AGENT === "1";
 
 app.setName("Quick Pebble");
 registerGhostScheme();
@@ -109,7 +109,7 @@ app.whenReady().then(async () => {
   } catch { /* another app owns the shortcut; the assistant is still one click away */ }
   app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
-  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE: "smoke" };
+  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
   if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });

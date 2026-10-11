@@ -308,6 +308,9 @@ export interface ScreenAction {
   type: "click" | "double_click" | "right_click" | "drag" | "type" | "key" | "scroll" | "open_app" | "wait" | "ask" | "done";
   cell?: string;
   to_cell?: string;
+  /** Where to act, as [y, x] integers 0..1000 across the screen (y first). */
+  point?: number[];
+  to_point?: number[];
   app?: string;
   fx?: number;
   fy?: number;

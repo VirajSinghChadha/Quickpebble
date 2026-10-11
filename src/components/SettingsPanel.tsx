@@ -40,10 +40,10 @@ export function SettingsPanel() {
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [engine, setEngine] = useState("ghostsearch");
   const [searxUrl, setSearxUrl] = useState("");
-  const [blockLevel, setBlockLevel] = useState("standard");
+  const [blockLevel, setBlockLevel] = useState("high");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
-  const [precision, setPrecision] = useState("high");
+  const [precision, setPrecision] = useState("standard");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -230,9 +230,9 @@ export function SettingsPanel() {
           <Row label="Model" hint={status?.models.length ? `Installed: ${status.models.slice(0, 4).join(", ")}` : undefined}>
             <input className={`${selectCls} w-44`} value={model} placeholder={provider === "ollama" ? "llama3" : "default"} onChange={(e) => setModel(e.target.value)} onBlur={() => void save("ai_model", model)} aria-label="Model" />
           </Row>
-          <Row label="Screen control precision" hint="High adds a second, much tighter zoom with a crosshair before each click. It clicks the exact center far more reliably but takes one extra AI call (a second or two) per click.">
+          <Row label="Screen control precision" hint="Accurate: the AI points at the target, then takes one zoomed second look before each click (about 9 in 10 land within a few pixels). Fast: one look only, about 2 seconds quicker per click.">
             <select className={selectCls} value={precision} onChange={(e) => { setPrecision(e.target.value); void save("screen_precision", e.target.value); }} aria-label="Screen control precision">
-              <option value="high">High (most precise)</option><option value="standard">Standard (faster)</option>
+              <option value="high">Accurate (zoom on clicks)</option><option value="standard">Fast (one look)</option>
             </select>
           </Row>
           {provider === "ollama" ? (

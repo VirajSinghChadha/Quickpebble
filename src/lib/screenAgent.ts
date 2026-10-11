@@ -46,14 +46,14 @@ export interface ScreenIO {
 }
 
 export function describeScreenAction(a: ScreenAction): string {
-  const at = a.cell ? ` in cell ${a.cell}` : "";
+  const at = a.point ? ` at ${Math.round(a.point[1] / 10)}% across, ${Math.round(a.point[0] / 10)}% down` : a.cell ? ` in cell ${a.cell}` : "";
   switch (a.type) {
     case "click": return `Click${at}`;
     case "double_click": return `Double-click${at}`;
     case "right_click": return `Right-click${at}`;
     case "type": return `Type “${(a.text ?? "").slice(0, 80)}”`;
     case "key": return `Press ${a.key}`;
-    case "drag": return `Drag from ${a.cell ?? "here"} to ${a.to_cell ?? "there"}`;
+    case "drag": return a.point && a.to_point ? `Drag from ${Math.round(a.point[1] / 10)}%,${Math.round(a.point[0] / 10)}% to ${Math.round(a.to_point[1] / 10)}%,${Math.round(a.to_point[0] / 10)}%` : `Drag from ${a.cell ?? "here"} to ${a.to_cell ?? "there"}`;
     case "open_app": return `Open ${a.app ?? "the app"}`;
     case "scroll": return `Scroll ${a.direction ?? "down"}${at}`;
     case "wait": return "Wait for the screen to update";
@@ -121,13 +121,13 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
 
     // Same action again and again usually means it isn't working. Nudge the model to change approach instead
     // of quitting; only give up after many identical attempts. Waiting is allowed to repeat for longer.
-    const key = JSON.stringify([action.type, action.cell, action.fx, action.fy, action.text, action.key]);
+    const key = JSON.stringify([action.type, action.cell, action.point, action.fx, action.fy, action.text, action.key]);
     repeats = key === lastKey ? repeats + 1 : 0;
     lastKey = key;
     const limit = action.type === "wait" ? MAX_WAITS_IN_A_ROW : HARD_STOP_REPEATS;
     if (repeats >= limit) return fail("I tried the same thing several times without progress, so I stopped. Try rephrasing the task.");
     if (repeats >= NUDGE_AFTER_REPEATS && action.type !== "wait") {
-      history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different cell, an offset inside the cell, a keyboard key, or scrolling)`);
+      history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different spot on the target, a keyboard key, or scrolling)`);
     }
 
     const desc = describeScreenAction(action);
@@ -189,7 +189,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
           ? `${history.length + 1}. ${desc} (WARNING: the screen did not change after this click. The target was probably missed or is covered${unchanged >= 2 ? ", or the window may be hidden or minimized" : ""}. Try a different position or offset, or scroll it into view.)`
           : `${history.length + 1}. ${desc}`,
       );
-      if (action.type !== "wait") await io.sleep(500);
+      if (action.type !== "wait") await io.sleep(250);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
       if (++failures >= MAX_ACTION_FAILURES) return fail(String(e));
