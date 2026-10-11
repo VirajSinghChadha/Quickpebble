@@ -71,7 +71,7 @@ export function sha512For(yml, fileName) {
 
 /** Where the new app goes. Run from the DMG or a translocated copy, the old app can't be replaced: install into Applications. */
 export function installTarget(currentBundle, appName = "Quick Pebble.app") {
-  return currentBundle.includes("/AppTranslocation/") || currentBundle.startsWith("/Volumes/") ? path.join("/Applications", appName) : currentBundle;
+  return currentBundle.includes("/AppTranslocation/") || currentBundle.startsWith("/Volumes/") ? path.posix.join("/Applications", appName) : currentBundle;
 }
 
 // ---- the updater ---------------------------------------------------------------------------------------------------
