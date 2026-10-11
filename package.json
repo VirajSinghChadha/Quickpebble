@@ -44,7 +44,8 @@
   },
   "main": "electron/main.mjs",
   "author": {
-    "name": "Quick Pebble contributors"
+    "name": "Quick Pebble contributors",
+    "email": "noreply@users.noreply.github.com"
   },
   "homepage": "https://github.com/VirajSinghChadha/Quickpebble",
   "build": {
