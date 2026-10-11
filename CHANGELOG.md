@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Fixes from the Chromium line: Mac keyboard shortcuts in Screen mode now send Command correctly, and Screen mode is more reliable on slow networks.
+
 ## 1.3.0
 
 - **Accounts.** Sign in with an emailed code (beta access code required at sign-up). Your Gemini key is saved encrypted to your account and comes back when you sign in, on any device, and you stay signed in across updates.
