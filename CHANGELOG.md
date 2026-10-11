@@ -51,6 +51,10 @@
 - Honest results: a price is only shown if that number is really on the shop's page; otherwise it says it couldn't be read. Shops that ask for a robot check are listed as unreadable. Used, refurbished, accessories and different editions are flagged, and "Cheapest match" only counts new offers that look like the same product.
 - You see what will be sent to the AI (each page's text and the product name) before it runs.
 
+### Look and docs
+- **Theme names:** every colour swatch in Settings now shows its name (Pebble, Ocean, Forest, Sunset, Lavender, Rose, Graphite, Aurora, Sunrise, Twilight), and the row says the selected theme's full name, for example "Aurora (teal + violet)".
+- A new README with download buttons, install steps for non-technical people, every feature with its own screenshot, and every network request listed under Privacy. All screenshots were retaken in the Aurora theme, plus a gallery of all ten themes in light and dark.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.

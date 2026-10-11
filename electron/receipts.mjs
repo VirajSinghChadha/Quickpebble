@@ -6,11 +6,14 @@
 // Deleting always means the Trash, never a permanent delete.
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { checkPath } from "./fsguard.mjs";
 import { uniquePath } from "./downloads.mjs";
 
 const now = () => Math.floor(Date.now() / 1000);
+/** "/Users/alex/Downloads/a.pdf" → "~/Downloads/a.pdf": shorter, and the account name isn't on screen. */
+export const tilde = (p, home = os.homedir()) => (typeof p === "string" && home && (p === home || p.startsWith(home + path.sep)) ? `~${p.slice(home.length)}` : p);
 const PENDING_MS = 30 * 60 * 1000;
 export const MAX_ITEMS = 2000;
 const clip = (v, n) => String(v ?? "").slice(0, n);
@@ -74,7 +77,7 @@ export class Tasks {
     const ok = p.items.filter((i) => !i.problem);
     return {
       id, title: p.title,
-      items: p.items.map(({ data: _d, ...it }) => it),
+      items: p.items.map(({ data: _d, ...it }) => ({ ...it, display: tilde(it.path) })),
       ready: ok.length,
       bytes: ok.reduce((s, i) => s + (i.size ?? 0), 0),
     };

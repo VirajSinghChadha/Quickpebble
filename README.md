@@ -1,307 +1,354 @@
-<div align="center">
+<p align="center">
+  <img src="public/pebble.svg" width="112" height="112" alt="Quick Pebble logo">
+</p>
 
-<img src="public/pebble.svg" alt="Quick Pebble logo" width="96" height="96" />
+<h1 align="center">Quick Pebble</h1>
 
-# Quick Pebble
+<p align="center"><b>Browse quicker.</b><br>
+A private browser with an AI that can use your whole Mac.<br>
+Real Chromium, built-in ad and tracker blocking, and an assistant that reads pages, answers from your own files, tidies your Mac and does tasks for you, always asking before anything that can't be taken back.</p>
 
-**Browse quicker.**
+<p align="center">
+  <a href="https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/VirajSinghChadha/Quickpebble?color=0d9488&label=release"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-7c3aed"></a>
+  <img alt="Electron (Chromium)" src="https://img.shields.io/badge/Electron-Chromium-0d9488">
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-7c3aed">
+</p>
 
-A lightweight, privacy-first desktop browser with a calm design, tab memory saving,
-and an AI assistant that runs on your own machine.
+<p align="center">
+  <a href="#download"><b>⬇️ Download</b></a>
+  &nbsp;·&nbsp; <a href="#install-on-mac"><b>🍎 Mac</b></a>
+  &nbsp;·&nbsp; <a href="#install-on-windows"><b>🪟 Windows</b></a>
+  &nbsp;·&nbsp; <a href="https://virajsinghchadha.github.io/Quickpebble/"><b>🌐 Website</b></a>
+  &nbsp;·&nbsp; <a href="#features"><b>✨ Features</b></a>
+  &nbsp;·&nbsp; <a href="#privacy"><b>🔒 Privacy</b></a>
+</p>
 
-[![CI](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml/badge.svg)](https://github.com/VirajSinghChadha/Quickpebble/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/VirajSinghChadha/Quickpebble)](https://github.com/VirajSinghChadha/Quickpebble/releases/latest)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Tauri 2](https://img.shields.io/badge/Tauri-2.x-24C8DB)
-![React 19](https://img.shields.io/badge/React-19-61DAFB)
+## Download
 
-[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Privacy](#privacy-and-security) · [Development](#development) · [Releasing](#releasing)
+Pick your computer. The buttons download the current release, **2.1.0**, straight from GitHub.
 
-</div>
+<table align="center">
+  <tr>
+    <th align="center" width="50%">🍎&nbsp; Mac</th>
+    <th align="center" width="50%">🪟&nbsp; Windows</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.1.0/Quick.Pebble_2.1.0_arm64.dmg"><b>⬇️&nbsp; Apple silicon (M1 and newer)<br>Quick.Pebble_2.1.0_arm64.dmg · 127 MB</b></a><br><br>
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.1.0/Quick.Pebble_2.1.0_x64.dmg"><b>⬇️&nbsp; Intel Mac<br>Quick.Pebble_2.1.0_x64.dmg · 133 MB</b></a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.1.0/Quick.Pebble_2.1.0_x64.exe"><b>⬇️&nbsp; Download for Windows<br>Quick.Pebble_2.1.0_x64.exe · 109 MB</b></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">macOS 11 Big Sur or newer<br>Not sure which Mac? Apple menu → About This Mac: "Chip: Apple…" means Apple silicon.</td>
+    <td align="center">Windows 10 or 11, 64-bit</td>
+  </tr>
+  <tr>
+    <td align="center"><a href="#install-on-mac">Mac install steps</a></td>
+    <td align="center"><a href="#install-on-windows">Windows install steps</a></td>
+  </tr>
+</table>
 
----
+Linux: [`Quick.Pebble_2.1.0_x86_64.AppImage`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.1.0/Quick.Pebble_2.1.0_x86_64.AppImage) (125 MB) or [`Quick.Pebble_2.1.0_amd64.deb`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.1.0/Quick.Pebble_2.1.0_amd64.deb) (97 MB). All files are on the [releases page](https://github.com/VirajSinghChadha/Quickpebble/releases/latest).
 
-<p align="center"><img src="docs/screenshots/01-ghostsearch-results.png" alt="Quick Pebble showing GhostSearch results" width="860"></p>
+> **The apps are not signed with a paid certificate yet.** Your Mac or PC will ask you to confirm the first time you open Quick Pebble. That's expected; the steps below show exactly what to click. Updates are checked by Quick Pebble itself (checksum, app ID, version and signature) before they are installed.
 
-<details open><summary><b>Screenshots</b></summary>
+### Install on Mac
 
-| | |
-|---|---|
-| ![GhostSearch home](docs/screenshots/02-ghostsearch-home.png)<br>**GhostSearch** home | ![Assistant](docs/screenshots/03-assistant-commands.png)<br>**Assistant** with slash commands |
-| ![Recall](docs/screenshots/06-recall-memory.png)<br>**Recall**: search the pages you've read | ![New tab](docs/screenshots/04-newtab.png)<br>**New tab** |
-| ![Settings](docs/screenshots/05-settings.png)<br>**Settings** | ![Profiles](docs/screenshots/07-profiles.png)<br>**Profiles** |
-| ![Privacy Center](docs/screenshots/09-privacy.png)<br>**Privacy Center** | |
+#### With Homebrew
 
-Website: <https://virajsinghchadha.github.io/Quickpebble/> (source in [`site/`](site/)). Regenerate the screenshots with `QP_SMOKE_SHOTS=1 npx electron electron/main.mjs && python3 scripts/compose-screenshots.py`.
-
-</details>
-
-## Chromium edition (this branch)
-
-This branch replaces the system web view with **real Chromium** (via Electron), so pages render exactly as in Chrome: Google looks and behaves like it does in Chrome, Google accounts sign in normally, and PDFs, WebRTC and modern web APIs work. The React UI, AI assistant, Recall, workspaces and privacy features are carried over; the Rust backend is ported to `electron/`.
-
-```bash
-npm install
-npm run electron:dev     # app with hot reload
-npm start                # build the UI and run
-npm run dist             # installers in release/ (dmg, nsis, AppImage/deb)
-```
-
-- **GhostSearch (default search engine).** A private meta-search engine built into the browser (`ghost://search?q=…`), with no Google involved. It asks several independent sources at once (DuckDuckGo, Wikipedia, Marginalia, plus Brave Search if you add a key under Web research, plus your own SearXNG instance if you set one), merges them with reciprocal-rank fusion so pages the sources agree on rise to the top, removes tracking parameters from every link, and drops known ad/tracker domains. Requests carry no cookies, referrer or account; nothing is stored (results are kept in memory for two minutes so Back works); the page has no JavaScript and loads nothing from anywhere else (no remote fonts, favicons or images). `!w`, `!yt`, `!gh`, `!so`, `!mdn`, `!osm` jump straight to those sites, resolved locally. Honest limits: it does not have its own web index (nobody can afford one for free), DuckDuckGo's results themselves come partly from Bing, the sources still see your query and IP address (route through Tor in Settings to hide the IP), and sources that scrape or rate-limit can be unavailable at times, in which case the page says which ones answered.
-- **Native ad & tracker blocking.** Every network request is checked in the browser process, including ones the HTML parser starts before any page script runs. It combines the built-in tracker list with EasyList / EasyPrivacy / uBlock-style filter lists (via Ghostery's engine), cached on disk and refreshed daily. Strict mode also blocks third-party ad paths.
-- **Profiles.** Separate cookies, logins and site data per profile (Command palette → Profiles), so each can hold a different Google account. Private windows use an in-memory session.
-- **Proxy.** Settings → Profiles & network can route everything through a SOCKS5/HTTP proxy such as Tor (`socks5://127.0.0.1:9050`) or your own VPN's proxy port. Quick Pebble does **not** include a VPN: a real one needs servers someone pays for.
-- **Password manager.** Passwords are encrypted with AES-256-GCM under a key derived from your master password (scrypt, 128 MB), locked after 15 idle minutes, filled only on an exact https host match, and saved only after you agree. Imports CSV exports from Chrome, Firefox, Safari, 1Password, Bitwarden, LastPass and Dashlane.
-- **Chrome extensions** run on Chromium's real extension runtime (content scripts, background workers, `chrome.storage`, `chrome.runtime`, scripting…). Install from a Web Store link or a `.crx`; they start switched off. Toolbar popups and `webRequest` are not provided yet, so ad blockers that depend on them add nothing (the built-in blocker already covers that).
-- **Screen mode** (Gemini operates your mouse and keyboard) runs through the Python agent in `agent/`; on first use it creates a private virtual environment and installs its packages. Needs Python 3.9+, a Gemini key, and macOS Screen Recording + Accessibility permission.
-- **In-app updates** follow the same protocol as the NotchApples app, which works for apps without a paid certificate: it reads this repo's GitHub releases list, keeps only releases that carry an installer for your platform and CPU, and announces a newer one without installing anything. "Update" downloads from github.com, verifies the sha512 from the release's `latest*.yml`, then (macOS) mounts the DMG, checks bundle ID, version and code signature, stages a copy, and a small script swaps it in after quit and relaunches. "Later" skips that version. CI builds are ad-hoc signed so they pass the same check. Covered by an end-to-end test on a real packaged app (`node scripts/test-update-e2e.mjs`). Windows runs the NSIS installer; Linux replaces the AppImage; both are written but only the Mac path has been run.
-- The Tauri build still lives in `src-tauri/` for reference.
-- **Google sign-in** works as in Chrome, but Google account *sync* (bookmarks, passwords across devices) is private to Google's own Chrome and cannot be offered by any other browser.
-- Quick checks: `QP_SMOKE=1 npx electron electron/main.mjs` runs a headless end-to-end test against a local site.
-
-## Install
-
-### macOS — Homebrew (recommended)
+One command (it also takes care of the "unidentified developer" step):
 
 ```bash
 brew tap VirajSinghChadha/quickpebble https://github.com/VirajSinghChadha/Quickpebble
 brew install --cask quick-pebble
 ```
 
-Works on Apple silicon and Intel. The app updates itself afterwards (see [Updates](#updates)), so you don't need `brew upgrade`.
+Quick Pebble updates itself after that, so you don't need `brew upgrade`.
 
-### macOS / Windows — direct download
+#### Manually
 
-Download the installer for your system from the [latest release](https://github.com/VirajSinghChadha/Quickpebble/releases/latest):
+1. **Download the right file above** (Apple silicon or Intel). It saves to your **Downloads** folder.
+2. **Double-click it** and drag **Quick Pebble** onto **Applications**.
+3. **Open it the first time with a right-click:** in Applications, right-click (or Control-click) **Quick Pebble** and choose **Open**, then **Open** again. You only do this once.
+   If macOS says it "can't be opened", go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+4. Sign in with your email, and you're browsing.
 
-| System | File |
-|---|---|
-| macOS, Apple silicon | `Quick.Pebble_<version>_aarch64.dmg` |
-| macOS, Intel | `Quick.Pebble_<version>_x64.dmg` |
-| Windows 10/11 (64-bit) | `Quick.Pebble_<version>_x64-setup.exe` (or `.msi`) |
+<details>
+<summary><b>Something not working on Mac?</b></summary>
 
-> **Builds are not code-signed or notarised yet.** The first time you open Quick Pebble, macOS asks you to confirm it: follow the short [macOS install guide](docs/INSTALL-macOS.md) (System Settings → Privacy & Security → **Open Anyway**). The Homebrew cask clears the warning for you. On Windows, SmartScreen shows "unknown publisher": follow the [Windows install guide](docs/INSTALL-Windows.md) (**More info → Run anyway**). Releases are verified by a separate update signature, described under [Updates](#updates).
+- **"Quick Pebble is damaged and can't be opened."** That's macOS being careful with an unsigned download. Open **Terminal** and run `xattr -dr com.apple.quarantine "/Applications/Quick Pebble.app"`, then open it again.
+- **I can't open it at all.** Use the right-click → **Open** step above, or **System Settings → Privacy & Security → Open Anyway**. The full guide with pictures is in [docs/INSTALL-macOS.md](docs/INSTALL-macOS.md).
+- **My antivirus moved it.** Restore it from the antivirus's quarantine, or [build it yourself](#build-from-source).
+- **Screen mode can't see or click.** Allow Quick Pebble under **System Settings → Privacy & Security → Screen Recording** and **Accessibility**, then restart it. See [Screen mode permissions](#screen-mode-permissions).
+- **Updating.** Quick Pebble checks every 15 minutes and offers the update; one click installs it and restarts. Or download the new `.dmg` and replace the app.
+- **Uninstall.** Quit it, then drag **Quick Pebble** from Applications to the Trash. Your data is in `~/Library/Application Support/Quick Pebble`; delete that folder too if you want nothing left.
 
-### Linux
+</details>
 
-Not packaged yet. You can [build from source](#development); CI compiles it on Ubuntu.
+### Install on Windows
 
-### Optional: local AI
+**It takes about a minute.**
 
-The assistant works best with [Ollama](https://ollama.com), which keeps everything on your machine:
+1. **Click "Download for Windows" above.** `Quick.Pebble_2.1.0_x64.exe` saves to your **Downloads** folder.
+   If Chrome or Edge says the file *isn't commonly downloaded*, click **Keep** (in Edge, open the **…** menu next to the file first).
+2. **Double-click the file.**
+   If a blue **"Windows protected your PC"** window appears, click **More info**, then **Run anyway**. Windows shows this for every app that doesn't pay for a code-signing certificate; the full source code is in this repository.
+3. **Quick Pebble opens by itself** when it's installed. Later, press the **Windows key**, type `Quick Pebble` and press **Enter**.
 
-```bash
-brew install ollama     # or download from https://ollama.com/download
-ollama serve
-ollama pull llama3      # or: ollama pull mistral
-```
+<details>
+<summary><b>Something not working on Windows?</b></summary>
 
-Quick Pebble finds Ollama automatically. Change the model or provider in **Settings → AI**.
+- **I can't find the "Run anyway" button.** Click the small **More info** link first; the button appears under it. The guide with pictures is in [docs/INSTALL-Windows.md](docs/INSTALL-Windows.md).
+- **My antivirus removed the file.** Restore it from the antivirus quarantine, or [build it yourself](#build-from-source).
+- **Updating.** Quick Pebble checks every 15 minutes and offers the update; or download the new installer and run it over the old one.
+- **Uninstall.** **Settings → Apps → Installed apps → Quick Pebble → Uninstall.**
+- **Screen mode on Windows** needs Python 3 with "Add python.exe to PATH" ticked when you install it.
+
+</details>
+
+---
+
+<p align="center"><img src="docs/screenshots/assistant-chat.png" width="900" alt="Quick Pebble in the Aurora theme: a Wikipedia article about volcanoes, with the assistant beside it answering a question about the page with numbered sources"></p>
+
+## New in 2.2 (not released yet)
+
+Everything below is on `main` and will ship in the next release. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+- 🛟 **Safety first:** a *Recent changes* list with **Undo** for every file the app moves, renames or trashes; a list to review before anything changes; receipts; **ask-per-app** for Screen mode; **Watch mode**; **protected folders**.
+- 🧹 **Clean up your Mac:** what's eating your disk, old installers, forgotten apps, Desktop and Downloads tidy-up, rename by content, screenshots and receipts among your photos, why it's slow, quit unused apps, login items.
+- 🧠 **Memory and knowledge:** answer from your own files, workspaces that remember the chat and project brief, a timeline of your day, and **Check this page** (ads, age, owner, trackers).
+- 🎒 **School:** study packs with spaced quizzes, timetable to Calendar, assignments due this week, slides to notes, a submit-checker, a practice partner.
+- 🔁 **Routines:** teach it by showing, shortcut phrases, reminders, sharing, and **Do this for me** from any app.
+- 🛍 **Compare prices** in your country's shops (never buys).
+- 🎨 Theme names under every colour swatch.
 
 ## Features
 
+Most features have a screenshot [below](#screenshots) (not yet: Import, old installers, forgotten apps and login items, which would have shown this computer's own apps). Tags: *(new)* is in the next release; *(opt-in)* is off until you turn it on.
+
 | | |
-|---|---|
-| **Pebble UI** | Refined new-tab dashboard, uncluttered toolbar, scrollable tabs and collapsible groups, keyboard focus handling, and reduced-motion support. |
-| **AI Assistant** | Side panel (`⌘J`) that answers questions about the page or operates the browser for you. |
-| **Recall** | Opt-in, on-device search over the text of pages you've read. Ask the assistant "what was that article about X?" and get cited answers from your own history. |
-| **Local AI first** | Summaries, tab grouping and address-bar completions run through Ollama on `localhost`. OpenAI, Anthropic and Gemini are opt-in. |
-| **Chrome extensions** | Add from the Chrome Web Store or a `.crx` file. Content-script extensions run natively. |
-| **Tab Therapist** | Built-in tab health score, duplicate cleanup, auto-organise and saved tabs. |
-| **Tab workspaces** | Name and save sets of tabs in Tab Therapist, preserving groups and pins. Restore alongside current tabs; pages load only when selected. Search workspaces by name or page. |
-| **Saved-tab search** | Filter saved pages and open all matches together. Duplicate cleanup protects active and pinned tabs. Saved tabs and workspaces are unavailable in private windows. |
-| **Memory Saver** | Suspends idle background tabs; never touches the active tab, pinned tabs, audio, camera/mic, or downloads. |
-| **Privacy Center** | Tracker blocking, per-site camera / mic / location / notification rules, private windows, one-click data clearing. |
-| **HTTPS-only mode** | Upgrades `http://` to `https://` and warns before opening a site insecurely. |
-| **Reader mode** | `⌘⇧R` turns an article into clean text with font size and light/sepia/dark themes. |
-| **Productivity** | Command palette (`⌘⇧P`), tab search (`⌘⇧A`), find in page, zoom, bookmarks bar, history search, reopen closed tab. |
-| **Small and native** | Tauri 2 + Rust on the OS web engine (WKWebView / WebView2). No bundled Chromium. |
-| **Signed auto-updates** | New releases show up inside the app; install is one click. |
+| --- | --- |
+| 👻 **GhostSearch** | A private meta-search built in (`ghost://search`): asks DuckDuckGo, Wikipedia and Marginalia at once (plus Brave Search or your own SearXNG if you add them), merges the results, strips tracking from every link, stores nothing. Google is the default engine; switch in Settings |
+| 🤖 **The assistant** (<kbd>⌘L</kbd>) | Ask about the page you're on, compare up to four tabs, search pages you've read, or let it operate the browser for you. Answers come with numbered sources. Gemini by default (a pictured guide helps you get a free key), or Ollama on your computer, OpenAI or Anthropic |
+| 🖱 **Screen mode** and the status bar | The assistant can use your whole Mac: it looks at the screen, moves the mouse and types. A bar at the bottom of the screen shows what it sees and will do next; risky steps ask first |
+| ⏸ **Pause and plan preview** | Pause or stop from the bar or with <kbd>⌘⌥P</kbd> and take over. Big tasks show their plan first, and nothing runs until you approve it |
+| 🛟 **Recent changes and Undo** *(new)* | Every file the app moves, renames or sends to the Trash is listed with **Undo**, and **Undo this whole task**. Undo never overwrites anything newer |
+| 📋 **Review first, then a receipt** *(new)* | Anything that deletes, moves or renames shows the full list first; you untick what to keep and confirm. Deleting always means the Trash |
+| 🔐 **Ask per app** *(new)* | The first time Screen mode is about to work in an app, it asks for that app only: this task, always, or no. Revoke any time |
+| 👀 **Watch mode** *(new, opt-in)* | See the exact screenshot Screen mode looked at, what it thinks and what it will do next. Kept only in memory |
+| 🗂 **Protected folders** *(new)* | Folders the app never touches; Screen mode must ask before any step that mentions one |
+| 🧠 **Project memory and clean-up** | A project brief the assistant keeps in mind, chats you can continue, and a guided clean-up that squashes old chats into summaries |
+| 📊 **Task manager and crash recovery** | See each tab's real memory use and put heavy tabs to sleep. A crashed tab reloads by itself; after a crash your tabs and scroll positions come back |
+| 📥 **Import from Chrome and Safari** | History, bookmarks, open tabs and Chrome extensions. Reads the other browser, never changes it (Safari needs Full Disk Access) |
+| 🪟 **Tab and link previews** | Hover a tab for a picture of the page; hover a link to see where it goes (titles are opt-in, because fetching them tells the site) |
+| 🔎 **AI tab search and groups** | "Find the tab where I read about volcanoes", and tabs sorted into groups the AI can name |
+| ⬇️ **Download sorting** *(opt-in)* | Finished downloads go into Images, PDFs, Documents…, with Undo, and clearer names suggested for files like `download (3).pdf` |
+| 🎨 **Wallpapers and ten themes** | Ten colour themes, each named under its swatch, separately for light and dark mode, with matching wallpapers |
+| 🗃 **Recall** *(opt-in)* | An on-device index of the pages you read: search it, or let the assistant answer from it with citations. Never in private windows or for logins, payments and webmail |
+| 👤 **Profiles and proxy** | Separate logins and cookies per profile, private windows in memory, and a SOCKS5/HTTP proxy such as Tor |
+| 🔑 **Password manager** | Encrypted with your master password (AES-256-GCM, scrypt), fills only on an exact site match, imports from Chrome, Firefox, Safari, 1Password, Bitwarden, LastPass and Dashlane |
+| 🧩 **Chrome extensions** | Chromium's real extension runtime; install from the Web Store or a `.crx`. Toolbar pop-ups and `webRequest` aren't supported yet |
+| 🛡 **Privacy Center** | Ad and tracker blocking on every request (Ghostery's engine with EasyList-style lists), HTTPS-only mode, cookie-banner refusal, per-site permissions |
+| 💽 **What's eating your disk** *(new)* | Biggest folders and files, old downloads, `node_modules`, caches and simulator data, from names and sizes only. Review, then Trash |
+| 📦 **Old installers** *(new)* | `.dmg`, `.pkg` and setup files for apps you already have |
+| 🧳 **Forgotten apps** *(new, Mac)* | Apps not opened in months with their size and leftovers; uninstall them and their leftovers to the Trash. Apple's apps are never listed |
+| 🧺 **Desktop and Downloads tidy-up** *(new)* | Loose files sorted into kind folders, with an undo list |
+| ✏️ **Rename by content** *(new)* | `IMG_4021.jpg` → "Beach trip - sunset". You see exactly what is sent to the AI first (a small picture, or the start of a text file) |
+| 🧾 **Photo triage** *(new)* | Screenshots and receipts spotted among photos and suggested for their own folders; moved only after you confirm |
+| 🐢 **Why is my Mac slow?** *(new)* | Names the apps using the most processor and memory, and asks them to quit politely |
+| 💤 **Quit unused apps** *(new, opt-in)* | Apps you haven't touched in days; apps with unsaved work are left open |
+| 🚀 **Login items** *(new)* | What starts when you log in; turn items off, with Undo |
+| 📚 **Answer from my files** *(new)* | Pick folders of notes and PDFs; they're indexed on your computer. The assistant shows which excerpts it would send and waits for your OK |
+| 🧷 **Workspaces that remember** *(new)* | One click restores a project's tabs, groups, the assistant chat and the project brief |
+| 🕰 **Timeline of my day** *(new, opt-in)* | Pages read, files downloaded, chats and assistant tasks, day by day. Local only, with Clear all |
+| 🧐 **Check this page** *(new)* | Ads and "sponsored" parts, when it was last updated, who runs it (by its own account), which trackers it loads, and its claims compared with pages you've read. Each finding says how sure it is |
+| 🃏 **Study packs** *(new)* | Flashcards, a quiz and a one-page summary from a few tabs; short quizzes come back later the same day |
+| 🗓 **Fill in my timetable** *(new)* | Reads your school portal and makes a calendar file; your Calendar app asks before adding anything |
+| 📝 **Assignments, slides, submit-checker, practice partner** *(new)* | What's due this week in one note; lecture slides to study notes; check a file against the assignment's rules (it never submits); hear quiz questions read aloud or get a mistake explained |
+| 🔁 **Routines** *(new)* | Teach a task by doing it once; run it with a preview of every step; give it a phrase ("tidy up") or a reminder; share it as a file (imports are checked against a list of allowed steps) |
+| 🪄 **Do this for me** *(new)* | Copy text in any app and press <kbd>⌃⇧Space</kbd>: "reply politely", "turn these notes into a table". Drafts are copied or pasted after a click, never sent |
+| 🛍 **Compare prices** *(new)* | The major shops in your country (for the UAE: Sharaf DG, Amazon.ae, Noon, Jumbo, Carrefour, Lulu, Virgin Megastore and more) in one table, read-only. Prices are shown only when they're really on the shop's page |
 
-### AI Assistant
+## Screenshots
 
-Open it with `⌘J` or the robot icon. **Ask** is the default. Answers use readable paragraphs, numbered citations, source cards, and a copy button. Choose up to four loaded tabs as evidence. With no selected tabs, the current page is used unless you turn that off. Answers without citations are labelled as general answers.
+Taken from the current app with `QP_SMOKE_SHOTS=1` ([`electron/smoke-shots.mjs`](electron/smoke-shots.mjs) and [`scripts/compose-screenshots.py`](scripts/compose-screenshots.py)): a throwaway profile, a sample account, public Wikipedia pages, sample files and pages served from the computer, and answers from Ollama running locally. Theme: **Aurora (teal + violet)**, light mode.
 
-For sources beyond open tabs, add a **Brave Search API key in Settings → Web research**, then enable **Search the web for sources** in chat. Your question is sent to Brave only when this option is enabled; result excerpts are passed to your chosen AI provider. Search sources are labelled as excerpts, not full articles. The key stays in your OS keychain. Search API usage is subject to your own Brave account plan. The app validates source IDs and uses URLs from retrieved metadata; this prevents invented citation links, but does not guarantee that the model interprets every source correctly.
+| | |
+| --- | --- |
+| ![GhostSearch results for how volcanoes form](docs/screenshots/ghostsearch.png) | ![The assistant beside a Wikipedia article, answering why some volcanoes explode, with a numbered source](docs/screenshots/assistant-chat.png) |
+| **GhostSearch**: private results from several sources, tracking stripped | **The assistant** (⌘L) answers about the page, with numbered sources |
+| ![The status bar at the bottom of the screen: Thinking, step 3 of 40, with Pause and Stop buttons](docs/screenshots/screen-statusbar.png) | ![The assistant showing a four-step plan with Run this plan, Run without a fixed plan and Cancel](docs/screenshots/plan-preview.png) |
+| **Screen mode's status bar**: what it sees, what it will do next, Pause and Stop | **Plan preview**: nothing runs until you approve the steps |
+| ![The Recent changes panel listing files moved by a tidy-up, each with an Undo button](docs/screenshots/recent-changes.png) | ![A review list of files to move into folders, with checkboxes and a Confirm button](docs/screenshots/review-list.png) |
+| **Recent changes** with Undo for every change and for the whole task | **Review first**: untick what to keep, then confirm; a receipt follows |
+| ![The assistant asking: May I work in Notes? with this task, always, or don't allow](docs/screenshots/app-permission.png) | ![Watch mode in the assistant showing the screenshot the agent looked at, what it sees and its next step](docs/screenshots/watch-mode.png) |
+| **Ask per app**: the first time it works in an app, it asks | **Watch mode**: the exact screenshot it saw, its thinking and its next step |
+| ![Settings, Assistant safety: Watch mode switch, the list of apps with Revoke buttons, and a protected folder](docs/screenshots/safety-settings.png) | ![The assistant with the Science fair project selected](docs/screenshots/project-memory.png) |
+| **Protected folders**, app answers and Watch mode in Settings | **Project memory**: a project brief the assistant keeps in mind |
+| ![The task manager listing tabs with their memory use](docs/screenshots/task-manager.png) | ![A tab showing This tab crashed with a Reload button](docs/screenshots/crash-recovery.png) |
+| **Task manager**: real memory use per tab | **Crash recovery**: a crashed tab says so and reloads |
+| ![A preview card with a picture of the page, shown when hovering a tab](docs/screenshots/tab-preview.png) | ![The tab search box finding the volcano tabs](docs/screenshots/tab-search.png) |
+| **Tab hover preview** | **Tab search** |
+| ![The Tabs panel with School and Personal groups and a saved workspace marked with its project brief](docs/screenshots/tab-groups.png) | ![The downloads panel with files sorted into PDFs, Images and Spreadsheets, each with Undo](docs/screenshots/downloads.png) |
+| **Tab groups and workspaces that remember** the chat and the project brief | **Download sorting** into folders, with Undo |
+| ![Settings, Appearance: two rows of ten colour swatches, each with its name underneath, Aurora selected](docs/screenshots/settings-themes.png) | ![The Library's Memory tab finding pages about lava and magma](docs/screenshots/recall.png) |
+| **Ten named themes**, separately for light and dark | **Recall**: search the text of pages you've read |
+| ![The profiles panel with School and Personal profiles](docs/screenshots/profiles.png) | ![The passwords panel with two sample logins](docs/screenshots/passwords.png) |
+| **Profiles**: separate logins and cookies | **Password manager** |
+| ![The extensions panel](docs/screenshots/extensions.png) | ![The Privacy Center with tracker blocking and per-site permissions](docs/screenshots/privacy.png) |
+| **Chrome extensions** | **Privacy Center** |
+| ![The clean-up panel after a disk scan: old downloads, node_modules folders, caches and big files, each with a Review button](docs/screenshots/cleanup-disk.png) | ![Rename by content listing IMG_4021.jpg and scan0003.pdf, with a note saying a small picture of each is sent](docs/screenshots/rename-by-content.png) |
+| **What's eating your disk**: groups to review, biggest folders | **Rename by content**: exactly what will be sent, before it is |
+| ![A review list moving a screenshot and a receipt into Screenshots and Receipts folders](docs/screenshots/photo-triage.png) | ![The clean-up tools for a slow Mac, unused apps and login items](docs/screenshots/cleanup-speed.png) |
+| **Photo triage**: screenshots and receipts suggested for their own folders | **Why is my Mac slow?**, quit unused apps and login items |
+| ![The assistant's plan listing excerpts from science-fair.md to send, with Send these excerpts and answer](docs/screenshots/files-plan.png) | ![The assistant's answer about the science fair date and poster, citing the notes file](docs/screenshots/files-answer.png) |
+| **Answer from my files**: the excerpts it would send, for your OK | …then the answer, citing your files |
+| ![Settings: Answer from my files with an indexed Notes folder, and the timeline switch](docs/screenshots/files-settings.png) | ![Library, Timeline: pages read today and an assistant task, by time](docs/screenshots/timeline.png) |
+| Folders to answer from, and the opt-in timeline, in Settings | **Timeline of my day** |
+| ![This site panel checking a page: sponsored parts, last updated in 2019, run by Wellness Wow Media, two tracking companies blocked](docs/screenshots/page-check.png) | ![The School panel with its six tools](docs/screenshots/school.png) |
+| **Check this page**: ads, age, owner and trackers, each with how sure it is | **School**: study packs (quiz, flashcards, summary), timetable, assignments, slides, submit-checker, practice partner |
+| ![Classes read from a sample school portal in a table, with weeks to repeat](docs/screenshots/timetable.png) | ![The Routines panel with Friday timetable, Tidy up and Check homework](docs/screenshots/routines.png) |
+| **Fill in my timetable**: check every class before the calendar file is made | **Routines**: taught by showing, with phrases and reminders |
+| ![The red Watching bar at the top of the window with a Stop button](docs/screenshots/teach-by-showing.png) | ![The assistant showing the steps of the Friday timetable routine with Run these 4 steps](docs/screenshots/routine-run.png) |
+| **Teach it by showing**: it watches until you press Stop | **Running a routine** always starts with every step |
+| ![The Do this for me window with copied meeting notes turned into a table, and Copy draft](docs/screenshots/quick-do.png) | ![A price table for sample shops with the cheapest same-product offer marked, a used offer flagged and a shop that couldn't be read](docs/screenshots/compare-prices.png) |
+| **Do this for me** from any app (⌃⇧Space) | **Compare prices**: one table, never buys |
+| ![The new tab page in the Aurora theme](docs/screenshots/newtab.png) | |
+| **New tab** with the Aurora wallpaper | |
 
-Type `/` in Ask mode for shortcuts: `/summarize`, `/tldr`, `/explain`, `/critique`, `/compare [topic]` and `/tabs` (both read up to four open pages), and `/recall <question>` (searches pages you've read). Answers offer follow-up questions, and the clipboard button exports the chat as Markdown.
+<details>
+<summary><b>Every theme, in light and dark</b></summary>
 
-Two modes:
+| Light | Dark |
+| --- | --- |
+| ![The new tab page in Pebble, light mode](docs/screenshots/themes/pebble-light.png) | ![The new tab page in Pebble, dark mode](docs/screenshots/themes/pebble-dark.png) |
+| ![The new tab page in Ocean, light mode](docs/screenshots/themes/ocean-light.png) | ![The new tab page in Ocean, dark mode](docs/screenshots/themes/ocean-dark.png) |
+| ![The new tab page in Forest, light mode](docs/screenshots/themes/forest-light.png) | ![The new tab page in Forest, dark mode](docs/screenshots/themes/forest-dark.png) |
+| ![The new tab page in Sunset, light mode](docs/screenshots/themes/sunset-light.png) | ![The new tab page in Sunset, dark mode](docs/screenshots/themes/sunset-dark.png) |
+| ![The new tab page in Lavender, light mode](docs/screenshots/themes/lavender-light.png) | ![The new tab page in Lavender, dark mode](docs/screenshots/themes/lavender-dark.png) |
+| ![The new tab page in Rose, light mode](docs/screenshots/themes/rose-light.png) | ![The new tab page in Rose, dark mode](docs/screenshots/themes/rose-dark.png) |
+| ![The new tab page in Graphite, light mode](docs/screenshots/themes/graphite-light.png) | ![The new tab page in Graphite, dark mode](docs/screenshots/themes/graphite-dark.png) |
+| ![The new tab page in Aurora (teal + violet), light mode](docs/screenshots/themes/aurora-light.png) | ![The new tab page in Aurora (teal + violet), dark mode](docs/screenshots/themes/aurora-dark.png) |
+| ![The new tab page in Sunrise (orange + pink), light mode](docs/screenshots/themes/sunrise-light.png) | ![The new tab page in Sunrise (orange + pink), dark mode](docs/screenshots/themes/sunrise-dark.png) |
+| ![The new tab page in Twilight (indigo + cyan), light mode](docs/screenshots/themes/twilight-light.png) | ![The new tab page in Twilight (indigo + cyan), dark mode](docs/screenshots/themes/twilight-dark.png) |
 
-- **Ask** answers questions using the page you're on.
-- **Do tasks** runs a loop — read the page → the model picks one action → you approve it → it runs → repeat (max 15 steps). It can click, type, select, scroll, press keys, navigate, open tabs and switch tabs.
+</details>
 
-It controls **browser tabs only**, not the rest of your computer, and it works from a text snapshot of the page, so it does not see images or canvases.
+## Getting a Gemini key
 
-Safety rails:
+The assistant uses Google's Gemini by default. A key is free for personal use:
 
-- **Ask before acting** (default) needs your approval for every click, keystroke and navigation. **Autopilot** only interrupts for sensitive clicks (buy, pay, delete, send, submit…).
-- It never types into password fields.
-- Page text is passed to the model as untrusted data and the prompt tells it to ignore instructions found on pages. That reduces prompt-injection risk but can't eliminate it — keep approval on for sites you don't trust.
-- It stops on repeated actions, invalid model output, or when you press **Stop**.
-- With a cloud provider selected, page content is sent to that provider; the panel footer always shows which one is active.
+1. In Quick Pebble, open the assistant (<kbd>⌘L</kbd>). If there's no key yet, it shows a short guide with pictures.
+2. Click **Get a free key**: it opens Google AI Studio. Sign in with a Google account and click **Create API key**.
+3. Copy the key, paste it into the box in Quick Pebble and click **Save**.
 
-Small local models follow the action format less reliably than large ones. If the agent keeps failing, choose a bigger model.
+The key is kept in memory on your computer and saved, encrypted, to your Quick Pebble account so it comes back when you sign in. It's never written to disk in plain text. Prefer nothing in the cloud? Choose **Ollama** in **Settings → AI**: everything then runs on your computer.
 
-### Chrome extensions
+## Screen mode permissions
 
-System web engines can't host Chrome's extension runtime, so Quick Pebble ships a small compatibility layer:
+Screen mode moves your mouse and keyboard and reads the screen, so macOS asks first:
 
-| Works | Doesn't work |
-|---|---|
-| Content scripts (JS + CSS), URL match patterns, `run_at` | Background / service workers |
-| `chrome.storage.local` / `sync` (per site) | Toolbar popups and options pages |
-| `chrome.runtime.getManifest` / `id` | `chrome.tabs`, `webRequest`, `declarativeNetRequest` and other APIs |
+- **System Settings → Privacy & Security → Screen Recording:** turn on **Quick Pebble**.
+- **System Settings → Privacy & Security → Accessibility:** turn on **Quick Pebble**.
+- Restart Quick Pebble afterwards.
 
-- **Install:** puzzle icon → paste a Chrome Web Store link or ID, or choose a `.crx` file. Downloads use Google's public update endpoint.
-- **Consent:** extensions install **switched off**. The list shows which sites each can read and change, plus warnings about unsupported parts. You switch them on.
-- **Scope:** applies to tabs opened afterwards; never in private windows. Scripts run in the page's own JavaScript world, so a page can observe what an extension adds.
-- Most popular extensions (ad blockers, password managers) depend on background workers and **won't function**.
+It needs Python 3.9 or newer (macOS includes it); the first run sets up its own private environment. Every step sends a screenshot of your whole screen to Google Gemini, so Screen mode needs a Gemini key. Move the mouse into a corner of the screen to stop it at once, or use **Pause** / **Stop** on the bar.
 
 ## Keyboard shortcuts
 
-Use `⌘` on macOS and `Ctrl` on Windows/Linux.
+| Shortcut | What it does |
+| --- | --- |
+| <kbd>⌘L</kbd> | Open the assistant (also <kbd>⌘J</kbd>) |
+| <kbd>⌘⇧L</kbd> | Go to the address bar |
+| <kbd>⌘⇧Space</kbd> | Open the assistant from any app |
+| <kbd>⌃⇧Space</kbd> | **Do this for me** with the text you copied, from any app (<kbd>Ctrl+Alt+Space</kbd> on Windows) |
+| <kbd>⌘⌥P</kbd> | Pause or resume Screen mode |
+| <kbd>⌘⇧P</kbd> | Command palette: every panel, including Clean-up, School, Routines and Compare prices |
+| <kbd>⌘⇧A</kbd> | Search your tabs |
+| <kbd>⌘T</kbd> / <kbd>⌘W</kbd> / <kbd>⌘⇧T</kbd> | New tab / close tab / reopen closed tab |
+| <kbd>⌘⇧N</kbd> | Private window |
+| <kbd>⌘Y</kbd> | History, bookmarks, Recall and Timeline |
+| <kbd>⌘F</kbd> · <kbd>⌘⇧R</kbd> · <kbd>⌘D</kbd> · <kbd>⌘⇧B</kbd> | Find · reader mode · bookmark · bookmarks bar |
+| <kbd>⌘=</kbd> / <kbd>⌘-</kbd> / <kbd>⌘0</kbd> | Zoom in / out / reset |
 
-| Shortcut | Action | | Shortcut | Action |
-|---|---|---|---|---|
-| `⌘T` / `⌘W` | New / close tab | | `⌘⇧P` | Quick Actions |
-| `⌘⇧T` | Reopen closed tab | | `⌘⇧A` | Search tabs |
-| `⌘L` | AI Assistant | | `⌘⇧L` | Focus address bar |
-| `⌘R` | Reload | | `⌘F` | Find in page |
-| `⌘[` / `⌘]` | Back / forward | | `⌘+` `⌘-` `⌘0` | Zoom in / out / reset |
-| `⌘D` | Bookmark page | | `⌘⇧R` | Reader mode |
-| `⌘Y` | History & bookmarks | | `⌘⇧B` | Bookmarks bar |
-| `⌘⇧N` | Private window | | | |
-
-Right-click a tab to pin, duplicate, mute, or move it into a **School / Work / Personal / Entertainment / Shopping** group (or let the AI choose).
+On Windows and Linux use <kbd>Ctrl</kbd> instead of <kbd>⌘</kbd>.
 
 ## Updates
 
-Quick Pebble checks GitHub Releases 15 seconds after launch and every 6 hours. When a newer version exists, an **Update** button appears in the toolbar; **Settings → Updates** shows the version and an **Install & restart** button. You can also press **Check now**, or turn automatic checks off. Settings displays release notes and download progress, keeps progress when you close and reopen the panel, and lets you retry a failed update. Installing an update preserves your saved tabs, workspaces and settings; there is no need to download another installer.
+Quick Pebble checks this repository's GitHub Releases shortly after it starts and then every 15 minutes (an anonymous request; turn it off in **Settings → Updates**). It only offers a release that has an installer for your system and processor. **Update** downloads it from GitHub, checks the sha512 checksum from the release's `latest*.yml`, and on a Mac also mounts the DMG and checks the app's ID, version and code signature before swapping it in and restarting. **Later** skips that version. Nothing installs without your click.
 
-Every update is verified against an Ed25519 public key embedded in the app before it is installed, so a tampered download is rejected. Nothing installs without your click.
+## Privacy
 
-## Privacy and security
+Everything stays on your computer unless you ask the AI to see it, and every tool that sends something shows you what first. New data collection is off by default and never happens in private windows.
 
-- **Local by default.** The default AI provider is Ollama on `localhost`. Choosing a cloud provider sends page text to it, and the app tells you so. API keys live in the OS keychain, never in the database.
-- **Ad and tracker blocking** (Chromium build) runs natively on every network request in the browser process, including ones the HTML parser starts before any page script, using the built-in tracker list plus EasyList/EasyPrivacy-style filter lists (cached, refreshed daily). Navigations to tracker hosts are refused. Per-site exceptions live in the Site panel. It is not a replacement for a full uBlock Origin configuration, but it blocks at the same layer.
-- **HTTPS-only** upgrades `http://` navigations (not localhost, private IPs or `.local`). It first checks the HTTPS site responds; if not, you choose whether to continue over HTTP for that site for the session.
-- **Navigation policy.** Only `http`, `https` and `about:blank` load; `javascript:`, `file:`, `data:` and custom schemes are refused.
-- **Pages get almost no IPC.** A web page can call only three commands (report its own state, forward a shortcut, return an agent result). The calling tab is identified from the webview label, never from the payload. The UI webview has a separate capability.
-- **Site permissions.** "Block" rules override `getUserMedia`, geolocation and `Notification.requestPermission` before page scripts run "Ask" shows a native prompt with a "remember" option; "Allow"/"Block" are applied by the browser itself.
-- **Private windows** use non-persistent webview storage, record no history, save no tab session, and don't load extensions.
-- **The SQLite database is not encrypted.** It sits in your OS app-data folder, protected by your user account. Use full-disk encryption if you need encryption at rest.
+**Every network request Quick Pebble can make:**
 
-Found a vulnerability? See [SECURITY.md](SECURITY.md).
+| When | Where it goes | What is sent |
+| --- | --- | --- |
+| You browse | The sites you visit | What any browser sends. Known trackers and ads are blocked before they load |
+| Daily | Ghostery's filter-list CDN | A request for the latest ad and tracker lists |
+| Every 15 minutes (can be turned off) | api.github.com | An anonymous request for this project's releases |
+| You sign in | Quick Pebble's account server (Supabase) | Your email and the sign-in code; your AI key, encrypted, so it comes back on your other devices |
+| You search with GhostSearch | DuckDuckGo, Wikipedia, Marginalia (and Brave Search or your SearXNG if you add them) | Your search words. No cookies, referrer or account |
+| You use the assistant or any AI tool | Your chosen AI: Google Gemini, OpenAI or Anthropic, or nothing if you choose Ollama | Your question, plus what that tool lists before you send: the page text, the excerpts from your files or pages you read, a small picture of a file, the text you copied |
+| Screen mode, at every step | Google Gemini | A screenshot of your whole screen and the task |
+| You turn on weather or news (off by default) | Open-Meteo; the news feed you pick (BBC, The Guardian, NPR, Al Jazeera, Hacker News) | Your chosen place's coordinates; nothing for news |
+| You turn on link titles (off by default) | The link you hover | A normal request for the page's title, with no cookies |
+| You turn on web research | Brave Search | Your question |
+| You install an extension | Google's Chrome Web Store | The extension's ID |
+| You compare prices | The shops you pick | A search for your product, from an empty session with no cookies or account |
 
-## Known limitations
+**What never leaves your computer:** your history, bookmarks, passwords (encrypted with your master password), Recall's page index, your file index, the timeline, the undo list and receipts, your routines and study packs, and the list of apps you use.
 
-- Only macOS has been exercised by hand; Windows and Linux are built by CI but not hand-tested.
-- Releases are unsigned (no Apple Developer ID / Windows certificate), so first launch needs the steps in [Install](#install).
-- No cross-platform API reports per-tab memory, so Memory Saver's "MB saved" is an estimate (~100 MB per suspended tab).
-- Download tracking isn't wired up, so the "don't suspend during a download" rule exists in the policy but the flag is never set.
-- Audio detection looks at `<audio>`/`<video>` elements only (not Web Audio or WebRTC-only pages).
-- Reader mode uses a density heuristic (not Mozilla Readability) and can miss unusual layouts.
-- The agent can't handle drag-and-drop, canvas apps or CAPTCHAs, and can struggle on heavily dynamic sites.
-- Tab groups are coloured labels, not Chrome-style collapsible groups.
-- Not in v1: sync, a password manager, a PDF viewer, Chrome-style extension popups.
-- Keyboard shortcuts inside pages rely on an injected script and won't fire where script injection is blocked.
+## Build from source
 
-## Development
-
-**Requirements:** Node 20+, Rust (stable), and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for your OS (Xcode Command Line Tools on macOS; WebView2 + MSVC Build Tools on Windows).
+You need Node.js 22 or newer and Python 3.9+ (for Screen mode).
 
 ```bash
 git clone https://github.com/VirajSinghChadha/Quickpebble.git
 cd Quickpebble
 npm install
-npm run tauri:dev        # app with hot reload
+npm run electron:dev     # the app with hot reload
+npm test                 # unit tests (vitest)
 ```
+
+More checks:
 
 ```bash
-npm run typecheck                                    # TypeScript
-npm test                                             # Vitest (frontend logic)
-cargo test   --manifest-path src-tauri/Cargo.toml    # Rust unit tests
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-npm run tauri:build                                  # production bundle for this OS
+npx tsc --noEmit -p .                                        # types
+cd agent && python -m pytest                                 # Screen mode agent
+npx vite --port 1420 &                                       # then, in another terminal, the real-app checks:
+QP_DEV_URL=http://localhost:1420/ QP_SMOKE_FEATURES=1 npx electron .
+QP_DEV_URL=http://localhost:1420/ QP_SMOKE_BROWSER=1 npx electron .
+QP_DEV_URL=http://localhost:1420/ QP_SMOKE_SHOTS=1 npx electron . && python3 scripts/compose-screenshots.py
 ```
 
-### Architecture
+`npm run dist` builds installers into `release/` (DMG, NSIS, AppImage and deb).
 
-```text
-┌─────────────────────────── window ───────────────────────────┐
-│ UI webview (React) ── tab strip · toolbar · panels · overlays│
-│ ┌──────────────────────────────────────────┐ ┌─────────────┐ │
-│ │ one child webview per live tab           │ │ side panel  │ │
-│ └──────────────────────────────────────────┘ └─────────────┘ │
-└───────────────────────────────┬───────────────────────────────┘
-                                │ Tauri IPC
-        ┌───────────────────────┴────────────────────────┐
-        │ Rust core: tabs · memory saver · SQLite · AI   │
-        └────────────────────────────────────────────────┘
-```
+## Project layout
 
-```text
-quick-pebble/
-├── src/                       React 19 + TypeScript + Tailwind v4
-│   ├── components/            TabStrip, AddressBar, Toolbar, ChatPanel, TherapistPanel, …
-│   ├── hooks/                 useTabs, useOllama, useShortcuts, useTheme
-│   ├── store/                 Zustand stores (tabs/UI, assistant chat)
-│   ├── lib/                   typed IPC client, agent loop, shortcuts, helpers
-│   └── styles/globals.css     Pebble UI design tokens
-├── src-tauri/
-│   ├── src/browser.rs         tab webviews, windows, IPC commands, HTTPS-only
-│   ├── src/daemon.rs          Ollama bridge + OpenAI / Anthropic / Gemini
-│   ├── src/memory_saver.rs    suspension policy and exclusion rules
-│   ├── src/extensions.rs      CRX unpacking, Web Store download, content-script runtime
-│   ├── src/updater.rs         signed update checks
-│   ├── src/database.rs        SQLite: history, bookmarks, settings, permissions
-│   ├── src/security.rs        URL normalisation, navigation policy, tracker list
-│   ├── src/inject.js          page script: state, shortcuts, agent ops, blocker, reader
-│   ├── capabilities/          least-privilege IPC permissions
-│   └── tauri.conf.json
-├── Casks/quick-pebble.rb      Homebrew cask (auto-updated on release)
-├── scripts/                   macOS DMG, Windows installer, cask generator
-└── .github/workflows/         CI and release pipelines
-```
+| Folder | What's in it |
+| --- | --- |
+| `electron/` | The main process: tabs and pages (`browser.mjs`), every command the interface can call (`commands.mjs`), blocking, passwords, updates, and the newer tools: `safety.mjs`, `actionlog.mjs`, `receipts.mjs`, `fsguard.mjs` (undo and review), `cleanup.mjs`, `fileindex.mjs`, `timeline.mjs`, `school.mjs`, `routines.mjs`, `quickdo.mjs`, `prices.mjs` |
+| `electron/data/` | Shops per country for price comparison (`retailers.json`) |
+| `agent/` | The Python helper for Screen mode (screenshots, the model call, mouse and keyboard) |
+| `src/` | The interface: React 19, TypeScript, Zustand and Tailwind 4 |
+| `site/` | The website |
+| `docs/` | Install guides and screenshots |
 
-Notes for contributors:
-
-- Design tokens live in `src/styles/globals.css`; changing a `--color-*` value re-themes the app.
-- Adding a Rust command means three edits: register it in `lib.rs`, list it in `build.rs`, and grant it in `src-tauri/permissions/ui.toml` (or `capabilities/pages.json` if pages may call it).
-- Overlays (menus, palette, dialogs) are drawn by the UI webview, which sits beneath page webviews, so the active page is hidden while one is open.
+The old Tauri version lives on the `tauri-1.x` branch.
 
 ## Releasing
 
-Releases are tag-driven. One-time setup (repository admin):
-
-1. Generate a signing key: `npx tauri signer generate -w ~/.tauri/quickpebble.key` (keep it and its password out of git).
-2. Put the **public** key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
-3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-4. Settings → Actions → General → Workflow permissions → **Read and write**.
-
-To ship a version, bump the version files and either run **Actions → Release → Run workflow** on `main` with that version (for example `1.1.0`), or push a matching tag:
-
-```bash
-# 1. bump the version in package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json
-# 2. commit, then tag and push
-git tag v1.1.0 && git push origin v1.1.0
-```
-
-The **Release** workflow then:
-
-1. validates that the tag matches every app version and a signing key is configured;
-2. builds macOS (Apple silicon + Intel) and Windows installers, signs the update bundles, and uploads them with `latest.json` to a draft release;
-3. publishes the release only after all platform builds succeed;
-4. regenerates `Casks/quick-pebble.rb` with the new version and checksums (so `brew install` gets the new build);
-5. running copies of Quick Pebble pick up `latest.json` and show **Update available**.
-
-If the private key is lost, existing installs can't receive updates and users must reinstall.
-
-## Contributing
-
-Issues and pull requests are welcome. Please run the checks under [Development](#development) first.
+1. Update `version` in `package.json` and add the release notes to `CHANGELOG.md`.
+2. Merge to `main` with green CI, then tag: `git tag v2.2.0 && git push origin v2.2.0`.
+3. The release workflow builds the Mac (Apple silicon and Intel), Windows and Linux installers and attaches them, with their `latest*.yml` checksums, to a draft release. Publish it when the files are there; the apps then offer the update.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Viraj Singh Chadha and Kriyansh Aggarwal.

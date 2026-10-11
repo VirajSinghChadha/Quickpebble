@@ -97,7 +97,7 @@ export function RoutinesPanel() {
             {list.length === 0 && <li className="py-6 text-center text-text-secondary">No routines yet.</li>}
             {list.map((r) => (
               <li key={r.id} className="flex items-center gap-2 rounded-xl border border-border p-3">
-                <div className="min-w-0 flex-1"><p className="font-medium">{r.name}{r.imported && <span className="ml-1 text-[11px] text-text-secondary">(imported)</span>}</p><p className="text-[11.5px] text-text-secondary">{r.steps.length} steps{r.trigger ? ` · say “${r.trigger}”` : ""}{r.schedule ? ` · ${scheduleText(r.schedule)}` : ""}</p></div>
+                <div className="min-w-0 flex-1"><p className="font-medium">{r.name}{r.imported && <span className="ml-1 text-[11px] text-text-secondary">(imported)</span>}</p><p className="text-[11.5px] text-text-secondary">{r.steps.length} step{r.steps.length === 1 ? "" : "s"}{r.trigger ? ` · say “${r.trigger}”` : ""}{r.schedule ? ` · ${scheduleText(r.schedule)}` : ""}</p></div>
                 <button type="button" aria-label={`Run ${r.name}`} title="Run (you'll see the steps first)" onClick={() => { close(); useRoutines.getState().ask(r); }} className="grid size-8 place-items-center rounded-lg hover:bg-surface-secondary"><Play size={14} /></button>
                 <button type="button" className={`${btn} text-[12px]`} onClick={() => setDraft(toDraft(r))}>Edit</button>
                 <button type="button" aria-label={`Export ${r.name}`} title="Export to share" onClick={() => void act(async () => { const p = await ipc.routineExport(r.id); if (p) setMsg(`Saved to ${p}.`); })} className="grid size-8 place-items-center rounded-lg hover:bg-surface-secondary"><Download size={14} /></button>

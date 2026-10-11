@@ -445,7 +445,7 @@ export interface LoginItem { kind: "login_item" | "launch_agent" | "run_key"; na
 /** One change in the "Recent changes" list. */
 export interface ActionEntry { id: number; task: string; task_title: string; kind: string; what: string; src: string | null; dst: string | null; at: number; undone: boolean; can_undo: boolean }
 /** A dry-run list waiting for the person's OK. Items with a problem are shown but can't be ticked. */
-export interface TaskItem { i: number; kind: string; path?: string; to?: string; size: number | null; note: string; label: string; what: string; problem: string | null }
+export interface TaskItem { i: number; kind: string; path?: string; display?: string; to?: string; size: number | null; note: string; label: string; what: string; problem: string | null }
 export interface TaskView { id: string; title: string; items: TaskItem[]; ready: number; bytes: number }
 export interface Receipt { id: string; title: string; at: number; done: { what: string; undoable: boolean }[]; failed: { what: string; error: string }[]; bytes: number; skipped: number }
 

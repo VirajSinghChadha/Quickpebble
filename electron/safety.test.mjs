@@ -209,3 +209,12 @@ describe("dry run, confirm, receipt", () => {
     expect(log.list()[0]).toMatchObject({ kind: "quit_app", can_undo: false });
   });
 });
+
+describe("paths on screen", () => {
+  it("shows the home folder as ~", async () => {
+    const { tilde } = await import("./receipts.mjs");
+    expect(tilde("/Users/alex/Downloads/a.pdf", "/Users/alex")).toBe(`~${path.sep === "/" ? "/Downloads/a.pdf" : "\\Downloads\\a.pdf"}`.replace(/\\/g, path.sep));
+    expect(tilde("/Users/alexandra/x", "/Users/alex")).toBe("/Users/alexandra/x");
+    expect(tilde("/tmp/x", "/Users/alex")).toBe("/tmp/x");
+  });
+});

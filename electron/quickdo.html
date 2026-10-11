@@ -14,12 +14,13 @@ button{font:inherit;color:inherit;background:transparent;border:1px solid var(--
 button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
 button:disabled{opacity:.45;cursor:default}
 .mut{color:var(--mut);font-size:12px}
-.copied{max-height:88px;overflow:auto;white-space:pre-wrap;background:var(--soft);border-radius:8px;padding:8px;font-size:12px}
+.copied{flex:none;max-height:88px;overflow:auto;white-space:pre-wrap;background:var(--soft);border-radius:8px;padding:8px;font-size:12px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chips button{border-radius:999px;font-size:12px;padding:3px 10px}
 input,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none}
 input:focus,textarea:focus{border-color:var(--acc)}
-textarea{flex:1;min-height:110px;resize:none}
+textarea{flex:1 1 auto;min-height:90px;resize:none}
+#manual{flex:none;min-height:70px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .note{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
 .warn{color:var(--warn)}

@@ -57,7 +57,7 @@ function ReviewBody() {
                 <input type="checkbox" className="mt-0.5 size-4 accent-primary" disabled={!!it.problem} checked={!it.problem && picked.has(it.i)} onChange={() => toggle(it.i)} aria-label={it.what} />
                 <span className="min-w-0 flex-1">
                   <span className="block break-words">{it.what}</span>
-                  {it.path && <span className="block truncate text-[11px] text-text-secondary" title={it.path}>{it.path}</span>}
+                  {it.path && <span className="block truncate text-[11px] text-text-secondary" title={it.path}>{it.display ?? it.path}</span>}
                   {it.note && <span className="block text-[11.5px] text-text-secondary">{it.note}</span>}
                   {it.problem && <span className="flex items-center gap-1 text-[11.5px] text-red-500"><CircleAlert size={12} /> {it.problem}</span>}
                 </span>

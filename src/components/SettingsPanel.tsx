@@ -37,7 +37,7 @@ const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
 /** The ten colour themes as swatches, each with its name underneath. */
 function ThemeSwatches({ group, value, onPick }: { group: string; value: string; onPick: (id: (typeof PRESETS)[number]["id"]) => void }) {
   return (
-    <div className="grid grid-cols-5 gap-x-1.5 gap-y-2" role="group" aria-label={group}>
+    <div className="grid shrink-0 grid-cols-5 gap-x-1.5 gap-y-2" role="group" aria-label={group}>
       {PRESETS.map((p) => (
         <button key={p.id} type="button" aria-pressed={value === p.id} aria-label={p.label} title={p.label} onClick={() => onPick(p.id)} className="flex w-14 flex-col items-center gap-1 rounded-lg p-0.5 focus-visible:outline-2">
           <span className="swatch" aria-hidden="true" style={{ background: p.color }} data-pressed={value === p.id} />
