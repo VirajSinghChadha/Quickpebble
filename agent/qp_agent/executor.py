@@ -177,6 +177,58 @@ def open_app(name: str) -> None:
     time.sleep(1.5)   # let the window appear before the next screenshot
 
 
+def _frontmost_mac() -> str | None:
+    try:
+        from AppKit import NSWorkspace  # comes with pyautogui's macOS dependencies
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        return str(app.localizedName()) if app else None
+    except Exception:
+        r = subprocess.run(["osascript", "-e", 'tell application "System Events" to get name of first application process whose frontmost is true'],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() or None if r.returncode == 0 else None
+
+
+def _frontmost_windows() -> str | None:
+    import ctypes
+    from ctypes import wintypes
+    u32, k32 = ctypes.windll.user32, ctypes.windll.kernel32  # type: ignore[attr-defined]
+    hwnd = u32.GetForegroundWindow()
+    if not hwnd:
+        return None
+    pid = wintypes.DWORD()
+    u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    handle = k32.OpenProcess(0x1000, False, pid.value)   # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        buf, size = ctypes.create_unicode_buffer(1024), wintypes.DWORD(1024)
+        if not k32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+            return None
+        return os.path.splitext(os.path.basename(buf.value))[0] or None
+    finally:
+        k32.CloseHandle(handle)
+
+
+def clean_app_name(name: str | None) -> str | None:
+    """App names go into the person's permission list, so keep them plain and short."""
+    if not name:
+        return None
+    cleaned = "".join(ch for ch in str(name) if ch.isalnum() or ch in " .&+()'_-").strip()[:80]
+    return cleaned if cleaned and cleaned[0].isalnum() else None
+
+
+def frontmost_app() -> str | None:
+    """Name of the app in front ("Notes", "Safari"), so the person can allow the assistant app by app. None if unknown."""
+    try:
+        if sys.platform == "darwin":
+            return clean_app_name(_frontmost_mac())
+        if sys.platform == "win32":
+            return clean_app_name(_frontmost_windows())
+    except Exception:
+        pass
+    return None
+
+
 def target_pixel(action: Action, grid: Grid, width: int, height: int) -> tuple[int, int]:
     """Where to click, in screen points. Order of trust: the zoomed second look, then the model's own point, then its grid cell."""
     if action.ax is not None and action.ay is not None:

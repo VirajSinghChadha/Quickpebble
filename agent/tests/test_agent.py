@@ -398,3 +398,19 @@ def test_calls_to_gemini_are_counted_and_rate_limits_explained(monkeypatch):
     with pytest.raises(gemini.AgentError, match="over its limit"):
         gemini.propose("k", "m", G, "goal", [], "AAAA")
     assert gemini.CALLS == before + 1                      # the refused request still counts toward the person's quota
+
+
+def test_app_names_are_cleaned_for_the_permission_list():
+    from qp_agent.executor import clean_app_name
+    assert clean_app_name("Notes") == "Notes"
+    assert clean_app_name("Microsoft Word") == "Microsoft Word"
+    assert clean_app_name("Evil\n\"; rm -rf /") == "Evil rm -rf"
+    assert clean_app_name("../../etc") is None
+    assert clean_app_name("") is None and clean_app_name(None) is None
+    assert len(clean_app_name("A" * 300)) == 80
+
+
+def test_frontmost_app_never_raises():
+    from qp_agent.executor import frontmost_app
+    name = frontmost_app()
+    assert name is None or (isinstance(name, str) and 0 < len(name) <= 80)

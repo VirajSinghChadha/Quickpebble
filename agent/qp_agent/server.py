@@ -1,6 +1,7 @@
 """Local sidecar that Quick Pebble talks to over 127.0.0.1. One token, printed once on stdout, guards it.
 
-POST /propose  {"goal": str, "history": [str]}  ->  {"user": {...}, "action": {...}}   (screenshot + Gemini; nothing executed)
+POST /propose  {"goal": str, "history": [str], "watch": bool}  ->  {"user": {...}, "action": {...}, "app": str, "shot"?: str}
+               (screenshot + Gemini; nothing executed. "app" is the app in front; "shot" is the image the model saw, only when watching)
 POST /verify {"goal","history","pending","page_text"} -> {"ok": bool, "problems": str}   (second look before a submit)
 POST /act      {"action": {...}}                ->  {"ok": true}                          (executes one validated action)
 GET  /health                                    ->  {"ok": true}
@@ -119,7 +120,10 @@ class Handler(BaseHTTPRequestHandler):
                         self._zoom(resp, raw, key, model)
                 elif resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_REFINE", "1") != "0":
                     self._refine(resp, raw, key, model)
-                self._send(200, {**resp.model_dump(exclude_none=True), "calls": gemini.CALLS - calls_before})
+                extra = {"app": executor.frontmost_app()}
+                if body.get("watch") is True:
+                    extra["shot"] = shot   # Watch mode: show the person exactly what the model looked at (kept in memory, never saved)
+                self._send(200, {**resp.model_dump(exclude_none=True), **{k: v for k, v in extra.items() if v}, "calls": gemini.CALLS - calls_before})
             elif self.path == "/verify":
                 goal, pending = str(body.get("goal", "")).strip(), str(body.get("pending", ""))[:300]
                 history = [str(h)[:200] for h in body.get("history", [])][-40:]

@@ -104,7 +104,7 @@ export class ScreenAgent {
   commands() {
     const check = (goal, history, extra = 0) => { if (!String(goal).trim() || goal.length > 4000 || history.length > 40 || extra) throw new Error("Invalid request"); };
     return {
-      screen_propose: async (_w, { goal, history, categories, pageText }) => { check(goal, history); const r = await this.post(await this.connection(), "/propose", { goal, history, categories, page_text: pageText }); bumpUsage(r.calls); return r; },
+      screen_propose: async (_w, { goal, history, categories, pageText, watch }) => { check(goal, history); const r = await this.post(await this.connection(), "/propose", { goal, history, categories, page_text: pageText, watch: watch === true }); bumpUsage(r.calls); return r; },
       screen_verify: async (_w, { goal, history, pending, pageText }) => { check(goal, history, String(pending).length > 300); const r = await this.post(await this.connection(), "/verify", { goal, history, pending, page_text: pageText }); bumpUsage(r.calls); return r; },
       screen_overlay: async (_w, { state }) => { this.overlay?.update(state); return true; },
       screen_act: async (_w, { action }) => {

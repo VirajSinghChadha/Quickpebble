@@ -6,6 +6,7 @@
  */
 import type { ScreenAction, ScreenResponse, ScreenStatus } from "./ipc";
 import { categoryLabel, isAllowed, type SitePerms } from "./permissions";
+import { appFor, mentionsProtected } from "./safety";
 
 export const MAX_SCREEN_STEPS = 40;
 const MAX_WAITS_IN_A_ROW = 8;
@@ -46,7 +47,15 @@ export interface ScreenIO {
   /** Pause and take over: while paused the loop waits, and when resumed it looks at the (changed) screen again. */
   isPaused?(): boolean;
   waitForResume?(): Promise<void>;
+  /** Safe mode for apps: may the agent work in this app? Asks the person the first time; false stops the task. */
+  appAccess?(app: string): Promise<boolean>;
+  /** The person's protected folders: steps that mention one always need their OK. */
+  protectedFolders?(): string[];
+  /** Watch mode: what the agent just looked at and what it plans to do. */
+  onWatch?(w: WatchFrame): void;
 }
+
+export interface WatchFrame { step: number; shot?: string; app?: string | null; thinking: string; next: string }
 
 export function describeScreenAction(a: ScreenAction): string {
   const at = a.point ? ` at ${Math.round(a.point[1] / 10)}% across, ${Math.round(a.point[0] / 10)}% down` : a.cell ? ` in cell ${a.cell}` : "";
@@ -130,6 +139,19 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     if (action.type === "done") { status({ phase: "done", thinking: user.message || "Done." }); return io.onEvent({ kind: "final", text: user.message || "Done." }); }
     if (action.type === "ask") { status({ phase: "waiting", thinking: user.message, next: "Waiting for your answer" }); return io.onEvent({ kind: "question", text: user.message || "What would you like me to do?" }); }
     status({ phase: "thinking", thinking: user.thinking, next: `${describeScreenAction(action)}${user.message ? `: ${user.message}` : ""}` });
+    io.onWatch?.({ step: n + 1, shot: res.shot, app: res.app ?? null, thinking: user.thinking, next: `${describeScreenAction(action)}${user.message ? `: ${user.message}` : ""}` });
+
+    // Safe mode for apps: the first step in an app the person hasn't allowed yet asks them, for that app only.
+    const app = appFor(res);
+    if (app && io.appAccess) {
+      status({ phase: "waiting", thinking: user.thinking, next: `Waiting for permission to use ${app}` });
+      const ok = await io.appAccess(app);
+      if (signal.aborted) return fail("Stopped.");
+      if (!ok) {
+        io.onStatus?.({ phase: "idle" });
+        return io.onEvent({ kind: "final", text: `I'm not allowed to work in ${app}, so I stopped. You can change that in Settings → Assistant safety → Apps.` });
+      }
+    }
 
     // Same action again and again usually means it isn't working. Nudge the model to change approach instead
     // of quitting; only give up after many identical attempts. Waiting is allowed to repeat for longer.
@@ -170,11 +192,12 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       }
     }
     const site = io.permissions();
-    const risky = isRisky(res, site);
+    const shielded = io.protectedFolders ? mentionsProtected(res, io.protectedFolders()) : null;
+    const risky = isRisky(res, site) || !!shielded;
     const cat = categoryOf(res, site);
     if (risky || doubtful || io.mode() === "ask") {
       const tag = risky && cat && cat !== "unknown" ? `[${categoryLabel(site, cat)}] ` : "";
-      const warn = doubtful ? `⚠ Double-check is not confident: ${doubtful}. ` : "";
+      const warn = `${shielded ? `⚠ This step involves your protected folder “${shielded}”. ` : ""}${doubtful ? `⚠ Double-check is not confident: ${doubtful}. ` : ""}`;
       status({ phase: "waiting", thinking: user.thinking, next: `Waiting for your OK: ${desc}` });
       const choice = await io.choose(`${warn}${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky || !!doubtful);
       if (signal.aborted || choice === "stop") {

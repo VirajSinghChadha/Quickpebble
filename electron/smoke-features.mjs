@@ -8,7 +8,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); if (!ok) failed++; };
 
-export async function run({ browser, commands, statusBar }) {
+export async function run({ browser, commands, statusBar, safety }) {
   const win = browser.windows.get("main");
   commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
@@ -112,6 +112,47 @@ export async function run({ browser, commands, statusBar }) {
   check("an old chat can be squashed to one summary", squashed.saved > 0 && afterSquash.items.length === 1 && afterSquash.items[0].kind === "summary");
   check("the project knows how many chats it has", commands.ctx_projects(win).find((p) => p.id === pid)?.chats >= 2);
   commands.ctx_clear(win, { chatIds: [squashChat], projectIds: [] });
+
+  // ---------- safety foundation: dry run, confirm, receipt, undo, protected folders, settings
+  const box = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-safety-"));
+  for (const n of ["a.txt", "b.txt", "keep.txt"]) fs.writeFileSync(path.join(box, n), n);
+  fs.mkdirSync(path.join(box, "Locked"));
+  fs.writeFileSync(path.join(box, "Locked", "secret.txt"), "x");
+  commands.settings_set(win, { key: "protected_folders", value: JSON.stringify([path.join(box, "Locked")]) });
+  check("protected folders are listed", commands.protected_list(win)[0] === path.join(box, "Locked"));
+  const items = [...["a.txt", "b.txt", "keep.txt"].map((n) => ({ kind: "move", path: path.join(box, n), to: path.join(box, "Sorted", n), size: 5 })), { kind: "move", path: path.join(box, "Locked", "secret.txt"), to: path.join(box, "Sorted", "secret.txt") }, { kind: "trash", path: "/etc/hosts" }];
+  const view = safety.tasks.preview({ title: "Smoke tidy", roots: [box], items });
+  check("a dry run lists everything and changes nothing", view.items.length === 5 && fs.existsSync(path.join(box, "a.txt")) && !fs.existsSync(path.join(box, "Sorted")));
+  check("protected and outside paths are refused in the list", /protected/.test(view.items[3].problem) && !!view.items[4].problem && view.ready === 3, JSON.stringify(view.items.map((i) => i.problem)));
+  const receipt = await commands.task_confirm(win, { id: view.id, picks: [0, 1, 3, 4] });
+  check("confirm does only the ticked, allowed items", receipt.done.length === 2 && fs.existsSync(path.join(box, "Sorted", "a.txt")) && fs.existsSync(path.join(box, "keep.txt")) && fs.existsSync(path.join(box, "Locked", "secret.txt")), JSON.stringify(receipt));
+  check("a receipt is saved", commands.receipts_list(win, {})[0]?.id === view.id);
+  check("each change is in the undo list", commands.actions_list(win, {}).filter((r) => r.task === view.id).length === 2);
+  const undone = commands.actions_undo_task(win, { task: view.id });
+  check("undo this whole task puts the files back", undone.undone === 2 && fs.existsSync(path.join(box, "a.txt")) && fs.existsSync(path.join(box, "b.txt")));
+  check("a used list can't be confirmed twice", await commands.task_confirm(win, { id: view.id, picks: [2] }).then(() => false, () => true));
+  check("bad safety settings are refused", ["screen_watch:yes", "screen_app_permissions:[1]", 'screen_app_permissions:{"a/b":"allow"}', "protected_folders:{}"].every((kv) => { const [key, ...v] = kv.split(":"); try { commands.settings_set(win, { key, value: v.join(":") }); return false; } catch { return true; } }));
+  commands.settings_set(win, { key: "screen_app_permissions", value: JSON.stringify({ Notes: "allow", Mail: "deny" }) });
+  commands.settings_set(win, { key: "screen_watch", value: "1" });
+  for (let i = 0; i < 5 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await sleep(400); }
+  await js(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Settings')?.click()`);
+  await sleep(1200);
+  check("settings has an Assistant safety section with Watch mode", await js(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent)) && document.querySelector('input[aria-label="Watch mode"]')?.checked === true`));
+  check("settings list app answers with Revoke and Forget", await js(`(() => { const t = document.querySelector('[aria-label="App permissions"]')?.innerText ?? ''; return /Notes\\s*Allowed/.test(t) && /Mail\\s*Not allowed/.test(t) && /Revoke/.test(t) && /Forget/.test(t); })()`));
+  check("settings list the protected folder", await js(`(document.querySelector('[aria-label="Protected folders"]')?.innerText ?? '').includes('Locked')`));
+  await js(`[...document.querySelectorAll('[aria-label="App permissions"] button')].find(b => b.textContent === 'Revoke')?.click()`);
+  await sleep(500);
+  check("revoking an app forgets it", JSON.parse(commands.settings_get(win).screen_app_permissions).Notes === undefined);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open' && b.closest('[aria-label="Assistant safety"]'))?.click()`);
+  await sleep(900);
+  check("Recent changes shows the task with its undone items", await js(`document.body.innerText.includes('Recent changes') && document.body.innerText.includes('Smoke tidy') && /Undone/.test(document.body.innerText)`));
+  await js(`[...document.querySelectorAll('[role="tab"]')].find(b => b.textContent === 'Receipts')?.click()`);
+  await sleep(300);
+  check("Recent changes shows the receipt", await js(`/Smoke tidy[\\s\\S]*2 done/.test(document.body.innerText)`));
+  await js(`document.querySelector('button[aria-label="Close"]')?.click()`);
+  commands.settings_set(win, { key: "screen_watch", value: "0" });
+  commands.settings_set(win, { key: "protected_folders", value: "[]" });
+  fs.rmSync(box, { recursive: true, force: true });
 
   // ---------- clean up the test data
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });

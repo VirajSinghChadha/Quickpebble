@@ -13,6 +13,7 @@ import { UsageMeter } from "./UsageMeter";
 import { useTour } from "../store/useTour";
 import { useReport } from "../store/useReport";
 import { useTaskManager } from "../store/useTaskManager";
+import { SafetySettings } from "./SafetySettings";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -311,6 +312,7 @@ export function SettingsPanel() {
           </p>
           {msg && <p role="alert" className="pt-1 text-[12px] text-red-500">{msg}</p>}
         </div>
+        <SafetySettings save={save} />
         <section className="py-4" aria-label="Web research settings">
           <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Web research</h3>
           <p className="mb-3 text-xs leading-relaxed text-text-secondary">Add your Brave Search API key to let the assistant find sources beyond your open tabs. Searches run only when you enable “Search the web for sources” in chat. Your question goes to Brave; excerpts go to your chosen AI provider. Your key stays in the OS keychain.</p>

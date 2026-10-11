@@ -70,13 +70,26 @@ export class Downloads {
       if (!to) return;
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.renameSync(d.path, to);
+      d.logId = this.log?.record({ task: "downloads-sort", taskTitle: "Download sorting", kind: "move", what: `Sorted “${path.basename(to)}” into ${path.basename(path.dirname(to))}`, from: d.path, to });
       d.movedFrom = d.path; d.path = to; d.name = path.basename(to);
     } catch { /* leave it where it is */ }
+  }
+  /** The action log tells us when a change was undone from the "Recent changes" list, so the item shows its real place. */
+  attachLog(log) {
+    this.log = log;
+    log.onChange((e) => {
+      if (!e?.dst || !e.src) return;   // only undo events carry the paths
+      const d = this.items.find((x) => x.path === e.dst);
+      if (!d) return;
+      d.path = e.src; d.name = path.basename(e.src); delete d.movedFrom; delete d.logId;
+      this.persist(d); this.push();
+    });
   }
   /** Put a tidied download back where it was saved, if that spot is still free. */
   undoMove(id) {
     const d = this.find(id);
     if (!d.movedFrom) throw new Error("That download was not moved.");
+    if (d.logId && this.log) { this.log.undo(d.logId); return; }   // the log moves it back and the listener above updates the list
     if (fs.existsSync(d.movedFrom)) throw new Error("Something with the original name is already in Downloads.");
     fs.renameSync(d.path, d.movedFrom);
     d.path = d.movedFrom; d.name = path.basename(d.path); delete d.movedFrom;
@@ -89,7 +102,8 @@ export class Downloads {
     const name = sanitizeFilename(raw);
     const to = uniquePath(path.dirname(d.path), name, (p) => fs.existsSync(p));
     fs.renameSync(d.path, to);
-    d.path = to; d.name = path.basename(to); d.renamed = true; delete d.movedFrom;
+    this.log?.record({ task: `download-rename-${d.id}-${Date.now()}`, taskTitle: "Renamed a download", kind: "rename", what: `Renamed “${d.name}” to “${path.basename(to)}”`, from: d.path, to });
+    d.path = to; d.name = path.basename(to); d.renamed = true; delete d.movedFrom; delete d.logId;
     this.persist(d); this.push();
   }
   /** Apply a model's suggested name (cleaned to a safe file name). */

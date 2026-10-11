@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
-import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent";
+import { runScreenAgent, type Choice, type ScreenMode, type WatchFrame } from "../lib/screenAgent";
+import { appDecision, parseAppPerms, protectedNote, withApp, type AppChoice } from "../lib/safety";
 import { ipc, isPrivateWindow, type ChatMsg, type ChatSummary, type PageSnapshot, type Project } from "../lib/ipc";
 import { chatTitle, projectContext } from "../lib/context";
 import { approvedPlanNote, normalizeSetting, parsePlan, PLAN_PROMPT, planText, shouldPreview, type Plan } from "../lib/plan";
@@ -47,6 +48,11 @@ interface ChatState {
   modelOffer: { current: string; models: ModelChoice[]; resolve: (model: string | null) => void } | null;
   editPermissions: () => Promise<void>;
   approval: { title?: string; description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
+  /** Safe mode for apps: asked the first time the agent is about to work in an app. */
+  appRequest: { app: string; resolve: (c: AppChoice) => void } | null;
+  /** Watch mode (opt-in): the last screenshot the agent looked at, its thinking and next step, and the approved plan. */
+  watch: WatchFrame | null;
+  watchPlan: string[] | null;
   /** Saved chat this conversation is stored in (null until the first message), the active project, and the lists for the pickers. */
   chatId: number | null;
   projectId: number | null;
@@ -78,6 +84,26 @@ async function activePageText(): Promise<string | undefined> {
   if (!tab.url) return undefined;
   const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot").catch(() => null);
   return snap?.text ? snap.text.slice(0, 6000) : undefined;
+}
+
+/** Apps allowed "just for this task". Cleared when a new task starts. */
+const onceApps = new Set<string>();
+
+/** Asks (or remembers) whether the screen agent may work in this app. */
+async function appAccess(app: string): Promise<boolean> {
+  const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+  const d = appDecision(app, parseAppPerms(s.screen_app_permissions), onceApps);
+  if (d !== "ask") return d === "allow";
+  const choice = await new Promise<AppChoice>((resolve) => {
+    useChat.setState({ appRequest: { app, resolve: (c) => { useChat.setState({ appRequest: null }); resolve(c); } } });
+  });
+  if (choice === "once") onceApps.add(app.toLowerCase());
+  else {
+    const fresh = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+    await ipc.settingsSet("screen_app_permissions", withApp(fresh.screen_app_permissions, app, choice === "always" ? "allow" : "deny")).catch(() => {});
+  }
+  add(choice === "no" ? "step" : "say", choice === "no" ? `Not allowed to use ${app}` : `Allowed to use ${app}${choice === "once" ? " for this task" : ""}.`, choice !== "no");
+  return choice !== "no";
 }
 
 /** Per-site permissions chosen for this session only. */
@@ -313,6 +339,9 @@ export const useChat = create<ChatState>((set, get) => ({
   screenApprovalMode: "auto",
   setScreenApprovalMode: (screenApprovalMode) => set({ screenApprovalMode }),
   approval: null,
+  appRequest: null,
+  watch: null,
+  watchPlan: null,
   permissionRequest: null,
   preparingPermissions: false,
   modelOffer: null,
@@ -355,6 +384,7 @@ export const useChat = create<ChatState>((set, get) => ({
     set({ paused: false });
     { const release = resumeGate; resumeGate = null; release?.(); }
     get().approval?.resolve("stop");
+    get().appRequest?.resolve("no");
     get().permissionRequest?.resolve(null);
     get().modelOffer?.resolve(null);
   },
@@ -435,7 +465,12 @@ export const useChat = create<ChatState>((set, get) => ({
         if (!perms) return void add("say", "Okay, I won't do anything without permissions. Send the task again when you're ready.");
         // Preview the plan: for big tasks (or always, or never, per Settings) the person approves the whole plan before anything runs.
         let goalWithPlan = goal;
-        const previewSetting = normalizeSetting((await ipc.settingsGet().catch(() => ({}) as Record<string, string>)).screen_plan);
+        const settings = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
+        const previewSetting = normalizeSetting(settings.screen_plan);
+        const watching = settings.screen_watch === "1";
+        const guarded = await ipc.protectedList().catch(() => [] as string[]);
+        onceApps.clear();
+        set({ watch: null, watchPlan: null });
         if (previewSetting !== "never") {
           void ipc.screenOverlay({ phase: "thinking", thinking: "Working out a plan…" }).catch(() => {});
           const plan = await makePlan(goal);
@@ -444,15 +479,16 @@ export const useChat = create<ChatState>((set, get) => ({
           if (plan && shouldPreview(previewSetting, plan)) {
             const choice = await askPlan(plan);
             if (runSignal.aborted || choice === "stop") return void add("say", "Okay, I cancelled that. Nothing was done.");
-            if (choice === "allow") goalWithPlan = `${goal}\n\n${approvedPlanNote(plan)}`;
+            if (choice === "allow") { goalWithPlan = `${goal}\n\n${approvedPlanNote(plan)}`; if (watching) set({ watchPlan: plan.steps }); }
           }
         }
         sessionPerms.set(host, perms);
         activePerms = perms;
         if (runSignal.aborted) return;
         const io = makeIO();
-        await runScreenAgent(screenGoal(prior, goalWithPlan, activeContext()), {
-          propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText()),
+        const rules = [activeContext(), protectedNote(guarded)].filter(Boolean).join("\n\n");
+        await runScreenAgent(screenGoal(prior, goalWithPlan, rules), {
+          propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText(), watching),
           verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),
           act: ipc.screenAct,
           // Bring the browser back if it was minimized while the task is about the page it shows.
@@ -466,6 +502,9 @@ export const useChat = create<ChatState>((set, get) => ({
           onStatus: (st) => void ipc.screenOverlay(st).catch(() => {}),
           isPaused: () => get().paused,
           waitForResume: () => new Promise<void>((resolve) => { resumeGate = resolve; }),
+          appAccess,
+          protectedFolders: () => guarded,
+          onWatch: watching ? (w) => set({ watch: w }) : undefined,
         }, runSignal, undefined, screenHistory);
       } else {
         const ctx = activeContext();
@@ -475,8 +514,9 @@ export const useChat = create<ChatState>((set, get) => ({
       if (!runSignal.aborted) add("error", String(e));
     } finally {
       get().approval?.resolve("stop");
+      get().appRequest?.resolve("no");
       void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
-    get().permissionRequest?.resolve(null);
+      get().permissionRequest?.resolve(null);
       set({ busy: false, paused: false });
     }
   },

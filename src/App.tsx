@@ -1,4 +1,6 @@
 import { AnimatePresence, MotionConfig } from "framer-motion";
+import { ChangesPanel } from "./components/ChangesPanel";
+import { ReviewDialog } from "./components/ReviewDialog";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
@@ -107,12 +109,14 @@ export default function App() {
         {overlay === "library" && <Library key="library" />}
         {overlay === "profiles" && <ProfilesPanel key="profiles" />}
         {overlay === "https" && <HttpsPrompt key="https" />}
+        {overlay === "changes" && <ChangesPanel key="changes" />}
       </AnimatePresence>
       <UpdatePrompt />
       {accountStatus !== "ready" && <AuthGate />}
       {accountStatus === "ready" && <Tour />}
       <ReportDialog />
       <TaskManager />
+      <ReviewDialog />
       <RecoveryNotice />
     </div>
     </MotionConfig>

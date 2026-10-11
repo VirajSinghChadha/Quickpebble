@@ -13,6 +13,7 @@ import { Extensions } from "./extensions.mjs";
 import { ScreenAgent } from "./screen.mjs";
 import { StatusBar } from "./overlay.mjs";
 import { ContextStore } from "./context.mjs";
+import { createSafety } from "./safety.mjs";
 import { initUsage } from "./usage.mjs";
 import { installDiagnostics } from "./diagnostics.mjs";
 import { Updater } from "./updater.mjs";
@@ -29,7 +30,7 @@ if (smoke) app.setPath("userData", fs.mkdtempSync(path.join(app.getPath("temp"),
 // A second launch just focuses the first one.
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let browser, db, downloads, commands, filters, extensions, screen, updater;
+let browser, db, downloads, commands, filters, extensions, screen, updater, safety;
 
 function appUrl() {
   if (process.env.QP_DEV_URL) return process.env.QP_DEV_URL;
@@ -72,6 +73,8 @@ app.whenReady().then(async () => {
   app.on("before-quit", () => { try { db.setSetting("clean_exit", "true"); } catch { /* closing anyway */ } });
   browser = new Browser(db, { appUrl: appUrl(), devtools: dev || process.env.QP_DEVTOOLS === "1" });
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
+  safety = createSafety(db);
+  downloads.attachLog(safety.log);
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
   browser.onDownload = (e, item, wc) => downloads.handle(e, item, wc);
   browser.ghost = ghostHandler(db);
@@ -87,7 +90,7 @@ app.whenReady().then(async () => {
   app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
+  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands(), safety: safety.commands } });
   commands.session_recovered = () => { const was = recovered; recovered = false; return was; };
   session.defaultSession.setUserAgent(chromeUserAgent());
 
@@ -125,7 +128,7 @@ app.whenReady().then(async () => {
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
   const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE_BROWSER: "smoke-browser", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
-  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
+  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar, safety })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });

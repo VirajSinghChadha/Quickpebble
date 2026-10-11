@@ -1,4 +1,5 @@
 import { GeminiKeyGuide } from "./GeminiKeyGuide";
+import { AppPermissionCard, WatchCard } from "./SafetyCards";
 import { ContextBar } from "./ContextBar";
 import { UsageMeter } from "./UsageMeter";
 import { useEffect, useRef, useState } from "react";
@@ -19,6 +20,7 @@ const SUGGESTIONS = {
 };
 
 export function ChatPanel() {
+  const appRequest = useChat((s) => s.appRequest);
   const { paused, togglePause, items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
@@ -205,6 +207,8 @@ export function ChatPanel() {
           </div>
         )}
         <PermissionDialog />
+        <AppPermissionCard />
+        <WatchCard />
         {approval && (
           <div role="alertdialog" aria-label="Approve action" className={`rounded-2xl border bg-surface p-3 shadow-pebble ${approval.risky ? "border-red-500/60" : "border-primary/50"}`}>
             <p className="mb-2 flex items-center gap-2 font-medium"><MousePointerClick size={14} className={approval.risky ? "text-red-500" : "text-primary"} /> {approval.title ?? (approval.risky ? "This step looks risky" : "Allow this action?")}</p>
@@ -220,7 +224,7 @@ export function ChatPanel() {
             <p className="mt-2 text-[10.5px] text-text-secondary">Press {approval.options.map((_, i) => i + 1).join(", ")} on your keyboard to choose.</p>
           </div>
         )}
-        {busy && !approval && !permissionRequest && !preparingPermissions && !modelOffer && (
+        {busy && !approval && !appRequest && !permissionRequest && !preparingPermissions && !modelOffer && (
           <div className="flex items-center gap-2 px-1 text-text-secondary" role="status">
             <span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-primary" /> Working…
           </div>

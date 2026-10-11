@@ -222,10 +222,22 @@ export const ipc = {
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
     call<T>("agent_exec", { tabId, op, args }),
-  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string) => {
+  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string, watch = false) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
-    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText });
+    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText, watch });
   },
+  actionsList: (limit = 200) => call<ActionEntry[]>("actions_list", { limit }, []),
+  actionUndo: (id: number) => call<boolean>("action_undo", { id }),
+  actionsUndoTask: (task: string) => call<{ undone: number; failed: { id: number; error: string }[] }>("actions_undo_task", { task }),
+  actionsClear: () => call<void>("actions_clear"),
+  taskView: (id: string) => call<TaskView>("task_view", { id }),
+  taskConfirm: (id: string, picks: number[]) => call<Receipt>("task_confirm", { id, picks }),
+  taskCancel: (id: string) => call<void>("task_cancel", { id }, undefined),
+  receiptsList: (limit = 50) => call<Receipt[]>("receipts_list", { limit }, []),
+  protectedList: () => call<string[]>("protected_list", undefined, []),
+  protectedAdd: () => call<string[]>("protected_add"),
+  protectedRemove: (path: string) => call<string[]>("protected_remove", { path }),
+  folderPick: (title: string) => call<string | null>("folder_pick", { title }),
   screenVerify: async (goal: string, history: string[], pending: string, pageText?: string) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
@@ -350,7 +362,18 @@ export interface ScreenUser {
 export interface ScreenResponse {
   user: ScreenUser;
   action: ScreenAction;
+  /** The app in front when the screenshot was taken (macOS and Windows), for the per-app permission. */
+  app?: string;
+  /** Watch mode only: the JPEG (base64) the model looked at. Kept in memory, never saved. */
+  shot?: string;
 }
+
+/** One change in the "Recent changes" list. */
+export interface ActionEntry { id: number; task: string; task_title: string; kind: string; what: string; src: string | null; dst: string | null; at: number; undone: boolean; can_undo: boolean }
+/** A dry-run list waiting for the person's OK. Items with a problem are shown but can't be ticked. */
+export interface TaskItem { i: number; kind: string; path?: string; to?: string; size: number | null; note: string; label: string; what: string; problem: string | null }
+export interface TaskView { id: string; title: string; items: TaskItem[]; ready: number; bytes: number }
+export interface Receipt { id: string; title: string; at: number; done: { what: string; undoable: boolean }[]; failed: { what: string; error: string }[]; bytes: number; skipped: number }
 
 export interface VaultEntry {
   id: number;

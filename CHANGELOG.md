@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Safety foundation
+- **Recent changes with Undo.** Every file Quick Pebble moves, renames or sends to the Trash for you is listed with an Undo button, plus "Undo this whole task". Undo never overwrites something newer. Download sorting and renames are listed too. Clicks the assistant makes inside other apps can't be undone from here, and the list says so.
+- **List first, then confirm, then a receipt.** Anything that deletes, moves or renames shows the full list first; nothing happens until you tick and confirm. Deleting always means the Trash. Every confirmed task leaves a receipt.
+- **Safe mode for apps.** The first time Screen mode is about to work in an app, it asks you, for that app only: just this task, always, or no. Answers can be revoked in Settings → Assistant safety.
+- **Watch mode** (opt-in, off by default): see the exact screenshot Screen mode looked at, what it thinks and what it will do next. The picture is only kept in memory.
+- **Protected folders.** Choose folders Quick Pebble must never touch. File tasks refuse them outright; Screen mode is told to keep out and must ask before any step that mentions one.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.
