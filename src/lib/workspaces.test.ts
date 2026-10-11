@@ -35,7 +35,7 @@ describe("workspaces", () => {
     persistWorkspaces([w]);
     expect(loadWorkspaces()).toEqual([w]);
     localStorage.setItem("qp.workspaces.v1", JSON.stringify([{ ...w, tabs: [{ url: "javascript:alert(1)" }, { url: "https://safe.com", group: "unknown" }] }]));
-    expect(loadWorkspaces()[0].tabs).toEqual([{ url: "https://safe.com", title: "https://safe.com", favicon: "", pinned: false, group: null }]);
+    expect(loadWorkspaces()[0].tabs).toEqual([{ url: "https://safe.com", title: "https://safe.com", favicon: "", pinned: false, group: "unknown" }]);
     localStorage.setItem("qp.workspaces.v1", "broken");
     expect(loadWorkspaces()).toEqual([]);
   });

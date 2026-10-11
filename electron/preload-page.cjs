@@ -1,7 +1,7 @@
 // Runs in every web page before its own scripts. Pages get a tiny allow-listed bridge; the calling tab is
 // identified in the main process from the sender, never from the payload.
 const { contextBridge, ipcRenderer, webFrame } = require("electron");
-const ALLOWED = new Set(["qp_report", "qp_shortcut", "qp_blocked", "qp_agent_result", "qp_login_seen"]);
+const ALLOWED = new Set(["qp_report", "qp_shortcut", "qp_blocked", "qp_agent_result", "qp_login_seen", "qp_link_hover"]);
 contextBridge.exposeInMainWorld("__qpPage", {
   invoke: (cmd, args) => (ALLOWED.has(cmd) ? ipcRenderer.invoke("qp:page", cmd, args) : Promise.reject(new Error("not allowed"))),
 });

@@ -166,7 +166,7 @@ Use `⌘` on macOS and `Ctrl` on Windows/Linux.
 |---|---|---|---|---|
 | `⌘T` / `⌘W` | New / close tab | | `⌘⇧P` | Quick Actions |
 | `⌘⇧T` | Reopen closed tab | | `⌘⇧A` | Search tabs |
-| `⌘L` | Focus address bar | | `⌘J` | AI Assistant |
+| `⌘L` | AI Assistant | | `⌘⇧L` | Focus address bar |
 | `⌘R` | Reload | | `⌘F` | Find in page |
 | `⌘[` / `⌘]` | Back / forward | | `⌘+` `⌘-` `⌘0` | Zoom in / out / reset |
 | `⌘D` | Bookmark page | | `⌘⇧R` | Reader mode |

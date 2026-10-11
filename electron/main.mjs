@@ -20,7 +20,7 @@ import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dev = !!process.env.QP_DEV_URL;
-const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1" || process.env.QP_SMOKE_FEATURES === "1" || process.env.QP_SMOKE_AGENT === "1";
+const smoke = process.env.QP_SMOKE === "1" || process.env.QP_SMOKE_WEB === "1" || process.env.QP_SMOKE_UI === "1" || process.env.QP_SMOKE_EXT === "1" || process.env.QP_SMOKE_GHOST === "1" || process.env.QP_SMOKE_SHOTS === "1" || process.env.QP_SMOKE_SCREEN === "1" || process.env.QP_SMOKE_FEATURES === "1" || process.env.QP_SMOKE_AGENT === "1" || process.env.QP_SMOKE_BROWSER === "1";
 
 app.setName("Quick Pebble");
 registerGhostScheme();
@@ -66,6 +66,10 @@ installDiagnostics();
 app.whenReady().then(async () => {
   db = new Db(path.join(app.getPath("userData"), "pebble.db"));
   initUsage(db);
+  // Did the last session end cleanly? If not, the UI tells the person their tabs were restored.
+  let recovered = db.getSetting("clean_exit") === "false";
+  db.setSetting("clean_exit", "false");
+  app.on("before-quit", () => { try { db.setSetting("clean_exit", "true"); } catch { /* closing anyway */ } });
   browser = new Browser(db, { appUrl: appUrl(), devtools: dev || process.env.QP_DEVTOOLS === "1" });
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
@@ -84,6 +88,7 @@ app.whenReady().then(async () => {
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
   commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands() } });
+  commands.session_recovered = () => { const was = recovered; recovered = false; return was; };
   session.defaultSession.setUserAgent(chromeUserAgent());
 
   ipcMain.handle("qp:invoke", async (event, cmd, args) => {
@@ -100,6 +105,7 @@ app.whenReady().then(async () => {
 
   applyProxy().catch(() => {});
   setupMenu();
+  browser.trackScroll();
   browser.openWindow({ label: "main" });
   updater.start();
   // Talk to the assistant from any app: bring the browser forward with the assistant open and the cursor in its box.
@@ -117,7 +123,7 @@ app.whenReady().then(async () => {
   try { globalShortcut.register("CommandOrControl+Alt+P", () => toWindows("qp://screen-pause")); } catch { /* the Pause button on the bar still works */ }
   app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
-  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE: "smoke" };
+  const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE_BROWSER: "smoke-browser", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
   if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });

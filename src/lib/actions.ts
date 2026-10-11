@@ -70,7 +70,8 @@ export function runAction(action: string): void {
 export const SHORTCUTS: { key: string; shift: boolean; action: string }[] = [
   { key: "t", shift: false, action: "new-tab" },
   { key: "w", shift: false, action: "close-tab" },
-  { key: "l", shift: false, action: "focus-address" },
+  { key: "l", shift: false, action: "assistant" },
+  { key: "l", shift: true, action: "focus-address" },
   { key: "r", shift: false, action: "reload" },
   { key: "d", shift: false, action: "bookmark" },
   { key: "[", shift: false, action: "back" },

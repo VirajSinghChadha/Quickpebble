@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, File, FolderOpen, Trash2, XCircle } from "lucide-react";
+import { SUGGEST_PROMPT } from "../lib/downloadName";
 import { ipc, type DownloadItem } from "../lib/ipc";
 import { formatBytes, timeAgo } from "../lib/format";
 import { useStore } from "../store/useStore";
@@ -8,6 +9,14 @@ import { useStore } from "../store/useStore";
 export function DownloadsPanel() {
   const items = useStore((s) => s.downloads);
   const [msg, setMsg] = useState<string | null>(null);
+  const [naming, setNaming] = useState<number | null>(null);
+  const suggest = async (d: DownloadItem) => {
+    setNaming(d.id); setMsg(null);
+    try {
+      const reply = await ipc.aiChat(SUGGEST_PROMPT, [{ role: "user", content: `Came from: ${d.host}\nCurrent name: ${d.name}` }], false);
+      await ipc.downloadSuggestApply(d.id, reply);
+    } catch (e) { setMsg(String(e)); } finally { setNaming(null); }
+  };
   const fail = (e: unknown) => setMsg(String(e));
   const finished = items.filter((d) => d.state !== "active").length;
 
@@ -31,6 +40,8 @@ export function DownloadsPanel() {
       <div className="mt-2 flex flex-wrap gap-1.5">
         {d.state === "done" && <button type="button" disabled={!d.can_open} title={d.can_open ? "Open the file" : "Files that can run code are not opened from here"} onClick={() => void ipc.downloadOpen(d.id).catch(fail)} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[12px] hover:bg-surface-secondary disabled:opacity-40"><File size={12} />Open</button>}
         {d.state === "done" && <button type="button" onClick={() => void ipc.downloadReveal(d.id).catch(fail)} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[12px] hover:bg-surface-secondary"><FolderOpen size={12} />Show in folder</button>}
+        {d.can_undo && <button type="button" title="Move it back to where it was saved" onClick={() => void ipc.downloadUndoMove(d.id).catch(fail)} className="rounded-lg border border-border px-2.5 py-1 text-[12px] hover:bg-surface-secondary">Undo move</button>}
+        {d.generic && <button type="button" disabled={naming === d.id} title="Ask your AI for a clearer name, using only the site it came from and the current name" onClick={() => void suggest(d)} className="rounded-lg border border-border px-2.5 py-1 text-[12px] hover:bg-surface-secondary disabled:opacity-50">{naming === d.id ? "Thinking…" : "Suggest a name"}</button>}
         {d.state !== "active" && <button type="button" aria-label={`Remove ${d.name} from the list`} title="Remove from list (the file stays on your computer)" onClick={() => void ipc.downloadRemove(d.id)} className="ml-auto grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary hover:text-red-500"><Trash2 size={13} /></button>}
       </div>
     </li>

@@ -1,4 +1,4 @@
-import { GROUPS, type Tab, type GroupName } from "../store/useStore";
+import { cleanGroupName, type Tab, type GroupName } from "../store/useStore";
 import { isPrivateWindow } from "./ipc";
 
 export interface WorkspaceTab {
@@ -43,7 +43,7 @@ export function loadWorkspaces(): Workspace[] {
       tabs: w.tabs.filter((t: WorkspaceTab) => pageUrl(t?.url)).map((t: WorkspaceTab) => ({
         url: t.url, title: typeof t.title === "string" ? t.title : t.url,
         favicon: typeof t.favicon === "string" ? t.favicon : "", pinned: t.pinned === true,
-        group: GROUPS.includes(t.group as GroupName) ? t.group : null,
+        group: cleanGroupName(t.group),
       })),
     })).filter((w) => w.tabs.length > 0);
   } catch { return []; }

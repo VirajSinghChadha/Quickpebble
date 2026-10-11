@@ -46,6 +46,8 @@ export interface TabEvent {
   loading: boolean;
   suspended: boolean;
   muted: boolean;
+  crashed?: boolean;
+  scrollY?: number;
 }
 
 export interface Suggestion {
@@ -150,6 +152,8 @@ export const ipc = {
   tabActivate: (id: string) => call<void>("tab_activate", { id }),
   tabClose: (id: string) => call<void>("tab_close", { id }),
   tabNavigate: (id: string, input: string, allowHttp = false) => call<string>("tab_navigate", { id, input, allowHttp }, input),
+  tabScrollTo: (id: string, y: number) => call<void>("tab_scroll_to", { id, y }),
+  sessionRecovered: () => call<boolean>("session_recovered", undefined, false),
   tabNav: (id: string, action: "back" | "forward" | "reload" | "stop") => call<void>("tab_nav", { id, action }),
   tabSetPinned: (id: string, pinned: boolean) => call<void>("tab_set_pinned", { id, pinned }),
   tabSetMuted: (id: string, muted: boolean) => call<void>("tab_set_muted", { id, muted }),
@@ -159,6 +163,10 @@ export const ipc = {
   bookmarkToggle: (url: string, title: string) => call<boolean>("bookmark_toggle", { url, title }, false),
   bookmarkSetFolder: (url: string, folder: string) => call<void>("bookmark_set_folder", { url, folder }),
   bookmarksImportChrome: () => call<number>("bookmarks_import_chrome", undefined, 0),
+  hoverShow: (id: string, r: { x: number; y: number; width: number; height: number }, dark: boolean) => call<void>("hover_show", { id, ...r, dark }),
+  hoverHide: () => call<void>("hover_hide"),
+  importScan: (browser: "chrome" | "safari") => call<ImportScan>("import_scan", { browser }),
+  importRun: (browser: "chrome" | "safari", opts: { history: boolean; bookmarks: boolean; tabs: boolean }) => call<{ history: number; bookmarks: number; tabs: string[] }>("import_run", { browser, ...opts }),
   bookmarksImportFile: () => call<number | null>("bookmarks_import_file", undefined, null),
   bookmarkList: (query = "") => call<Bookmark[]>("bookmark_list", { query }, []),
   suggest: (query: string) => call<Suggestion[]>("suggest", { query }, []),
@@ -237,6 +245,8 @@ export const ipc = {
   ctxStale: (days: number) => call<StaleReport>("ctx_stale", { days }, { days, chats: [], projects: [] }),
   ctxClear: (chatIds: number[], projectIds: number[]) => call<{ chats: number; projects: number }>("ctx_clear", { chatIds, projectIds }),
   reportPreview: (includeLog: boolean) => call<{ text: string; version: string; platform: string }>("report_preview", { includeLog }, { text: "(Only available in the installed app.)", version: "", platform: "" }),
+  taskManager: () => call<TaskReport>("task_manager", undefined, { rows: [], total_mb: 0, tabs_mb: 0, other_mb: 0, processes: 0, suspended: 0 }),
+  tabSuspend: (id: string) => call<boolean>("tab_suspend", { id }),
   usageToday: () => call<UsageToday>("usage_today", undefined, { date: "", calls: 0, limit: 1000, level: "ok" }),
   /** Updates the status bar at the bottom of the screen (no-op outside the app). */
   screenOverlay: (state: ScreenStatus) => call<boolean>("screen_overlay", { state }, false),
@@ -246,6 +256,9 @@ export const ipc = {
   downloadsList: () => call<DownloadItem[]>("downloads_list", undefined, []),
   downloadOpen: (id: number) => call<void>("download_open", { id }),
   downloadReveal: (id: number) => call<void>("download_reveal", { id }),
+  downloadUndoMove: (id: number) => call<void>("download_undo_move", { id }),
+  downloadRename: (id: number, name: string) => call<void>("download_rename", { id, name }),
+  downloadSuggestApply: (id: number, reply: string) => call<void>("download_suggest_apply", { id, reply }),
   downloadRemove: (id: number) => call<void>("download_remove", { id }),
   downloadsClearFinished: () => call<void>("downloads_clear_finished"),
   vaultStatus: () => call<{ exists: boolean; unlocked: boolean }>("vault_status", undefined, { exists: false, unlocked: false }),
@@ -353,6 +366,8 @@ export async function onLoginSeen(cb: (e: { id: string; host: string; username: 
   return listen<{ window: string; id: string; host: string; username: string }>("qp://login-seen", (e) => e.payload.window === label && cb(e.payload));
 }
 
+export interface ImportScan { browser: "chrome" | "safari"; history: number | null; bookmarks: number | null; tabs: number; extensions: { id: string; name: string }[]; problem: string }
+
 export interface DownloadItem {
   id: number;
   name: string;
@@ -364,6 +379,8 @@ export interface DownloadItem {
   finished: number | null;
   size: number | null;
   can_open: boolean;
+  can_undo?: boolean;
+  generic?: boolean;
 }
 
 export interface Project { id: number; name: string; notes: string; created: number; last_used: number; bytes: number; chats?: number; last_chat?: number | null }
@@ -371,6 +388,9 @@ export interface ChatSummary { id: number; title: string; project_id: number | n
 export interface StaleRow { id: number; title: string; last_used: number; bytes: number; messages?: number; summarized?: boolean }
 export interface StaleReport { days: number; chats: StaleRow[]; projects: StaleRow[] }
 export interface ContextUsage { chats: number; messages: number; projects: number; bytes: number }
+
+export interface TaskRow { id: string; title: string; url: string; mb: number; cpu: number; shared: boolean; live: boolean; suspended: boolean; pinned: boolean; active: boolean; audible: boolean }
+export interface TaskReport { rows: TaskRow[]; total_mb: number; tabs_mb: number; other_mb: number; processes: number; suspended: number }
 
 export interface UsageToday { date: string; calls: number; limit: number; level: "ok" | "near" | "over" }
 

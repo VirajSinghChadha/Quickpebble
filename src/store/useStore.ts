@@ -2,8 +2,18 @@ import { create } from "zustand";
 import { ipc, isPrivateWindow, type DownloadItem, type TabEvent } from "../lib/ipc";
 import { defaultHome, homeToSettings, parseHome, type HomeSettings } from "../lib/home";
 
-export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
-export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
+export type BuiltinGroup = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
+/** A group is any short name. The five built-in ones have fixed colors; names the AI (or you) make up get a color from their name. */
+export type GroupName = string;
+export const GROUPS: BuiltinGroup[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
+/** Letters, numbers and spaces only, short, so a model can't smuggle markup or a huge label into the tab strip. */
+export const cleanGroupName = (raw: unknown): string | null => {
+  const n = String(raw ?? "").replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 20).trim();
+  if (!n) return null;
+  return GROUPS.find((g) => g.toLowerCase() === n.toLowerCase()) ?? n;
+};
+/** Built-in groups first, then any custom ones in the order they appear. */
+export const groupsInUse = (tabs: readonly { group: GroupName | null }[]): GroupName[] => [...GROUPS, ...new Set(tabs.flatMap((t) => (t.group && !(GROUPS as string[]).includes(t.group) ? [t.group] : [])))];
 export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site" | "passwords" | "downloads";
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
@@ -27,6 +37,10 @@ export interface Tab {
   bookmarked: boolean;
   /** Restored from a previous session; the page loads on first activation. */
   needsLoad: boolean;
+  /** The page's process died twice in a row; the tab shows a "this tab crashed" screen instead of a blank page. */
+  crashed: boolean;
+  /** How far down the page was scrolled, kept so a restored session returns to the same spot. */
+  scrollY: number;
 }
 
 export const NEW_TAB_URL = "";
@@ -46,6 +60,8 @@ export const makeTab = (over: Partial<Tab> = {}): Tab => ({
   muted: false,
   bookmarked: false,
   needsLoad: false,
+  crashed: false,
+  scrollY: 0,
   ...over,
 });
 
@@ -74,6 +90,8 @@ interface State {
   setPreset: (mode: "light" | "dark", p: string) => void;
   layout: Layout;
   aiAutocomplete: boolean;
+  wallpaper: boolean;
+  setWallpaper: (v: boolean) => void;
   summary: { tabId: string; text: string | null; error: string | null; loading: boolean } | null;
   focusAddressNonce: number;
   sidebar: Sidebar;
@@ -135,7 +153,7 @@ const safeSet = (k: string, v: string) => {
 
 function persist(tabs: Tab[], activeId: string) {
   if (isPrivateWindow()) return; // private windows never write a session
-  const slim = tabs.map(({ id, url, title, favicon, pinned, group }) => ({ id, url, title, favicon, pinned, group }));
+  const slim = tabs.map(({ id, url, title, favicon, pinned, group, scrollY }) => ({ id, url, title, favicon, pinned, group, scrollY }));
   safeSet(SESSION_KEY, JSON.stringify({ tabs: slim, activeId }));
 }
 
@@ -170,6 +188,8 @@ export const useStore = create<State>((set, get) => ({
   },
   layout: (safeGet("qp.layout") as Layout) || "classic",
   aiAutocomplete: safeGet("qp.aiAutocomplete") === "1",
+  wallpaper: safeGet("qp.wallpaper") !== "0",
+  setWallpaper: (v) => { safeSet("qp.wallpaper", v ? "1" : "0"); set({ wallpaper: v }); },
   summary: null,
   focusAddressNonce: 0,
   sidebar: null,
@@ -215,7 +235,7 @@ export const useStore = create<State>((set, get) => ({
     const saved = loadSession();
     if (saved) set({ tabs: saved.tabs, activeId: saved.activeId });
     const { tabs, activeId } = get();
-    for (const t of tabs) await ipc.tabCreate(t.id, t.pinned);
+    for (const t of tabs) { await ipc.tabCreate(t.id, t.pinned); if (t.scrollY > 40) void ipc.tabScrollTo(t.id, t.scrollY); }
     get().activate(activeId);
     if (get().bookmarksBar) void ipc.chromeSet(BASE_CHROME + BOOKMARKS_BAR);
     const s = await ipc.settingsGet();
@@ -304,7 +324,7 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) =>
         t.id === e.id
-          ? { ...t, url: e.url || t.url, title: e.title, favicon: e.favicon, audible: e.audible, recording: e.recording, loading: e.loading, suspended: e.suspended, muted: e.muted }
+          ? { ...t, url: e.url || t.url, title: e.title, favicon: e.favicon, audible: e.audible, recording: e.recording, loading: e.loading, suspended: e.suspended, muted: e.muted, crashed: !!e.crashed, scrollY: e.scrollY ?? t.scrollY }
           : t,
       ),
     }));

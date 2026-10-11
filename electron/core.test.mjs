@@ -118,3 +118,15 @@ describe("memory saver", () => {
     expect(shouldSuspend(cfg, { ...t, idleMs: 11 * 60_000 }, 0.9)).toBe(true); // pressure halves the 20-minute timeout
   });
 });
+
+import { searchLang } from "./security.mjs";
+describe("search language", () => {
+  it("adds the language for engines that support it", () => {
+    expect(normalizeInput("volcano", "google", "en").href).toBe("https://www.google.com/search?q=volcano&hl=en&lr=lang_en");
+    expect(normalizeInput("volcano", "bing", "en").href).toContain("&setlang=en");
+    expect(searchLang("duckduckgo", "en")).toBe("&kl=us-en");
+    expect(searchLang("google", "")).toBe("");
+    expect(searchLang("google", "en&x=1")).toBe("");
+    expect(searchLang("ecosia", "en")).toBe("");
+  });
+});

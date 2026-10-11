@@ -127,7 +127,7 @@ const add = (kind: ChatKind, text: string, ok?: boolean) =>
 async function offerUpgrade(): Promise<void> {
   try {
     const settings = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
-    if ((settings.ai_provider ?? "ollama") !== "gemini") return;
+    if ((settings.ai_provider ?? "gemini") !== "gemini") return;
     const status = await ipc.aiStatus().catch(() => null);
     const current = settings.ai_model || status?.model || "";
     const models = rankUpgrades(await ipc.geminiModels().catch(() => []), current);

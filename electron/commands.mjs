@@ -9,10 +9,11 @@ import { ftsQuery } from "./recall.mjs";
 import { PERMISSIONS, POLICIES, SEARCH_ENGINES, parseUrl } from "./security.mjs";
 import { stats as blockStats } from "./adblock.mjs";
 import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
+import * as importer from "./importer.mjs";
 import { usageSummary } from "./usage.mjs";
 import { buildReport } from "./diagnostics.mjs";
 
-const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen"]);
+const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen", "downloads_sort", "search_lang", "link_preview"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -55,6 +56,22 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
       if (!fs.existsSync(file)) throw new Error("Chrome's bookmarks were not found on this computer.");
       return db.importBookmarks(parseChromeJson(fs.readFileSync(file, "utf8")).slice(0, 5000));
     },
+    // Import from Chrome / Safari. Scan counts what is there; run brings the chosen kinds in.
+    import_scan: async (_w, { browser }) => {
+      const b = browser === "safari" ? "safari" : "chrome";
+      const res = { browser: b, history: null, bookmarks: null, tabs: await importer.openTabs(b).then((t) => t.length), extensions: b === "chrome" ? importer.chromeExtensions() : [], problem: "" };
+      try { res.history = importer.history(b).length; } catch (e) { res.problem = importer.explain(b, e); }
+      try { res.bookmarks = (b === "chrome" ? importer.chromeBookmarks() : await importer.safariBookmarks()).length; } catch (e) { res.problem ||= importer.explain(b, e); }
+      return res;
+    },
+    import_run: async (_w, { browser, history, bookmarks, tabs }) => {
+      const b = browser === "safari" ? "safari" : "chrome";
+      const out = { history: 0, bookmarks: 0, tabs: [] };
+      if (history) out.history = db.importHistory(importer.history(b));
+      if (bookmarks) out.bookmarks = db.importBookmarks(b === "chrome" ? importer.chromeBookmarks() : await importer.safariBookmarks());
+      if (tabs) out.tabs = await importer.openTabs(b);
+      return out;
+    },
     bookmarks_import_file: async (w) => {
       const r = await dialog.showOpenDialog(w.win, { filters: [{ name: "Bookmarks", extensions: ["html", "htm"] }], properties: ["openFile"] });
       if (r.canceled || !r.filePaths[0]) return null;
@@ -93,6 +110,16 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
 
     // ---- memory saver
     memory_saver_get: () => B.memory,
+    task_manager: (w) => B.taskManager(w),
+    tab_scroll_to: (w, { id, y }) => { const t = B.tab(w, id); t.restoreScrollY = Number.isFinite(y) ? Math.max(0, Math.min(1e7, Math.round(y))) : 0; },
+    hover_show: async (w, { id, x, y, width, height, dark }) => {
+      const t = B.tab(w, id);
+      const host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ""); } catch { return ""; } })();
+      const num = (n) => (Number.isFinite(n) ? Number(n) : 0);
+      B.hoverCard.show(w, { title: t.title, host, thumb: await B.thumbOf(w, id), dark: !!dark, anchor: { x: num(x), y: num(y), width: num(width), height: num(height) } });
+    },
+    hover_hide: (w) => B.hoverCard.hide(w),
+    tab_suspend: (w, { id }) => B.suspendTab(w, id),
     memory_saver_set: (_w, { config }) => { db.setSetting("memory_saver", JSON.stringify(config)); B.memory = { ...B.memory, ...config }; },
     memory_stats: () => B.memoryStats(),
 
@@ -188,6 +215,9 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     downloads_list: () => downloads.snapshot(),
     download_open: (_w, { id }) => downloads.open(id),
     download_reveal: (_w, { id }) => downloads.reveal(id),
+    download_undo_move: (_w, { id }) => downloads.undoMove(id),
+    download_rename: (_w, { id, name }) => downloads.rename(id, name),
+    download_suggest_apply: (_w, { id, reply }) => downloads.applySuggestion(id, reply),
     download_remove: (_w, { id }) => downloads.remove(id),
     downloads_clear_finished: () => downloads.clearFinished(),
 

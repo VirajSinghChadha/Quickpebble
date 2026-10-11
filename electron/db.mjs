@@ -56,6 +56,21 @@ export class Db {
     return added;
   }
 
+  /** Merge imported history: keep the newest visit time and the larger visit count. Never lowers what is already here. */
+  importHistory(items) {
+    let added = 0;
+    this.d.exec("BEGIN");
+    try {
+      for (const { url, title, visits, at } of items) {
+        added += Number(this.run(`INSERT INTO history (url, title, visited_at, visit_count) VALUES (?1, ?2, ?3, ?4)
+          ON CONFLICT(url) DO UPDATE SET visited_at = MAX(history.visited_at, excluded.visited_at), visit_count = MAX(history.visit_count, excluded.visit_count),
+          title = CASE WHEN history.title = '' THEN excluded.title ELSE history.title END`, url, String(title).slice(0, 300), at || now(), Math.max(1, visits)).changes);
+      }
+      this.d.exec("COMMIT");
+    } catch (e) { this.d.exec("ROLLBACK"); throw e; }
+    return added;
+  }
+
   getSetting(key) { return this.get("SELECT value FROM settings WHERE key = ?1", key)?.value; }
   setSetting(key, value) {
     this.run("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value);

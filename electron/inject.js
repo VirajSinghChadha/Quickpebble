@@ -345,12 +345,29 @@
 
   // ---- shortcuts (the UI webview does not receive keys while a page has focus) -------
   const COMBOS = [
-    ["t", false, "new-tab"], ["t", true, "reopen-tab"], ["w", false, "close-tab"], ["l", false, "focus-address"],
+    ["t", false, "new-tab"], ["t", true, "reopen-tab"], ["w", false, "close-tab"], ["l", false, "assistant"], ["l", true, "focus-address"],
     ["r", false, "reload"], ["d", false, "bookmark"], ["[", false, "back"], ["]", false, "forward"],
     ["p", true, "palette"], ["a", true, "tab-search"], ["n", true, "private"], ["j", false, "assistant"],
     ["f", false, "find"], ["y", false, "library"], ["r", true, "reader"], ["b", true, "bookmarks-bar"], ["=", false, "zoom-in"], ["+", true, "zoom-in"],
     ["-", false, "zoom-out"], ["0", false, "zoom-reset"],
   ];
+  // ---- link hover preview: real mouse only (a page can't fake it), after a short pause ----
+  let hoverEl = null, hoverTimer = 0;
+  const clearHover = () => { clearTimeout(hoverTimer); if (hoverEl) { hoverEl = null; invoke("qp_link_hover", { url: "" }); } };
+  document.addEventListener("mouseover", (e) => {
+    if (!e.isTrusted) return;
+    const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (a === hoverEl) return;
+    clearHover();
+    if (!a || !/^https?:/i.test(a.href)) return;
+    hoverTimer = setTimeout(() => {
+      hoverEl = a;
+      const r = a.getBoundingClientRect();
+      invoke("qp_link_hover", { url: a.href, x: r.left, y: r.top, w: r.width, h: r.height });
+    }, 700);
+  }, true);
+  for (const ev of ["mouseout", "mousedown", "wheel", "keydown", "blur"]) window.addEventListener(ev, (e) => { if (ev === "mouseout" && e.relatedTarget && hoverEl && hoverEl.contains(e.relatedTarget)) return; clearHover(); }, true);
+
   window.addEventListener("keydown", (e) => {
     if (!(MAC ? e.metaKey : e.ctrlKey) || e.altKey) return;
     const k = e.key.toLowerCase();

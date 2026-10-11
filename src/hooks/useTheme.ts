@@ -19,6 +19,8 @@ export function useTheme(): void {
   const theme = useStore((s) => s.theme);
   const presetLight = useStore((s) => s.presetLight);
   const presetDark = useStore((s) => s.presetDark);
+  const wallpaper = useStore((s) => s.wallpaper);
+  useEffect(() => { if (wallpaper) document.documentElement.dataset.wall = "on"; else delete document.documentElement.dataset.wall; }, [wallpaper]);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
