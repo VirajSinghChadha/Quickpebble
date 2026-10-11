@@ -63,6 +63,26 @@ export async function run({ browser, commands }) {
   commands.tab_nav(win, { id, action: "reload" });
   check("Reload brings the tab back", await waitFor(async () => !tab().crashed && (await wc().executeJavaScript("document.title")) === "Page /one", 10000));
 
+  // ---- hover card, import scan, wallpaper
+  const kids = () => win.win.contentView.children.length;
+  const before = kids();
+  await commands.hover_show(win, { id, x: 100, y: 8, width: 120, height: 32, dark: false });
+  check("hovering a tab shows a preview card above the page", kids() === before + 1);
+  await commands.hover_show(win, { id, x: 100, y: 8, width: 120, height: 32, dark: true });
+  check("showing it again replaces it, no pile-up", kids() === before + 1);
+  commands.hover_hide(win);
+  check("moving away removes the card", kids() === before);
+  let thumb = "";
+  await waitFor(async () => { thumb = await browser.thumbOf(win, id); return thumb.length > 500; }, 5000);
+  check("the card has a real picture of the page", /^data:image\/jpeg;base64,/.test(thumb) && thumb.length > 500, String(thumb).length);
+  const scan = await commands.import_scan(win, { browser: "chrome" });
+  check("import scan answers for Chrome without crashing", typeof scan.tabs === "number" && Array.isArray(scan.extensions), JSON.stringify({ ...scan, extensions: scan.extensions.length }));
+  const scanS = await commands.import_scan(win, { browser: "safari" });
+  check("import scan explains when Safari is locked or missing", scanS.history !== null || /Full Disk Access|not found/.test(scanS.problem), scanS.problem);
+  await ui.executeJavaScript(`localStorage.setItem("qp.wallpaper","1")`);
+  const wall = await probe(() => ui.executeJavaScript(`document.documentElement.dataset.wall`));
+  check("wallpaper is on by default", wall === "on", String(wall));
+
   check("the unexpected-quit flag can be read", typeof commands.session_recovered(win) === "boolean");
   console.log(failed ? `\n${failed} CHECK(S) FAILED` : "\nALL BROWSER CHECKS PASSED");
   server.close();

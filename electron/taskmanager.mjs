@@ -23,5 +23,6 @@ export function summarize(metrics, tabs) {
   const total = metrics.reduce((n, m) => n + m.memory.workingSetSize, 0);
   const tabPids = new Set(tabs.filter((t) => t.pid).map((t) => t.pid));
   const tabsKb = metrics.filter((m) => tabPids.has(m.pid)).reduce((n, m) => n + m.memory.workingSetSize, 0);
-  return { rows, total_mb: mb(total), tabs_mb: mb(tabsKb), other_mb: mb(total - tabsKb), processes: metrics.length, suspended: tabs.filter((t) => t.suspended).length };
+  const totalMb = mb(total), tabsMb = Math.min(mb(tabsKb), totalMb);   // 'other' is the remainder, so the rounded numbers always add up
+  return { rows, total_mb: totalMb, tabs_mb: tabsMb, other_mb: totalMb - tabsMb, processes: metrics.length, suspended: tabs.filter((t) => t.suspended).length };
 }

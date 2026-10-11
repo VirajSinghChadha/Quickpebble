@@ -12,7 +12,8 @@ const LIMIT = 5000;
 const WEBKIT_EPOCH = 11644473600;   // seconds between 1601 and 1970 (Chrome)
 const COCOA_EPOCH = 978307200;      // seconds between 1970 and 2001 (Safari)
 
-export const chromeTime = (micros) => Math.max(0, Math.floor(Number(micros) / 1e6 - WEBKIT_EPOCH));
+/** Chrome stores microseconds since 1601; the query divides to whole seconds first because the raw value is too big for a JS number. */
+export const chromeTime = (secs1601) => Math.max(0, Math.floor(Number(secs1601) - WEBKIT_EPOCH));
 export const safariTime = (secs) => Math.max(0, Math.floor(Number(secs) + COCOA_EPOCH));
 export const isWebUrl = (u) => /^https?:\/\//i.test(String(u));
 const web = (rows) => rows.filter((r) => isWebUrl(r.url)).slice(0, LIMIT);
@@ -49,7 +50,7 @@ export async function openTabs(browser) {
 
 export function history(browser) {
   if (browser === "chrome") {
-    return web(readDb(path.join(chromeDir(), "History"), "SELECT url, title, visit_count AS n, last_visit_time AS t FROM urls WHERE hidden = 0 ORDER BY last_visit_time DESC LIMIT 6000")
+    return web(readDb(path.join(chromeDir(), "History"), "SELECT url, title, visit_count AS n, last_visit_time / 1000000 AS t FROM urls WHERE hidden = 0 ORDER BY last_visit_time DESC LIMIT 6000")
       .map((r) => ({ url: r.url, title: r.title ?? "", visits: Number(r.n) || 1, at: chromeTime(r.t) })));
   }
   return web(readDb(path.join(safariDir(), "History.db"), "SELECT i.url AS url, v.title AS title, i.visit_count AS n, MAX(v.visit_time) AS t FROM history_items i JOIN history_visits v ON v.history_item = i.id GROUP BY i.id ORDER BY t DESC LIMIT 6000")
@@ -107,4 +108,5 @@ function resolveName(name, dir, locale) {
 /** Plain-language reason for a failed read, so the screen can tell the person what to do. */
 export const explain = (browser, e) => String(e?.message) === "no-access"
   ? `macOS is blocking access to ${browser === "safari" ? "Safari's" : "Chrome's"} files. Open System Settings → Privacy & Security → Full Disk Access, turn on Quick Pebble, then try again.`
-  : `${browser === "safari" ? "Safari" : "Chrome"} data was not found on this computer.`;
+  : String(e?.message) === "not-found" ? `${browser === "safari" ? "Safari" : "Chrome"} data was not found on this computer.`
+  : `Could not read ${browser === "safari" ? "Safari" : "Chrome"} data (${String(e?.message).slice(0, 100)}).`;

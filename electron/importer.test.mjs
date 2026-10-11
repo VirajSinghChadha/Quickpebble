@@ -3,7 +3,7 @@ import { chromeTime, isWebUrl, safariTime, walkSafari } from "./importer.mjs";
 
 describe("importing from other browsers", () => {
   it("converts Chrome and Safari timestamps to unix seconds", () => {
-    expect(chromeTime(13_370_000_000_000_000)).toBe(13_370_000_000 - 11_644_473_600);
+    expect(chromeTime(13_370_000_000)).toBe(13_370_000_000 - 11_644_473_600);
     expect(safariTime(0)).toBe(978_307_200);
     expect(chromeTime(0)).toBe(0);
   });
