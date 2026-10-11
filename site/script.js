@@ -30,8 +30,8 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const system = matchMedia('(prefers-color-scheme: dark)');
   const toggle = document.querySelector('#theme-toggle');
-  const colors = ['#2563eb','#0891b2','#16a34a','#ea580c','#7c3aed','#e11d48','#374151','#0d9488','#f97316','#4f46e5'];
-  const ends = ['#0d9488','#2563eb','#0891b2','#e11d48','#2563eb','#7c3aed','#6b7280','#7c3aed','#ec4899','#06b6d4'];
+  const colors = ['#087f9d','#0891b2','#16a34a','#ea580c','#7c3aed','#e11d48','#374151','#0d9488','#f97316','#4f46e5'];
+  const ends = ['#16875a','#2563eb','#0891b2','#e11d48','#2563eb','#7c3aed','#6b7280','#7c3aed','#ec4899','#06b6d4'];
   const names = ['Pebble','Ocean','Forest','Sunset','Lavender','Rose','Graphite','Aurora','Sunrise','Twilight'];
   const choices = { light:0, dark:0 };
   const mode = () => root.dataset.theme || (system.matches ? 'dark' : 'light');
