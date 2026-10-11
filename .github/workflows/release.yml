@@ -81,6 +81,15 @@ jobs:
     steps:
       - env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      # Installed Tauri (1.x) apps read releases/latest/download/latest.json. Whichever release is "latest" must carry that
+      # file, or their update check fails. Copy it from the newest 1.x release.
+      - name: Keep the Tauri update feed working
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          old=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v1."))][0]')
+          [ -n "$old" ] || exit 0
+          mkdir feed && gh release download "$old" --repo "$GITHUB_REPOSITORY" -p latest.json -D feed
+          gh release upload "$TAG" feed/latest.json --repo "$GITHUB_REPOSITORY" --clobber
 
   homebrew:
     name: Update Homebrew cask
