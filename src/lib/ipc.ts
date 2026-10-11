@@ -118,7 +118,7 @@ export interface PageSnapshot {
   text: string;
   elements: { i: number; tag: string; type?: string; label: string; href?: string; value?: string; disabled?: boolean; offscreen?: boolean }[];
 }
-export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text";
+export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text" | "page_facts";
 export interface ExtensionInfo {
   id: string;
   name: string;
@@ -238,6 +238,15 @@ export const ipc = {
   protectedAdd: () => call<string[]>("protected_add"),
   protectedRemove: (path: string) => call<string[]>("protected_remove", { path }),
   folderPick: (title: string) => call<string | null>("folder_pick", { title }),
+  filesFolders: () => call<FileFolder[]>("files_folders", undefined, []),
+  filesAddFolder: () => call<FileFolder[] | null>("files_add_folder"),
+  filesRemoveFolder: (path: string) => call<FileFolder[]>("files_remove_folder", { path }),
+  filesReindex: () => call<{ path: string; files: number; skipped: number; capped: boolean }[]>("files_reindex"),
+  filesSearch: (query: string, limit = 5) => call<FileHit[]>("files_search", { query, limit }, []),
+  timelineDay: (day: string) => call<{ on: boolean; events: TimelineEvent[] }>("timeline_day", { day }, { on: false, events: [] }),
+  timelineNote: (title: string) => call<boolean>("timeline_note", { kind: "task", title, detail: "" }, false),
+  timelineClear: () => call<void>("timeline_clear"),
+  pageTrackers: (id: string) => call<{ host: string; count: number; blocked: boolean }[]>("page_trackers", { id }, []),
   cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
   cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
   cleanInstallers: () => call<TaskView>("clean_installers"),
@@ -384,6 +393,9 @@ export interface ScreenResponse {
   shot?: string;
 }
 
+export interface FileFolder { path: string; files: number; indexed_at: number | null; skipped: number }
+export interface FileHit { path: string; name: string; snippet: string }
+export interface TimelineEvent { at: number; kind: "page" | "task" | "download" | "chat" | "change"; title: string; detail: string; site?: string; count?: number }
 export interface DiskItem { path: string; size: number; note: string }
 export interface DiskReport { total: number; partial: boolean; scanned: number; folders: { path: string; size: number }[]; groups: { id: string; title: string; count: number; bytes: number; top: DiskItem[] }[] }
 export interface ForgottenApp { name: string; path: string; lastUsed: number | null; size: number | null; leftovers: number; leftoverBytes: number }

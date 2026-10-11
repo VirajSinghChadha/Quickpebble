@@ -404,7 +404,7 @@ export class Browser {
       t.recording = !!r.recording;
       if (typeof r.text === "string") {
         t.text = r.text.slice(0, MAX_TEXT);
-        if (!win.private) { try { this.db.recordVisit(t.url, t.title); } catch { /* db busy */ } remember(this.db, t.url, t.title, t.text); }
+        if (!win.private) { try { this.db.recordVisit(t.url, t.title); } catch { /* db busy */ } remember(this.db, t.url, t.title, t.text); this.onVisit?.(t.url, t.title); }
       } else if (titleChanged && !win.private) { try { this.db.updateTitle(t.url, t.title); } catch { /* ignore */ } }
       this.emitTab(win, t);
     } else if (cmd === "qp_shortcut") {

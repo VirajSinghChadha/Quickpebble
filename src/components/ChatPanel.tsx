@@ -21,7 +21,7 @@ const SUGGESTIONS = {
 
 export function ChatPanel() {
   const appRequest = useChat((s) => s.appRequest);
-  const { paused, togglePause, items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { paused, togglePause, items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, myFiles, setMyFiles, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
   const [showSources, setShowSources] = useState(false);
@@ -37,6 +37,10 @@ export function ChatPanel() {
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (mode === "ask") void ipc.recallStats().then(setRecallStats); }, [mode]);
+  const [fileCount, setFileCount] = useState(0);
+  const overlay = useStore((s) => s.overlay);
+  // Recount after Settings (or any dialog) closes, so a folder added there shows up here straight away.
+  useEffect(() => { if (mode === "ask" && !overlay) void ipc.filesFolders().then((f) => setFileCount(f.reduce((n, x) => n + x.files, 0))); }, [mode, overlay]);
   const enableRecall = async () => {
     await ipc.settingsSet("recall_enabled", "true");
     setRecallStats(await ipc.recallStats());
@@ -142,6 +146,9 @@ export function ChatPanel() {
         {recallStats?.enabled
           ? <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-secondary"><input type="checkbox" disabled={busy} checked={recall} onChange={e => setRecall(e.target.checked)}/> Search pages I've read ({recallStats.pages} remembered)</label>
           : recallStats && <div className="mt-1 px-2 text-xs text-text-secondary">Recall can answer from pages you've read before, stored only on this computer. <button type="button" onClick={() => void enableRecall()} className="font-medium text-primary underline-offset-2 hover:underline">Turn on Recall</button></div>}
+        {fileCount > 0
+          ? <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-secondary"><input type="checkbox" disabled={busy} checked={myFiles} onChange={e => setMyFiles(e.target.checked)}/> Search my files ({fileCount} indexed; you approve what's sent)</label>
+          : <div className="mt-1 px-2 text-xs text-text-secondary">Answer from your own notes and PDFs: choose folders in Settings → Answer from my files.</div>}
         {webResearch && <p className="mt-1 px-2 text-[10px] leading-relaxed text-text-secondary">Sends your question to Brave Search. API key required in Settings. Results are search excerpts.</p>}
         {showSources && <div className="mt-2 space-y-1">
           <p className="px-2 pb-1 text-[11px] text-text-secondary">Choose up to four loaded pages. Only their text is used. With none selected, use the current page if enabled.</p>

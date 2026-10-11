@@ -5,7 +5,7 @@ import { appDecision, parseAppPerms, protectedNote, withApp, type AppChoice } fr
 import { ipc, isPrivateWindow, type ChatMsg, type ChatSummary, type PageSnapshot, type Project } from "../lib/ipc";
 import { chatTitle, projectContext } from "../lib/context";
 import { approvedPlanNote, normalizeSetting, parsePlan, PLAN_PROMPT, planText, shouldPreview, type Plan } from "../lib/plan";
-import { answerPrompt, parseAnswer, sourceFromRecall, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
+import { answerPrompt, parseAnswer, sourceFromFile, sourceFromRecall, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
 import { parseSlash } from "../lib/slash";
 import { rankUpgrades, wantsUpgrade, type ModelChoice } from "../lib/models";
@@ -33,6 +33,9 @@ interface ChatState {
   /** Also search the on-device Recall index of pages the person has read. */
   recall: boolean;
   setRecall: (value: boolean) => void;
+  /** Also search the folders the person chose under "Answer from my files" (local index; excerpts sent only after approval). */
+  myFiles: boolean;
+  setMyFiles: (value: boolean) => void;
   includeCurrentPage: boolean;
   setIncludeCurrentPage: (value: boolean) => void;
   setWebResearch: (value: boolean) => void;
@@ -198,14 +201,14 @@ async function makePlan(goal: string): Promise<Plan | null> {
 }
 
 /** Shows the plan with numbered choices. Resolves "allow" (run it), "skip" (run without a fixed plan) or "stop" (cancel). */
-function askPlan(plan: Plan): Promise<Choice> {
+function askPlan(plan: Plan, words: { title?: string; run?: string; skip?: string } = {}): Promise<Choice> {
   return new Promise<Choice>((resolve) => {
     useChat.setState({
       approval: {
-        title: "Here's my plan",
+        title: words.title ?? "Here's my plan",
         description: planText(plan),
         risky: false,
-        options: [{ choice: "allow", label: "Run this plan" }, { choice: "skip", label: "Run it without a fixed plan" }, { choice: "stop", label: "Cancel" }],
+        options: [{ choice: "allow", label: words.run ?? "Run this plan" }, { choice: "skip", label: words.skip ?? "Run it without a fixed plan" }, { choice: "stop", label: "Cancel" }],
         resolve: (c) => { useChat.setState({ approval: null }); resolve(c); },
       },
     });
@@ -291,6 +294,8 @@ export const useChat = create<ChatState>((set, get) => ({
   webResearch: false,
   recall: false,
   setRecall: (recall) => set({ recall }),
+  myFiles: false,
+  setMyFiles: (myFiles) => set({ myFiles }),
   refreshContext: async () => {
     const [projects, chats] = await Promise.all([ipc.ctxProjects().catch(() => []), ipc.ctxChats().catch(() => [])]);
     set((s) => ({ projects, chats, projectId: projects.some((p) => p.id === s.projectId) ? s.projectId : null }));
@@ -416,6 +421,7 @@ export const useChat = create<ChatState>((set, get) => ({
     const sourceIds = slashTabs ?? [...get().sourceTabIds];
     const webResearch = get().webResearch;
     const recall = get().recall || slashRecall;
+    const myFiles = get().myFiles;
     const includeCurrentPage = get().includeCurrentPage;
     set({ busy: true });
     try {
@@ -444,6 +450,22 @@ export const useChat = create<ChatState>((set, get) => ({
           }
           if (runSignal.aborted) return;
           if (!hits.length && !sources.length) throw new Error("Nothing in your browsing memory matches that. Recall only remembers pages read after it was switched on in Settings.");
+        }
+        if (myFiles) {
+          const hits = await ipc.filesSearch(goal, 5).catch(() => []);
+          if (runSignal.aborted) return;
+          if (!hits.length && !sources.length) throw new Error("Nothing in your chosen folders matches that. Add or re-index folders in Settings → Answer from my files.");
+          if (hits.length) {
+            // Same approval step as computer tasks: the person sees which excerpts will be sent before anything is.
+            const cfg = await ipc.aiStatus().catch(() => null);
+            const where = cfg ? (cfg.provider === "ollama" ? "Ollama on this computer" : cfg.provider) : "your AI provider";
+            const choice = await askPlan({ big: true, steps: [`Search your folders for: “${goal.slice(0, 120)}”`, ...hits.map((h) => `Use an excerpt (about ${h.snippet.length} characters) from “${h.name}”`), `Send ${hits.length === 1 ? "this excerpt" : `these ${hits.length} excerpts`} and your question to ${where}, and answer with citations`] }, { title: "Here's my plan for your files", run: "Send these excerpts and answer", skip: "Answer without my files" });
+            if (runSignal.aborted || choice === "stop") return void add("say", "Okay, nothing was sent.");
+            if (choice === "allow") for (const hit of hits) {
+              const source = sourceFromFile(hit, Math.max(0, ...sources.map(s => s.id)) + 1);
+              if (source) sources.push(source);
+            }
+          }
         }
         if (ids.length && !sources.length) throw new Error("Couldn't read your selected page sources. Reload the pages and try again, or remove them to ask without sources.");
         const ctx = activeContext();
@@ -487,6 +509,7 @@ export const useChat = create<ChatState>((set, get) => ({
         if (runSignal.aborted) return;
         const io = makeIO();
         const rules = [activeContext(), protectedNote(guarded)].filter(Boolean).join("\n\n");
+        if (!isPrivateWindow()) void ipc.timelineNote(`Assistant task: ${goal.slice(0, 160)}`).catch(() => {});
         await runScreenAgent(screenGoal(prior, goalWithPlan, rules), {
           propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText(), watching),
           verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),

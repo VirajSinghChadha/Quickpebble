@@ -8,7 +8,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); if (!ok) failed++; };
 
-export async function run({ browser, commands, statusBar, safety }) {
+export async function run({ browser, commands, statusBar, safety, files }) {
   const win = browser.windows.get("main");
   commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
@@ -195,6 +195,27 @@ export async function run({ browser, commands, statusBar, safety }) {
   await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Check now')?.click()`);
   for (let i = 0; i < 32 && !(await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`)); i++) await sleep(250);
   check("the slow-Mac check shows memory in the panel", await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`), await js(`(document.querySelector('section[aria-label="Slow"]')?.innerText ?? 'no section').slice(0, 300)`));
+  await closeDialogs();
+
+  // ---------- answer from my files
+  const notes = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-notes-"));
+  fs.writeFileSync(path.join(notes, "biology.md"), "# Biology\nMitochondria are the powerhouse of the cell and make ATP.");
+  fs.writeFileSync(path.join(notes, "history.html"), "<h1>History</h1><p>The Treaty of Versailles was signed in 1919.</p>");
+  files.addFolder(notes);
+  await files.indexFolder(notes);
+  check("my files are indexed on this computer", commands.files_folders(win).some((f) => f.path === path.resolve(notes) && f.files === 2));
+  const hits = commands.files_search(win, { query: "what makes ATP in the cell?" });
+  check("searching my files finds the right excerpt", hits[0]?.name === "biology.md" && /powerhouse/.test(hits[0].snippet), JSON.stringify(hits[0]));
+  await openSettings();   // as a person would: add the folder in Settings, then go back to the assistant
+  await closeDialogs();
+  await until(`!!document.querySelector('aside textarea')`);
+  await js(`[...document.querySelectorAll('button,[role=tab],[role=radio]')].find(b => /^ask$/i.test(b.textContent.trim()))?.click()`);
+  check("Ask mode offers “Search my files” once folders are indexed", await until(`/Search my files \\(2 indexed/.test(document.body.innerText)`));
+  await openSettings();
+  check("settings list the indexed folder", await until(`(document.querySelector('[aria-label="Indexed folders"]')?.innerText ?? '').includes('2 files')`));
+  commands.files_remove_folder(win, { path: path.resolve(notes) });
+  check("removing a folder forgets its index", commands.files_search(win, { query: "mitochondria" }).length === 0);
+  fs.rmSync(notes, { recursive: true, force: true });
   await closeDialogs();
 
   // ---------- clean up the test data

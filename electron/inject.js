@@ -322,6 +322,50 @@
       let n = 0; for (const [node, v] of tx.orig) { if (node.isConnected) { node.nodeValue = v; n++; } }
       tx.orig.clear(); return { restored: n };
     },
+    // Page check: dates, who publishes it, ad and "sponsored" labels. Read-only; everything is cut short and sent as plain data.
+    page_facts() {
+      const meta = (sel) => { const m = document.querySelector(sel); return m ? clean(m.getAttribute("content") || "", 200) : ""; };
+      const ld = [];
+      document.querySelectorAll('script[type="application/ld+json"]').forEach((s, n) => {
+        if (n > 8) return;
+        try {
+          const walk = (o, depth) => {
+            if (!o || typeof o !== "object" || depth > 4 || ld.length > 12) return;
+            if (Array.isArray(o)) return o.forEach((x) => walk(x, depth + 1));
+            if (o.datePublished || o.dateModified || o.publisher || o.author) {
+              const name = (v) => (typeof v === "string" ? v : v && typeof v.name === "string" ? v.name : Array.isArray(v) && v[0] ? name(v[0]) : "");
+              ld.push({ type: clean(String(o["@type"] || ""), 40), published: clean(String(o.datePublished || ""), 40), modified: clean(String(o.dateModified || ""), 40), publisher: clean(name(o.publisher), 100), author: clean(name(o.author), 100) });
+            }
+            if (o["@graph"]) walk(o["@graph"], depth + 1);
+          };
+          walk(JSON.parse(s.textContent.slice(0, 200000)), 0);
+        } catch (_) { /* not valid JSON */ }
+      });
+      const AD_LABEL = /^(sponsored|sponsored content|advertisement|advertisements|ad|ads|promoted|paid partnership|partner content|anzeige|werbung|publicité|patrocinado|إعلان)$/i;
+      const labels = [];
+      const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(), seen = 0; n && seen < 20000; n = walker.nextNode(), seen++) {
+        const t = n.nodeValue.trim();
+        if (t.length > 30 || !AD_LABEL.test(t)) continue;
+        const el = n.parentElement; if (!el || !visible(el)) continue;
+        const box = el.closest("article,li,section,div");
+        const near = box ? clean((box.querySelector("h1,h2,h3,h4,a") || {}).innerText || "", 90) : "";
+        labels.push({ label: t, near });
+        if (labels.length >= 30) break;
+      }
+      const adFrames = Array.from(document.querySelectorAll("iframe[src]")).filter((f) => /doubleclick|googlesyndication|adservice|amazon-adsystem|taboola|outbrain|criteo|adnxs|pubmatic|rubicon/i.test(f.src)).length;
+      const sponsoredLinks = document.querySelectorAll('a[rel~="sponsored"]').length;
+      const about = Array.from(document.querySelectorAll("a[href]")).filter((a) => /^(about( us)?|who we are|our team|impressum|imprint|contact( us)?|editorial (policy|standards))$/i.test(clean(a.innerText, 40))).slice(0, 5).map((a) => ({ text: clean(a.innerText, 40), href: a.href.slice(0, 200) }));
+      const footer = document.querySelector("footer");
+      return {
+        url: location.href, title: document.title, lang: document.documentElement.lang || "",
+        meta: { siteName: meta('meta[property="og:site_name"]'), type: meta('meta[property="og:type"]'), published: meta('meta[property="article:published_time"]') || meta('meta[name="date"]') || meta('meta[name="pubdate"]'), modified: meta('meta[property="article:modified_time"]') || meta('meta[property="og:updated_time"]') || meta('meta[name="last-modified"]'), author: meta('meta[name="author"]'), publisher: meta('meta[property="article:publisher"]'), description: meta('meta[name="description"]') },
+        ld, times: Array.from(document.querySelectorAll("time[datetime]")).slice(0, 6).map((t) => clean(t.getAttribute("datetime"), 40)),
+        labels, adFrames, sponsoredLinks, about,
+        footer: footer ? clean(footer.innerText, 400) : "",
+        text: clean(document.body ? document.body.innerText : "", 6000),
+      };
+    },
     scroll({ direction }) {
       const d = direction === "up" ? -1 : 1; scrollBy({ top: d * innerHeight * 0.8, behavior: "instant" }); return { ok: true, y: Math.round(scrollY) };
     },

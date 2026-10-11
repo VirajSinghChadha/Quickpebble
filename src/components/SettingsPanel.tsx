@@ -14,6 +14,7 @@ import { useTour } from "../store/useTour";
 import { useReport } from "../store/useReport";
 import { useTaskManager } from "../store/useTaskManager";
 import { SafetySettings } from "./SafetySettings";
+import { MemorySettings } from "./MemorySettings";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -312,6 +313,7 @@ export function SettingsPanel() {
           </p>
           {msg && <p role="alert" className="pt-1 text-[12px] text-red-500">{msg}</p>}
         </div>
+        <MemorySettings save={save} />
         <SafetySettings save={save} />
         <section className="py-4" aria-label="Web research settings">
           <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Web research</h3>

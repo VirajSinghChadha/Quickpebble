@@ -20,6 +20,12 @@
 - **Quit apps you haven't touched** (opt-in: Quick Pebble notices which app is in front once a minute, on this computer only). Apps with unsaved work are left open.
 - **Login items:** see what starts when you log in and turn items off; Undo turns them back on.
 
+### Memory and knowledge
+- **Answer from my files.** Choose folders of notes, PDFs and documents (txt, md, html, rtf, docx, pdf) in Settings; they're indexed in Quick Pebble's own database on this computer. Tick "Search my files" in the assistant: it lists which excerpts it would send and waits for your OK, then answers with citations to your files. Protected folders are never read.
+- **Workspaces that remember.** A saved workspace now also keeps the assistant chat and the project brief, and one click brings them all back with the tabs.
+- **A timeline of my day** (opt-in, off by default): pages read, files downloaded, chats and assistant tasks, day by day, in Library → Timeline. Local only, 30 days, never from private windows, with Clear all.
+- **Check this page** (This site panel): ads and "sponsored" parts, when it was last updated (flags pages years old), who runs the site according to the page itself, and which tracking companies it tried to load. Each finding says how sure it is. Optionally compare the page's claims with pages you've read (Recall), after seeing exactly what is sent; disagreements are shown as a reason to look closer, never as proof.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.
