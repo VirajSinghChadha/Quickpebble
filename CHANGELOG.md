@@ -2,7 +2,8 @@
 
 ## 1.3.1
 
-- Fixes from the Chromium line: Mac keyboard shortcuts in Screen mode now send Command correctly, and Screen mode is more reliable on slow networks.
+- Fixed Mac shortcuts in Screen mode: Command combinations such as Cmd+W were typed as plain letters.
+- Staying signed in is more reliable: the start-up check runs once, a newer login from another window is adopted, and you are signed out only when the login is truly dead.
 
 ## 1.3.0
 
