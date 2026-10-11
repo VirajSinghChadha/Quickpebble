@@ -7,6 +7,7 @@ import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
+import { ImportDialog } from "./ImportDialog";
 import { StoragePanel } from "./StoragePanel";
 import { UsageMeter } from "./UsageMeter";
 import { useTour } from "../store/useTour";
@@ -50,6 +51,7 @@ export function SettingsPanel() {
   const [precision, setPrecision] = useState("high");
   const [planPreview, setPlanPreview] = useState("big");
   const [sortDl, setSortDl] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [usageLimit, setUsageLimit] = useState("1000");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
@@ -167,6 +169,9 @@ export function SettingsPanel() {
           </Row>
           <Row label="Identify as Chrome" hint="Helps sites that refuse other browsers. Google, YouTube and Apple always see the real browser, because they treat a fake one as a bot and show &quot;are you a robot&quot; checks. Applies to new tabs.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={chromeUa} onChange={(e) => { setChromeUa(e.target.checked); void save("chrome_ua", String(e.target.checked)); }} aria-label="Identify as Chrome" />
+          </Row>
+          <Row label="Import from Chrome or Safari" hint="History, bookmarks, open tabs and Chrome extensions. Reads the other browser, never changes it.">
+            <button type="button" onClick={() => setImporting(true)} className="rounded-full border border-border px-3 py-1.5 hover:bg-surface-secondary">Import…</button>
           </Row>
           <Row label="Bookmarks bar" hint="Shortcut: ⌘⇧B">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={bookmarksBar} onChange={toggleBookmarksBar} aria-label="Bookmarks bar" />
@@ -301,6 +306,7 @@ export function SettingsPanel() {
           {researchMessage && <p role="status" className="mt-2 text-xs text-text-secondary">{researchMessage}</p>}
         </section>
       </div>
+      {importing && <ImportDialog onClose={() => setImporting(false)} />}
     </Modal>
   );
 }

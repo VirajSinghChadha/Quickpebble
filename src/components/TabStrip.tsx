@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Copy, Pin, PinOff, Plus, Search, Volume2, Vo
 import { GROUPS, useStore, type GroupName, type Tab } from "../store/useStore";
 import { tabLabel } from "../lib/url";
 import { orderForStrip, toggled } from "../lib/tabGroups";
+import { ipc } from "../lib/ipc";
 import { isMac, modKey } from "../lib/actions";
 import { Favicon } from "./Favicon";
 import { IconButton } from "./IconButton";
@@ -112,6 +113,8 @@ function PebbleTab({
   onMenu: (x: number, y: number) => void;
 }) {
   const label = tabLabel(tab.title, tab.url);
+  const hoverTimer = useRef<number>(0);
+  useEffect(() => () => { window.clearTimeout(hoverTimer.current); }, []);
   return (
     <motion.div
       layout
@@ -122,12 +125,20 @@ function PebbleTab({
       role="tab"
       aria-selected={active}
       tabIndex={0}
-      title={label}
-      onClick={onSelect}
+      aria-label={label}
+      onMouseEnter={(e) => {
+        if (!tab.url) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        window.clearTimeout(hoverTimer.current);
+        hoverTimer.current = window.setTimeout(() => void ipc.hoverShow(tab.id, { x: r.x, y: r.y, width: r.width, height: r.height }, document.documentElement.classList.contains("dark")), 600);
+      }}
+      onMouseLeave={() => { window.clearTimeout(hoverTimer.current); void ipc.hoverHide(); }}
+      onClick={() => { window.clearTimeout(hoverTimer.current); void ipc.hoverHide(); onSelect(); }}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect()}
       onAuxClick={(e) => e.button === 1 && onClose()}
       onContextMenu={(e) => {
         e.preventDefault();
+        window.clearTimeout(hoverTimer.current); void ipc.hoverHide();
         onMenu(e.clientX, e.clientY);
       }}
       className={`group relative flex h-8 min-w-0 items-center gap-2 rounded-xl px-2.5 text-[12.5px] transition-colors duration-150

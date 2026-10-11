@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { allowNavigation, httpsUpgrade, normalizeInput, parseUrl } from "./security.mjs";
 import { installBlocker } from "./adblock.mjs";
 import { remember } from "./recall.mjs";
+import { HoverCard } from "./hovercard.mjs";
 import { shouldSuspend, defaultMemoryConfig } from "./memory-saver.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,7 @@ export class Browser {
     this.db = db;
     this.appUrl = appUrl;
     this.devtools = devtools;
+    this.hoverCard = new HoverCard();
     this.windows = new Map(); // label -> window state
     this.byContents = new Map(); // webContents.id -> { win, tab }
     this.uiByContents = new Map(); // ui webContents.id -> window state
@@ -172,6 +174,7 @@ export class Browser {
     this.destroyView(win, t);
   }
   destroyView(win, t) {
+    t.thumb = undefined;
     if (!t.view) return;
     const wc = t.view.webContents;
     this.byContents.delete(wc.id);
@@ -181,11 +184,35 @@ export class Browser {
   }
   activateTab(win, id) {
     const t = this.tab(win, id);
+    this.snapshot(win, win.active);
     t.lastActive = Date.now();
     win.active = id;
     this.ensureLive(win, t);
     this.syncVisibility(win);
     this.emitTab(win, t);
+  }
+  /** Keep a small picture of a tab as you leave it, in memory only, for the hover card. Not for private windows. */
+  snapshot(win, id) {
+    const prev = id && id !== undefined ? win.tabs.get(id) : null;
+    if (!prev?.view || win.private || prev.crashed || prev.suspended || !prev.url) return;
+    prev.view.webContents.capturePage(undefined, { stayHidden: true }).then((img) => {
+      if (img.isEmpty()) return;
+      const s = img.getSize();
+      prev.thumb = `data:image/jpeg;base64,${img.resize({ width: 400, height: Math.max(1, Math.round((400 * s.height) / Math.max(1, s.width))) }).toJPEG(60).toString("base64")}`;
+    }).catch(() => {});
+  }
+  /** The picture for the hover card: the live page if it is the one showing, otherwise the one kept when you left it. */
+  async thumbOf(win, id) {
+    const t = this.tab(win, id);
+    if (win.private) return "";
+    if (win.active === id && t.view && !t.crashed && !t.suspended) {
+      try {
+        const img = await t.view.webContents.capturePage();
+        const s = img.getSize();
+        if (!img.isEmpty()) return `data:image/jpeg;base64,${img.resize({ width: 400, height: Math.max(1, Math.round((400 * s.height) / Math.max(1, s.width))) }).toJPEG(60).toString("base64")}`;
+      } catch { /* fall through to the kept picture */ }
+    }
+    return t.thumb ?? "";
   }
   ensureLive(win, t) {
     if (t.view || !t.url) return;

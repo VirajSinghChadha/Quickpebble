@@ -163,6 +163,10 @@ export const ipc = {
   bookmarkToggle: (url: string, title: string) => call<boolean>("bookmark_toggle", { url, title }, false),
   bookmarkSetFolder: (url: string, folder: string) => call<void>("bookmark_set_folder", { url, folder }),
   bookmarksImportChrome: () => call<number>("bookmarks_import_chrome", undefined, 0),
+  hoverShow: (id: string, r: { x: number; y: number; width: number; height: number }, dark: boolean) => call<void>("hover_show", { id, ...r, dark }),
+  hoverHide: () => call<void>("hover_hide"),
+  importScan: (browser: "chrome" | "safari") => call<ImportScan>("import_scan", { browser }),
+  importRun: (browser: "chrome" | "safari", opts: { history: boolean; bookmarks: boolean; tabs: boolean }) => call<{ history: number; bookmarks: number; tabs: string[] }>("import_run", { browser, ...opts }),
   bookmarksImportFile: () => call<number | null>("bookmarks_import_file", undefined, null),
   bookmarkList: (query = "") => call<Bookmark[]>("bookmark_list", { query }, []),
   suggest: (query: string) => call<Suggestion[]>("suggest", { query }, []),
@@ -361,6 +365,8 @@ export async function onLoginSeen(cb: (e: { id: string; host: string; username: 
   const label = windowLabel();
   return listen<{ window: string; id: string; host: string; username: string }>("qp://login-seen", (e) => e.payload.window === label && cb(e.payload));
 }
+
+export interface ImportScan { browser: "chrome" | "safari"; history: number | null; bookmarks: number | null; tabs: number; extensions: { id: string; name: string }[]; problem: string }
 
 export interface DownloadItem {
   id: number;
