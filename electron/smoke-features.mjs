@@ -99,6 +99,19 @@ export async function run({ browser, commands, statusBar }) {
   check("unknown plan setting refused", (() => { try { commands.settings_set(win, { key: "screen_plan", value: "sometimes" }); return false; } catch { return true; } })());
   check("settings show the usage meter and the plan option", await js(`document.body.innerText.includes('AI calls today') && !!document.querySelector('select[aria-label="Preview the plan"]') && !!document.querySelector('input[aria-label="Daily AI call limit"]')`));
 
+  // ---------- problem report, tour, squash
+  const rp = commands.report_preview(win, { includeLog: false });
+  check("report preview carries version info and no log unless asked", /Quick Pebble/.test(rp.text) && !/Recent warnings/.test(rp.text) && !!rp.version, rp.text.split("\n")[0]);
+  check("report with the log attached still has no keys or tokens", !/AIza|eyJ|sb_secret/.test(commands.report_preview(win, { includeLog: true }).text) && /Recent warnings/.test(commands.report_preview(win, { includeLog: true }).text));
+  check("settings offer the tour, the problem report and the clean-up", await js(`[...document.querySelectorAll('button')].some(b => /take the tour/i.test(b.textContent)) && [...document.querySelectorAll('button')].some(b => /report a problem/i.test(b.textContent))`));
+  const squashChat = commands.ctx_chat_new(win, { title: "Old chat to squash", projectId: pid });
+  commands.ctx_chat_append(win, { id: squashChat, items: Array.from({ length: 6 }, (_, i) => ({ kind: i % 2 ? "assistant" : "user", text: `message ${i}: a few words about the volcano project` })) });
+  const squashed = commands.ctx_chat_squash(win, { id: squashChat, summary: "You planned a volcano project: materials, steps and a poster outline for the fair." });
+  const afterSquash = commands.ctx_chat_peek(win, { id: squashChat });
+  check("an old chat can be squashed to one summary", squashed.saved > 0 && afterSquash.items.length === 1 && afterSquash.items[0].kind === "summary");
+  check("the project knows how many chats it has", commands.ctx_projects(win).find((p) => p.id === pid)?.chats >= 2);
+  commands.ctx_clear(win, { chatIds: [squashChat], projectIds: [] });
+
   // ---------- clean up the test data
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });
   check("test data erased only when asked", commands.ctx_chats(win).length === 0 && commands.ctx_projects(win).length === 0);

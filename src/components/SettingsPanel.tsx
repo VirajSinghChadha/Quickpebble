@@ -9,6 +9,8 @@ import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 import { StoragePanel } from "./StoragePanel";
 import { UsageMeter } from "./UsageMeter";
+import { useTour } from "../store/useTour";
+import { useReport } from "../store/useReport";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -170,6 +172,12 @@ export function SettingsPanel() {
 
         <div className="py-2">
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Account</h3>
+          <Row label="Report a problem" hint="Tell the developers what went wrong. You choose whether to attach a diagnostic log, and you can read it first.">
+            <button type="button" className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary" onClick={() => { close(); useReport.getState().show(); }}>Report a problem…</button>
+          </Row>
+          <Row label="Quick tour" hint="A one-minute walkthrough of sign-in, the assistant and your permissions.">
+            <button type="button" className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary" onClick={() => { close(); useTour.getState().show(); }}>Take the tour</button>
+          </Row>
           <Row label={account.profile?.name ?? "Signed in"} hint={account.profile?.email ?? ""}>
             <button type="button" className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary" onClick={() => void useAccount.getState().signOut()}>Sign out</button>
           </Row>

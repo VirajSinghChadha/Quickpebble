@@ -229,11 +229,14 @@ export const ipc = {
   ctxChats: () => call<ChatSummary[]>("ctx_chats", undefined, []),
   ctxChatNew: (title: string, projectId: number | null) => call<number>("ctx_chat_new", { title, projectId }),
   ctxChatLoad: (id: number) => call<{ id: number; title: string; project_id: number | null; items: { kind: string; text: string }[] }>("ctx_chat_load", { id }),
+  ctxChatPeek: (id: number) => call<{ id: number; title: string; items: { kind: string; text: string }[] }>("ctx_chat_peek", { id }),
+  ctxChatSquash: (id: number, summary: string) => call<{ saved: number }>("ctx_chat_squash", { id, summary }),
   ctxChatAppend: (id: number, items: { kind: string; text: string }[]) => call<void>("ctx_chat_append", { id, items }),
   ctxChatProject: (id: number, projectId: number | null) => call<void>("ctx_chat_project", { id, projectId }),
   ctxUsage: () => call<ContextUsage>("ctx_usage", undefined, { chats: 0, messages: 0, projects: 0, bytes: 0 }),
   ctxStale: (days: number) => call<StaleReport>("ctx_stale", { days }, { days, chats: [], projects: [] }),
   ctxClear: (chatIds: number[], projectIds: number[]) => call<{ chats: number; projects: number }>("ctx_clear", { chatIds, projectIds }),
+  reportPreview: (includeLog: boolean) => call<{ text: string; version: string; platform: string }>("report_preview", { includeLog }, { text: "(Only available in the installed app.)", version: "", platform: "" }),
   usageToday: () => call<UsageToday>("usage_today", undefined, { date: "", calls: 0, limit: 1000, level: "ok" }),
   /** Updates the status bar at the bottom of the screen (no-op outside the app). */
   screenOverlay: (state: ScreenStatus) => call<boolean>("screen_overlay", { state }, false),
@@ -363,9 +366,9 @@ export interface DownloadItem {
   can_open: boolean;
 }
 
-export interface Project { id: number; name: string; notes: string; created: number; last_used: number; bytes: number }
-export interface ChatSummary { id: number; title: string; project_id: number | null; created: number; last_used: number; messages: number; bytes: number }
-export interface StaleRow { id: number; title: string; last_used: number; bytes: number; messages?: number }
+export interface Project { id: number; name: string; notes: string; created: number; last_used: number; bytes: number; chats?: number; last_chat?: number | null }
+export interface ChatSummary { id: number; title: string; project_id: number | null; created: number; last_used: number; messages: number; bytes: number; summarized?: number }
+export interface StaleRow { id: number; title: string; last_used: number; bytes: number; messages?: number; summarized?: boolean }
 export interface StaleReport { days: number; chats: StaleRow[]; projects: StaleRow[] }
 export interface ContextUsage { chats: number; messages: number; projects: number; bytes: number }
 

@@ -47,6 +47,25 @@ Deno.serve(async (req) => {
 
   if (!profile) return json({ error: "Enter an access code first." }, 403);
 
+  if (action === "report") {
+    const message = String(body.message ?? "").trim().slice(0, 4000);
+    if (message.length < 5) return json({ error: "Please describe what went wrong." }, 400);
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { count } = await admin.from("reports").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
+    if ((count ?? 0) >= 20) return json({ error: "You've sent a lot of reports today. Please try again tomorrow." }, 429);
+    const log = body.log == null ? null : String(body.log).slice(0, 30000);
+    const { error } = await admin.from("reports").insert({
+      user_id: user.id,
+      email: user.email ?? "",
+      message,
+      log,
+      app_version: String(body.version ?? "").slice(0, 40),
+      platform: String(body.platform ?? "").slice(0, 80),
+    });
+    if (error) return json({ error: "Could not send your report." }, 500);
+    return json({ ok: true });
+  }
+
   const provider = String(body.provider ?? "");
   if (action === "key_list") {
     const { data } = await admin.from("user_keys").select("provider,last4").eq("user_id", user.id);

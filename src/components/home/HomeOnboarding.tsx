@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Cloud, Droplets, Newspaper, Sparkles } from "lucide-react";
 import { NEWS_SOURCES, WHATS_NEW, weatherInfo } from "../../lib/home";
 import { useStore } from "../../store/useStore";
+import { useTour } from "../../store/useTour";
 import { CityPicker } from "./HomeOptions";
 import { WeatherIconView } from "./WeatherCard";
 
@@ -39,7 +40,9 @@ export function HomeOnboarding() {
   const [weather, setWeather] = useState(false);
   const [news, setNews] = useState(false);
   const [source, setSource] = useState(home.newsSource);
-  if (!home.loaded || home.onboarded === WHATS_NEW) return null;
+  const tourChecked = useTour((s) => s.checked);
+  const tourOpen = useTour((s) => s.open);
+  if (!home.loaded || home.onboarded === WHATS_NEW || !tourChecked || tourOpen) return null;   // the tour goes first
 
   const finish = (apply: boolean) =>
     void useStore.getState().setHome(apply ? { weather, news, newsSource: source, onboarded: WHATS_NEW } : { onboarded: WHATS_NEW });

@@ -172,6 +172,8 @@ export function ChatPanel() {
               {m.ok ? <Check size={13} className="mt-0.5 shrink-0 text-group-personal" /> : <X size={13} className="mt-0.5 shrink-0 text-red-500" />}
               <span className="min-w-0 break-words">{m.text}</span>
             </div>
+          ) : m.kind === "summary" ? (
+            <div key={m.id} className="mr-4 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-[12.5px] text-text-secondary"><p className="mb-1 font-medium text-text-primary">Summary of the earlier conversation</p><p className="select-text whitespace-pre-wrap">{m.text}</p></div>
           ) : m.kind === "say" ? (
             <p key={m.id} className="px-1 text-[12.5px] italic text-text-secondary">{m.text}</p>
           ) : m.kind === "error" ? (

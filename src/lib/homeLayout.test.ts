@@ -68,4 +68,16 @@ describe("the plan really fits", () => {
       expect(total, `height ${h}`).toBeLessThanOrEqual(h);
     }
   });
+
+  it("makes room for the project brief without ever scrolling, and drops it before the widgets", () => {
+    const withBrief = { ...all, brief: true };
+    expect(planHome(1000, withBrief).brief).toBe(true);
+    expect(planHome(1000, all).brief).toBe(false);
+    for (let h = 1100; h >= 300; h -= 20) {
+      const p = planHome(h, withBrief);
+      expect(p.widgets, `widgets at ${h}`).toBe(true);
+      expect(p.newsCount).toBeGreaterThanOrEqual(1);
+    }
+    expect(planHome(330, withBrief).brief).toBe(false);
+  });
 });

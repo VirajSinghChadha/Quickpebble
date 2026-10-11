@@ -3,8 +3,8 @@
 // active project's notes with every request so it keeps context. Chats persist so a conversation can be continued later.
 const now = () => Math.floor(Date.now() / 1000);
 const DAY = 86400;
-export const LIMITS = { name: 80, notes: 8000, title: 80, message: 6000, messagesPerChat: 1500, chats: 500, projects: 100 };
-const KINDS = new Set(["user", "assistant", "say", "step", "error", "question"]);
+export const LIMITS = { name: 80, notes: 8000, title: 80, message: 6000, messagesPerChat: 1500, chats: 500, projects: 100, summary: 1500 };
+const KINDS = new Set(["user", "assistant", "say", "step", "error", "question", "summary"]);
 const clip = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const int = (v) => (Number.isInteger(v) && v > 0 ? v : null);
 
@@ -22,11 +22,15 @@ export class ContextStore {
       CREATE TABLE IF NOT EXISTS ctx_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL REFERENCES ctx_chats(id) ON DELETE CASCADE, kind TEXT NOT NULL, text TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS idx_ctx_messages_chat ON ctx_messages(chat_id, id);`);
     db.d.exec("PRAGMA foreign_keys = ON");
+    try { db.d.exec("ALTER TABLE ctx_chats ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0"); } catch { /* already there */ }
   }
 
   // ------------------------------------------------------------ projects
   projects() {
-    return this.db.all("SELECT id, name, notes, created, last_used, length(name) + length(notes) AS bytes FROM ctx_projects ORDER BY last_used DESC LIMIT ?1", LIMITS.projects);
+    return this.db.all(`SELECT p.id, p.name, p.notes, p.created, p.last_used, length(p.name) + length(p.notes) AS bytes,
+        (SELECT COUNT(*) FROM ctx_chats c WHERE c.project_id = p.id) AS chats,
+        (SELECT MAX(c.last_used) FROM ctx_chats c WHERE c.project_id = p.id) AS last_chat
+      FROM ctx_projects p ORDER BY COALESCE((SELECT MAX(c.last_used) FROM ctx_chats c WHERE c.project_id = p.id), p.last_used) DESC LIMIT ?1`, LIMITS.projects);
   }
   saveProject({ id, name, notes }) {
     const n = clip(name, LIMITS.name);
@@ -50,7 +54,7 @@ export class ContextStore {
 
   // ------------------------------------------------------------ chats
   chats() {
-    return this.db.all(`SELECT c.id, c.title, c.project_id, c.created, c.last_used,
+    return this.db.all(`SELECT c.id, c.title, c.project_id, c.created, c.last_used, c.summarized,
         (SELECT COUNT(*) FROM ctx_messages m WHERE m.chat_id = c.id) AS messages,
         (SELECT COALESCE(SUM(length(m.text)), 0) FROM ctx_messages m WHERE m.chat_id = c.id) + length(c.title) AS bytes
       FROM ctx_chats c ORDER BY c.last_used DESC LIMIT ?1`, LIMITS.chats);
@@ -65,6 +69,13 @@ export class ContextStore {
     const chat = cid && this.db.get("SELECT id, title, project_id FROM ctx_chats WHERE id = ?1", cid);
     if (!chat) throw new Error("That chat no longer exists.");
     this.db.run("UPDATE ctx_chats SET last_used = ?2 WHERE id = ?1", cid, now());
+    return { ...chat, items: this.db.all("SELECT kind, text FROM ctx_messages WHERE chat_id = ?1 ORDER BY id", cid) };
+  }
+  /** Reads a chat without counting as "using" it (the clean-up reads old chats to summarise them). */
+  peekChat(id) {
+    const cid = int(id);
+    const chat = cid && this.db.get("SELECT id, title FROM ctx_chats WHERE id = ?1", cid);
+    if (!chat) throw new Error("That chat no longer exists.");
     return { ...chat, items: this.db.all("SELECT kind, text FROM ctx_messages WHERE chat_id = ?1 ORDER BY id", cid) };
   }
   appendMessages(chatId, items) {
@@ -82,6 +93,22 @@ export class ContextStore {
       this.db.d.exec("COMMIT");
     } catch (e) { this.db.d.exec("ROLLBACK"); throw e; }
   }
+  /** Replaces a chat's messages with one short summary: the context stays, the space is freed. Returns the bytes saved. */
+  squashChat(id, summary) {
+    const cid = int(id);
+    const text = clip(summary, LIMITS.summary);
+    if (!cid || !this.db.get("SELECT 1 AS x FROM ctx_chats WHERE id = ?1", cid)) throw new Error("That chat no longer exists.");
+    if (text.length < 20) throw new Error("The summary was too short to keep, so the chat was left as it is.");
+    const before = this.db.get("SELECT COALESCE(SUM(length(text)), 0) AS b FROM ctx_messages WHERE chat_id = ?1", cid).b;
+    this.db.d.exec("BEGIN");
+    try {
+      this.db.run("DELETE FROM ctx_messages WHERE chat_id = ?1", cid);
+      this.db.run("INSERT INTO ctx_messages (chat_id, kind, text, created) VALUES (?1, 'summary', ?2, ?3)", cid, text, now());
+      this.db.run("UPDATE ctx_chats SET summarized = 1 WHERE id = ?1", cid);   // last_used is left alone: squashing isn't "using" the chat
+      this.db.d.exec("COMMIT");
+    } catch (e) { this.db.d.exec("ROLLBACK"); throw e; }
+    return { saved: Math.max(0, before - text.length) };
+  }
   renameChat(id, title) { const cid = int(id); if (cid) this.db.run("UPDATE ctx_chats SET title = ?2 WHERE id = ?1", cid, clip(title, LIMITS.title)); }
   setChatProject(id, projectId) { const cid = int(id); if (cid) this.db.run("UPDATE ctx_chats SET project_id = ?2 WHERE id = ?1", cid, int(projectId)); }
 
@@ -97,7 +124,7 @@ export class ContextStore {
     const d = Math.min(3650, Math.max(1, Math.floor(Number(days) || 30)));
     return {
       days: d,
-      chats: staleRows(this.chats(), d).map((c) => ({ id: c.id, title: c.title || "Untitled chat", last_used: c.last_used, bytes: c.bytes, messages: c.messages })),
+      chats: staleRows(this.chats(), d).map((c) => ({ id: c.id, title: c.title || "Untitled chat", last_used: c.last_used, bytes: c.bytes, messages: c.messages, summarized: !!c.summarized })),
       projects: staleRows(this.projects(), d).map((p) => ({ id: p.id, title: p.name, last_used: p.last_used, bytes: p.bytes })),
     };
   }
@@ -125,6 +152,8 @@ export class ContextStore {
       ctx_chat_new: (_w, { title, projectId }) => this.newChat({ title, projectId }),
       ctx_chat_load: (_w, { id }) => this.loadChat(id),
       ctx_chat_append: (_w, { id, items }) => this.appendMessages(id, items),
+      ctx_chat_peek: (_w, { id }) => this.peekChat(id),
+      ctx_chat_squash: (_w, { id, summary }) => this.squashChat(id, summary),
       ctx_chat_rename: (_w, { id, title }) => this.renameChat(id, title),
       ctx_chat_project: (_w, { id, projectId }) => this.setChatProject(id, projectId),
       ctx_usage: () => this.usage(),

@@ -7,6 +7,7 @@ export interface HomePlan {
   newsCount: number;
   tiles: boolean;
   cards: boolean;
+  brief: boolean;
   quick: boolean;
 }
 
@@ -15,10 +16,12 @@ export interface PlanOptions {
   news: boolean;
   tiles: boolean;
   cards: boolean;
+  /** A project exists, so there is a one-line "where you left off" brief to place. */
+  brief?: boolean;
 }
 
 // Heights in px, measured from the rendered page. `gap` is the space between sections.
-const H = { header: 24, heroFull: 115, heroCompact: 36, search: 56, tiles: 98, cards: 82, quick: 31, weather: 150, newsHead: 76, newsItem: 68 };
+const H = { header: 24, heroFull: 115, heroCompact: 36, search: 56, tiles: 98, cards: 82, brief: 46, quick: 31, weather: 150, newsHead: 76, newsItem: 68 };
 export const MAX_NEWS = 5;
 
 function planFor(height: number, o: PlanOptions, compact: boolean): HomePlan {
@@ -28,13 +31,14 @@ function planFor(height: number, o: PlanOptions, compact: boolean): HomePlan {
   // header, title and search box are always there, with a gap between each
   let left = height - padding - (H.header + (compact ? H.heroCompact : H.heroFull) + H.search) - 2 * gap;
 
-  const plan: HomePlan = { compact, widgets: hasWidgets, newsCount: 0, tiles: false, cards: false, quick: false };
+  const plan: HomePlan = { compact, widgets: hasWidgets, newsCount: 0, tiles: false, cards: false, brief: false, quick: false };
   // Priority order: the cards the person asked for, then shortcuts, then feature cards, then the hint.
   const minItems = compact ? 1 : 2;
   const newsMin = o.news ? H.newsHead + minItems * H.newsItem : 0;
   const widgetsMin = hasWidgets ? Math.max(o.weather ? H.weather : 0, newsMin) : 0;
   if (hasWidgets) left -= widgetsMin + gap;
   if (o.tiles && left >= H.tiles + gap) (plan.tiles = true), (left -= H.tiles + gap);
+  if (o.brief && left >= H.brief + gap) (plan.brief = true), (left -= H.brief + gap);
   if (o.cards && left >= H.cards + gap) (plan.cards = true), (left -= H.cards + gap);
   if (left >= H.quick + gap) (plan.quick = true), (left -= H.quick + gap);
   if (o.news) {
@@ -44,7 +48,7 @@ function planFor(height: number, o: PlanOptions, compact: boolean): HomePlan {
   return plan;
 }
 
-const score = (p: HomePlan) => ((p.tiles ? 1 : 0) + (p.cards ? 1 : 0) + (p.quick ? 1 : 0)) * 10 + p.newsCount;
+const score = (p: HomePlan) => ((p.tiles ? 1 : 0) + (p.cards ? 1 : 0) + (p.brief ? 1 : 0) + (p.quick ? 1 : 0)) * 10 + p.newsCount;
 
 /** The roomy layout when it shows as much as the tight one, otherwise the tight one. Never loses a section as the window grows. */
 export function planHome(height: number, o: PlanOptions): HomePlan {

@@ -85,4 +85,49 @@ describe("storage clean-up", () => {
     const rows = [{ last_used: 100 }, { last_used: 100 + 50 * DAY }];
     expect(staleRows(rows, 30, 100 + 60 * DAY)).toHaveLength(1);
   });
+
+  it("squashes a chat into one short summary, keeping it and freeing space", () => {
+    const s = make();
+    const c = s.newChat({ title: "Volcano model" });
+    s.appendMessages(c, Array.from({ length: 40 }, (_, i) => ({ kind: i % 2 ? "assistant" : "user", text: `message number ${i} with some words in it` })));
+    const old = s.chats().find((x) => x.id === c);
+    age(s, "ctx_chats", c, 45);
+    const r = s.squashChat(c, "You planned a baking-soda volcano for the fair: materials list, three steps, and a poster outline.");
+    expect(r.saved).toBeGreaterThan(1000);
+    const loaded = s.loadChat(c);
+    expect(loaded.items).toEqual([{ kind: "summary", text: expect.stringMatching(/baking-soda volcano/) }]);
+    const now = s.chats().find((x) => x.id === c);
+    expect(now.summarized).toBe(1);
+    expect(now.bytes).toBeLessThan(old.bytes / 5);
+    expect(s.stale(30).chats.find((x) => x.id === c)?.summarized ?? true).toBe(true);   // still listed as old; flagged as already summarised
+  });
+  it("won't squash with a useless summary or a missing chat", () => {
+    const s = make();
+    const c = s.newChat({});
+    s.appendMessages(c, [{ kind: "user", text: "keep me" }]);
+    expect(() => s.squashChat(c, "ok")).toThrow(/too short/);
+    expect(s.loadChat(c).items).toHaveLength(1);
+    expect(() => s.squashChat(999, "x".repeat(50))).toThrow(/no longer exists/);
+  });
+  it("keeps an old chat's age when it is squashed", () => {
+    const s = make();
+    const c = s.newChat({ title: "t" });
+    s.appendMessages(c, [{ kind: "user", text: "hello there friend" }]);
+    age(s, "ctx_chats", c, 60);
+    const before = s.chats().find((x) => x.id === c).last_used;
+    s.squashChat(c, "A short summary of the old conversation about the project.");
+    expect(s.chats().find((x) => x.id === c).last_used).toBe(before);
+  });
+  it("reports how many chats a project has and when it was last worked on", () => {
+    const s = make();
+    const p = s.saveProject({ name: "Science fair" });
+    const a = s.newChat({ title: "a", projectId: p }), b = s.newChat({ title: "b", projectId: p });
+    s.appendMessages(a, [{ kind: "user", text: "x" }]);
+    age(s, "ctx_chats", b, 5);
+    const proj = s.projects().find((x) => x.id === p);
+    expect(proj.chats).toBe(2);
+    expect(proj.last_chat).toBeGreaterThan(Math.floor(Date.now() / 1000) - 60);
+    const empty = s.saveProject({ name: "Empty" });
+    expect(s.projects().find((x) => x.id === empty)).toMatchObject({ chats: 0, last_chat: null });
+  });
 });

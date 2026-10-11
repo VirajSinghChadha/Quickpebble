@@ -10,8 +10,9 @@ import { PERMISSIONS, POLICIES, SEARCH_ENGINES, parseUrl } from "./security.mjs"
 import { stats as blockStats } from "./adblock.mjs";
 import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
 import { usageSummary } from "./usage.mjs";
+import { buildReport } from "./diagnostics.mjs";
 
-const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit"]);
+const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -98,6 +99,11 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     // ---- AI
     ai_status: () => ai.status(ai.aiConfig(db)),
     usage_today: () => usageSummary(),
+    // The exact text a problem report would carry, so the person can read it before choosing to send it.
+    report_preview: (_w, { includeLog }) => {
+      const settings = Object.fromEntries(["theme", "newtab_layout", "screen_precision", "screen_plan", "ai_provider", "ai_model", "block_level", "search_engine"].flatMap((k) => { const v = db.getSetting(k); return v == null ? [] : [[k, v]]; }));
+      return { text: buildReport({ version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, settings, includeLog: !!includeLog }), version: app.getVersion(), platform: `${process.platform}-${process.arch}` };
+    },
     ai_run: async (w, { req }) => {
       const cfg = ai.aiConfig(db);
       if (req.task === "complete") {
