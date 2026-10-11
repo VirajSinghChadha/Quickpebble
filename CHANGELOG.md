@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+- Fixed Mac shortcuts in Screen mode: Command combinations such as Cmd+W were typed as plain letters.
+- Staying signed in is more reliable: the start-up check runs once, a newer login from another window is adopted, and you are signed out only when the login is truly dead.
+
 ## 1.3.0
 
 - **Accounts.** Sign in with an emailed code (beta access code required at sign-up). Your Gemini key is saved encrypted to your account and comes back when you sign in, on any device, and you stay signed in across updates.
