@@ -1,6 +1,9 @@
 // QP_SMOKE_FEATURES=1: checks the assistant features inside the real app: status bar window, project memory, single-search home page,
 // project picker and Storage settings. Prints PASS/FAIL lines and exits non-zero if anything fails.
 import { app, screen as display } from "electron";
+import fs from "node:fs";
+import path from "node:path";
+import { getSecret } from "./secrets.mjs";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); if (!ok) failed++; };
@@ -44,6 +47,14 @@ export async function run({ browser, commands, statusBar }) {
   check("writing to a missing chat is refused", rejected);
   check("storage report lists nothing recent", commands.ctx_stale(win, { days: 30 }).chats.length === 0);
   check("account session can be saved (stays signed in)", (() => { try { commands.settings_set(win, { key: "account_session", value: JSON.stringify({ session: { a: 1 } }) }); return !!JSON.parse(commands.settings_get(win).account_session); } catch { return false; } })());
+
+  // ---------- API keys: usable, never on disk (no keychain involvement)
+  commands.ai_set_key(win, { provider: "gemini", key: "TEST-KEY-1234567" });
+  check("account key is usable by the AI", getSecret("gemini") === "TEST-KEY-1234567");
+  const secretsFile = path.join(app.getPath("userData"), "secrets.json");
+  check("account key is not written to disk or the keychain", !fs.existsSync(secretsFile) || !/gemini/.test(fs.readFileSync(secretsFile, "utf8")));
+  commands.ai_set_key(win, { provider: "gemini", key: "" });
+  check("signing out clears the key", getSecret("gemini") === null);
 
   // ---------- real interface
   for (let i = 0; i < 40 && !(await js(`!!document.querySelector('input[placeholder*="Search or enter"]')`).catch(() => false)); i++) await sleep(250);
