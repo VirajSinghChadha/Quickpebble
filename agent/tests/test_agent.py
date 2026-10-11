@@ -400,6 +400,7 @@ def test_calls_to_gemini_are_counted_and_rate_limits_explained(monkeypatch):
     assert gemini.CALLS == before + 1                      # the refused request still counts toward the person's quota
 
 
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
 def test_app_names_are_cleaned_for_the_permission_list():
     from qp_agent.executor import clean_app_name
     assert clean_app_name("Notes") == "Notes"
@@ -410,6 +411,7 @@ def test_app_names_are_cleaned_for_the_permission_list():
     assert len(clean_app_name("A" * 300)) == 80
 
 
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
 def test_frontmost_app_never_raises():
     from qp_agent.executor import frontmost_app
     name = frontmost_app()
