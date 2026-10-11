@@ -244,3 +244,28 @@ def test_the_prompt_teaches_the_new_actions_and_the_risk_rules():
     p = system_prompt(G)
     for needle in ("open_app", "drag", "to_cell", "Terminal or PowerShell", "whole computer"):
         assert needle in p, needle
+
+
+@pytest.mark.skipif(_sys.platform != "darwin", reason="macOS key events")
+def test_mac_shortcuts_are_sent_with_their_modifier_flags(monkeypatch):
+    from qp_agent import executor
+    import Quartz
+    posted = []
+    monkeypatch.setattr(Quartz, "CGEventPost", lambda tap, ev: posted.append(Quartz.CGEventGetFlags(ev)))
+    monkeypatch.setattr(executor.time, "sleep", lambda s: None)
+    assert executor.mac_shortcut(["command", "w"]) is True
+    assert len(posted) == 2 and all(f & Quartz.kCGEventFlagMaskCommand for f in posted)
+    assert executor.mac_shortcut(["command", "shift", "s"]) is True
+    assert posted[-1] & Quartz.kCGEventFlagMaskShift
+    assert executor.mac_shortcut(["w"]) is False          # a plain key is typed normally
+    assert executor.mac_shortcut(["command", "nonsense"]) is False
+
+
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
+def test_key_actions_go_through_press_keys(monkeypatch):
+    from qp_agent import executor
+    from qp_agent.grid import Grid
+    seen = []
+    monkeypatch.setattr(executor, "press_keys", lambda keys: seen.append(keys))
+    executor.perform(Action(type="key", key="cmd+shift+s"), Grid(cols=26, rows=16))
+    assert seen == [["command", "shift", "s"]]
