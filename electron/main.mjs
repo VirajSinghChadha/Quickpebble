@@ -13,6 +13,7 @@ import { Extensions } from "./extensions.mjs";
 import { ScreenAgent } from "./screen.mjs";
 import { StatusBar } from "./overlay.mjs";
 import { ContextStore } from "./context.mjs";
+import { initUsage } from "./usage.mjs";
 import { Updater } from "./updater.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
@@ -61,6 +62,7 @@ function senderWindow(event) {
 
 app.whenReady().then(async () => {
   db = new Db(path.join(app.getPath("userData"), "pebble.db"));
+  initUsage(db);
   browser = new Browser(db, { appUrl: appUrl(), devtools: dev || process.env.QP_DEVTOOLS === "1" });
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
@@ -72,7 +74,8 @@ app.whenReady().then(async () => {
   const filtersReady = filters.start().catch(() => {});
   extensions = new Extensions(() => [...browser.sessions].filter((x) => x.storagePath));
   updater = new Updater(db, (channel, payload) => { for (const w of browser.windows.values()) browser.emitUi(w, channel, payload); });
-  const statusBar = new StatusBar(() => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://screen-stop", {}); });
+  const toWindows = (channel) => { for (const w of browser.windows.values()) browser.emitUi(w, channel, {}); };
+  const statusBar = new StatusBar(() => toWindows("qp://screen-stop"), () => toWindows("qp://screen-pause"));
   screen = new ScreenAgent(db, statusBar);
   app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
@@ -107,6 +110,7 @@ app.whenReady().then(async () => {
       browser.emitUi(w, "qp://assistant", {});
     });
   } catch { /* another app owns the shortcut; the assistant is still one click away */ }
+  try { globalShortcut.register("CommandOrControl+Alt+P", () => toWindows("qp://screen-pause")); } catch { /* the Pause button on the bar still works */ }
   app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
   const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE: "smoke" };

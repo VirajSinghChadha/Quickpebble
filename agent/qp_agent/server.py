@@ -111,6 +111,7 @@ class Handler(BaseHTTPRequestHandler):
                 raw, shot = executor.capture(GRID)
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
                 page_text = str(body.get("page_text") or "")[:6000] or None
+                calls_before = gemini.CALLS
                 resp = gemini.propose(key, model, GRID, goal, history, shot, cats, page_text)
                 if resp.action.point:   # the model pointed straight at the target: that is the position (exact, not a cell)
                     resp.action.ax, resp.action.ay = resp.action.point[1] / 1000, resp.action.point[0] / 1000
@@ -118,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
                         self._zoom(resp, raw, key, model)
                 elif resp.action.type in ("click", "double_click", "right_click") and os.environ.get("QP_AGENT_REFINE", "1") != "0":
                     self._refine(resp, raw, key, model)
-                self._send(200, resp.model_dump(exclude_none=True))
+                self._send(200, {**resp.model_dump(exclude_none=True), "calls": gemini.CALLS - calls_before})
             elif self.path == "/verify":
                 goal, pending = str(body.get("goal", "")).strip(), str(body.get("pending", ""))[:300]
                 history = [str(h)[:200] for h in body.get("history", [])][-40:]
@@ -127,7 +128,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("invalid verify request")
                 shot = executor.capture_gridded_jpeg_b64(GRID)
                 model = os.environ.get("QP_AGENT_MODEL") or gemini.DEFAULT_MODEL
-                self._send(200, gemini.verify(key, model, goal, history, pending, shot, str(body.get("page_text") or "")[:6000] or None))
+                v_before = gemini.CALLS
+                out = gemini.verify(key, model, goal, history, pending, shot, str(body.get("page_text") or "")[:6000] or None)
+                self._send(200, {**out, "calls": gemini.CALLS - v_before})
             elif self.path == "/act":
                 action = Action.model_validate(body.get("action"))
                 action.check_cell(GRID)

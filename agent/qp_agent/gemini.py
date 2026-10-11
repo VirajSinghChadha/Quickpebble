@@ -18,6 +18,7 @@ ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gene
 
 # One connection reused for every call: skips a fresh TLS handshake (about half a second) each time.
 HTTP = requests.Session()
+CALLS = 0   # requests that reached Gemini (each counts toward the person's quota, even when it fails); the server reports the difference per step
 
 
 def post(model: str, api_key: str, body: dict, timeout):
@@ -26,7 +27,10 @@ def post(model: str, api_key: str, body: dict, timeout):
     last: Exception | None = None
     for attempt in range(3):
         try:
-            return HTTP.post(ENDPOINT.format(model=model), headers={"x-goog-api-key": api_key}, json=body, timeout=timeout)
+            global CALLS
+            resp = HTTP.post(ENDPOINT.format(model=model), headers={"x-goog-api-key": api_key}, json=body, timeout=timeout)
+            CALLS += 1
+            return resp
         except (requests.ConnectionError, requests.Timeout) as e:
             last = e
             time.sleep(1.0 * (attempt + 1))
@@ -71,6 +75,8 @@ def propose(api_key: str, model: str, grid: Grid, goal: str, history: list[str],
             r = post(model, api_key, body, (6, 45))
         except requests.RequestException as e:
             raise AgentError(f"Could not reach Gemini: {e}") from e
+        if r.status_code == 429:
+            raise AgentError("Google says you are over its limit right now (too many requests, or today's free quota is used up). Wait a minute and try again, or check your plan in Google AI Studio.")
         if r.status_code == 404:
             raise AgentError(f"Gemini model '{model}' was not found. Set a valid model in Settings or QP_AGENT_MODEL.")
         if not r.ok:

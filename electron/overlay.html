@@ -20,7 +20,10 @@ html,body{height:100%;background:transparent;overflow:hidden;font:13px/1.4 -appl
 .next{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mut)}.next b{color:var(--fg);font-weight:600}
 button{flex:none;border:0;cursor:pointer;font:600 12px/1 inherit;padding:10px 16px;border-radius:999px;color:#fff;background:var(--stop)}
 button:hover{filter:brightness(1.08)}button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
-.bar.done button,.bar.error button{display:none}
+button.ghost{background:rgba(120,130,150,.22);color:var(--fg)}
+.bar.paused .orb{background:#f59e0b;animation:none}
+.btns{flex:none;display:flex;gap:8px}
+.bar.done .btns,.bar.error .btns{display:none}
 </style></head>
 <body>
 <div class="bar" id="bar" role="status" aria-live="polite">
@@ -30,16 +33,17 @@ button:hover{filter:brightness(1.08)}button:focus-visible{outline:2px solid var(
     <div class="think" id="think"></div>
     <div class="next" id="next"></div>
   </div>
-  <button id="stop" type="button">Stop</button>
+  <div class="btns"><button id="pause" class="ghost" type="button" title="Pause so you can do a step yourself (Cmd/Ctrl+Alt+P)">Pause</button><button id="stop" type="button">Stop</button></div>
 </div>
 <script>
-const TITLES={looking:"Looking at your screen",thinking:"Thinking",acting:"Working",waiting:"Waiting for you",done:"Finished",error:"Stopped"};
+const TITLES={looking:"Looking at your screen",thinking:"Thinking",acting:"Working",waiting:"Waiting for you",paused:"Paused",done:"Finished",error:"Stopped"};
 const bar=document.getElementById("bar"),$=(i)=>document.getElementById(i);
 overlay.onState((s)=>{
   bar.className="bar on "+s.phase;
   $("title").textContent=TITLES[s.phase]||"Pebble";
   $("count").textContent=s.step?("step "+s.step+(s.max?" of "+s.max:"")):"";
-  $("think").textContent=s.thinking||(s.phase==="looking"?"Taking a screenshot and reading the screen…":"");
+  $("think").textContent=s.phase==="paused"?"Do your step yourself, then press Resume. I will look at the new screen and carry on.":(s.thinking||(s.phase==="looking"?"Taking a screenshot and reading the screen…":""));
+  $("pause").textContent=s.phase==="paused"?"Resume":"Pause";
   const n=$("next");n.textContent="";
   if(s.next){const b=document.createElement("b");b.textContent="Next: ";n.append(b,document.createTextNode(s.next));}
 });
@@ -47,4 +51,8 @@ const stop=$("stop");
 stop.addEventListener("mouseenter",()=>overlay.hover(true));
 stop.addEventListener("mouseleave",()=>overlay.hover(false));
 stop.addEventListener("click",()=>overlay.stop());
+const pause=$("pause");
+pause.addEventListener("mouseenter",()=>overlay.hover(true));
+pause.addEventListener("mouseleave",()=>overlay.hover(false));
+pause.addEventListener("click",()=>overlay.pause());
 </script></body></html>

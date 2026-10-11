@@ -217,3 +217,36 @@ describe("status bar updates", () => {
     expect(describeScreenAction({ type: "open_app", app: "Pages" })).toBe("Open Pages");
   });
 });
+
+
+describe("pause and take over", () => {
+  it("waits while paused, then looks at the new screen instead of acting on the old plan", async () => {
+    const proposals: string[] = [];
+    const { io, acted, events } = make([res({ type: "click", cell: "A1" }, "Click the old button"), res({ type: "click", cell: "B2" }, "Click the new button"), res({ type: "done" }, "ok")]);
+    const basePropose = io.propose;
+    io.propose = async (g, h) => { proposals.push(h.join("|")); return basePropose(g, h); };
+    let paused = false;
+    let calls = 0;
+    io.isPaused = () => { calls++; if (calls === 2) paused = true; return paused; };   // pressed Pause after the first plan was made, before it ran
+    let resumed = 0;
+    io.waitForResume = async () => { resumed++; paused = false; };
+    const seen: string[] = [];
+    io.onStatus = (st) => void seen.push(st.phase);
+    await runScreenAgent("g", io, { aborted: false });
+    expect(resumed).toBe(1);
+    expect(seen).toContain("paused");
+    expect(acted.map((a) => a.cell)).toEqual(["B2"]);                       // the stale click on A1 never happened
+    expect(proposals.at(-1)).toMatch(/you were paused/);                  // the model is told the person acted
+    expect(events.some((e) => /Paused/.test(e))).toBe(true);
+  });
+  it("stopping while paused ends the task", async () => {
+    const { io } = make([res({ type: "click", cell: "A1" })]);
+    const signal = { aborted: false };
+    io.isPaused = () => true;
+    io.waitForResume = async () => { signal.aborted = true; };
+    const seen: string[] = [];
+    io.onStatus = (st) => void seen.push(st.phase);
+    await runScreenAgent("g", io, signal);
+    expect(seen.at(-1)).toBe("idle");
+  });
+});

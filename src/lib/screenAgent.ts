@@ -43,6 +43,9 @@ export interface ScreenIO {
   onEvent(e: { kind: "say" | "step" | "final" | "question" | "error"; text: string; ok?: boolean }): void;
   /** Live progress for the on-screen status bar: what the agent sees, thinks and will do next. */
   onStatus?(s: ScreenStatus): void;
+  /** Pause and take over: while paused the loop waits, and when resumed it looks at the (changed) screen again. */
+  isPaused?(): boolean;
+  waitForResume?(): Promise<void>;
 }
 
 export function describeScreenAction(a: ScreenAction): string {
@@ -89,6 +92,14 @@ export function isRisky(res: ScreenResponse, site: SitePerms): boolean {
 
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
   // Every way of failing also tells the status bar, so it never stays on screen showing a stale "working" state.
+  const pauseIfAsked = async (n: number): Promise<boolean> => {
+    if (!io.isPaused?.()) return false;
+    io.onStatus?.({ phase: "paused", step: n + 1, max: maxSteps });
+    io.onEvent({ kind: "say", text: "Paused. Do your step yourself, then press Resume: I'll look at the new screen and carry on." });
+    await io.waitForResume?.();
+    history.push(`${history.length + 1}. (you were paused and the person did something themselves; study the new screen and do not repeat anything they may already have done)`);
+    return true;
+  };
   const fail = (text: string) => { io.onStatus?.({ phase: text === "Stopped." ? "idle" : "error", thinking: text }); io.onEvent({ kind: "error", text }); };
   let lastKey = "";
   let repeats = 0;
@@ -97,6 +108,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
   let unchanged = 0;
   for (let n = 0; n < maxSteps; n++) {
     if (signal.aborted) return fail("Stopped.");
+    if (await pauseIfAsked(n)) { if (signal.aborted) return fail("Stopped."); }
     await io.prepare?.().catch(() => {});
     const status = (s: ScreenStatus) => io.onStatus?.({ step: n + 1, max: maxSteps, ...s });
     status({ phase: "looking" });
@@ -177,6 +189,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       }
       if (choice === "auto") io.setMode("auto");
     }
+    if (await pauseIfAsked(n)) { if (signal.aborted) return fail("Stopped."); lastKey = ""; repeats = 0; continue; }   // the screen changed: look again instead of acting on a stale plan
     status({ phase: "acting", thinking: user.thinking, next: desc });
     try {
       const result = await io.act(action);

@@ -8,6 +8,7 @@ import { Modal, ModalHeader } from "./Modal";
 import { PRESETS } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 import { StoragePanel } from "./StoragePanel";
+import { UsageMeter } from "./UsageMeter";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -43,7 +44,9 @@ export function SettingsPanel() {
   const [blockLevel, setBlockLevel] = useState("high");
   const [chromeUa, setChromeUa] = useState(true);
   const [cookies, setCookies] = useState(true);
-  const [precision, setPrecision] = useState("standard");
+  const [precision, setPrecision] = useState("high");
+  const [planPreview, setPlanPreview] = useState("big");
+  const [usageLimit, setUsageLimit] = useState("1000");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -68,6 +71,8 @@ export function SettingsPanel() {
       setChromeUa(s.chrome_ua !== "false");
       setCookies(s.cookie_banners !== "false");
       setPrecision(s.screen_precision === "standard" ? "standard" : "high");
+      setUsageLimit(s.usage_limit || "1000");
+      setPlanPreview(s.screen_plan === "always" || s.screen_plan === "never" ? s.screen_plan : "big");
       setProvider(s.ai_provider ?? "ollama");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
@@ -229,6 +234,19 @@ export function SettingsPanel() {
           </Row>
           <Row label="Model" hint={status?.models.length ? `Installed: ${status.models.slice(0, 4).join(", ")}` : undefined}>
             <input className={`${selectCls} w-44`} value={model} placeholder={provider === "ollama" ? "llama3" : "default"} onChange={(e) => setModel(e.target.value)} onBlur={() => void save("ai_model", model)} aria-label="Model" />
+          </Row>
+          <div className="space-y-2 py-2.5">
+            <Row label="AI calls today" hint="Counts the AI requests Quick Pebble made today, including each look of Screen mode. Your real quota is in Google AI Studio.">
+              <label className="flex items-center gap-2 text-[12px] text-text-secondary">Daily limit
+                <input type="number" min={10} max={100000} value={usageLimit} onChange={(e) => setUsageLimit(e.target.value)} onBlur={() => { const n = Math.min(100000, Math.max(10, Math.round(Number(usageLimit) || 1000))); setUsageLimit(String(n)); void save("usage_limit", String(n)); }} className={`${selectCls} w-24`} aria-label="Daily AI call limit" />
+              </label>
+            </Row>
+            <UsageMeter />
+          </div>
+          <Row label="Preview the plan" hint="Before a computer task starts, the AI lists its steps and you approve the whole plan. Small tasks just run.">
+            <select className={selectCls} value={planPreview} onChange={(e) => { setPlanPreview(e.target.value); void save("screen_plan", e.target.value); }} aria-label="Preview the plan">
+              <option value="big">For big tasks</option><option value="always">Always</option><option value="never">Never</option>
+            </select>
           </Row>
           <Row label="Screen control precision" hint="Accurate: the AI points at the target, then takes one zoomed second look before each click (about 9 in 10 land within a few pixels). Fast: one look only, about 2 seconds quicker per click.">
             <select className={selectCls} value={precision} onChange={(e) => { setPrecision(e.target.value); void save("screen_precision", e.target.value); }} aria-label="Screen control precision">

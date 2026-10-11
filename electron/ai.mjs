@@ -1,5 +1,6 @@
 // AI bridge: local Ollama by default, opt-in OpenAI / Anthropic / Gemini (port of daemon.rs).
 import { getSecret, setSecret } from "./secrets.mjs";
+import { bumpUsage } from "./usage.mjs";
 
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 const MAX_PAGE_CHARS = 8000;
@@ -53,10 +54,12 @@ export function normalizeMessages(msgs) {
   return out;
 }
 
-async function sendJson(url, init) {
+async function sendJson(url, init, count = true) {
+  if (count) bumpUsage(1);
   let r;
   try { r = await http(url, init); } catch (e) { throw new Error(`Network error: ${e.message ?? e}`); }
   const v = await r.json().catch(() => ({}));
+  if (r.status === 429) throw new Error("The AI provider says you are over its limit right now (too many requests, or today's free quota is used up). Wait a minute and try again, or check your plan in Google AI Studio.");
   if (!r.ok) throw new Error(`${v?.error?.message ?? (typeof v?.error === "string" ? v.error : "Request failed")} (HTTP ${r.status})`);
   return v;
 }
@@ -100,7 +103,7 @@ export async function chat(cfg, system, messages, json = false) {
 
 export async function geminiModels() {
   const key = getSecret("gemini"); if (!key) return [];
-  const v = await sendJson("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+  const v = await sendJson("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } }, false);
   return (v.models ?? []).filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent")).map((m) => String(m.name).replace(/^models\//, ""));
 }
 

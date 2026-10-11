@@ -9,8 +9,9 @@ import { ftsQuery } from "./recall.mjs";
 import { PERMISSIONS, POLICIES, SEARCH_ENGINES, parseUrl } from "./security.mjs";
 import { stats as blockStats } from "./adblock.mjs";
 import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
+import { usageSummary } from "./usage.mjs";
 
-const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days"]);
+const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -75,6 +76,8 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
       if (!SETTING_KEYS.has(key)) throw new Error(`unknown setting: ${key}`);
       value = String(value);
       if (key === "search_engine" && !SEARCH_ENGINES[value]) throw new Error("unknown search engine");
+      if (key === "usage_limit" && !(Number(value) >= 10 && Number(value) <= 100000)) throw new Error("The daily limit must be between 10 and 100000");
+      if (key === "screen_plan" && !["big", "always", "never"].includes(value)) throw new Error("unknown plan setting");
       if (key === "screen_precision" && !["standard", "high"].includes(value)) throw new Error("unknown precision");
       if (key === "home_weather_place" && (value.length > 512 || (value && !jsonOk(value)))) throw new Error("invalid place");
       if (key === "home_news_source" && !home.NEWS_SOURCES[value]) throw new Error("unknown news source");
@@ -94,6 +97,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
 
     // ---- AI
     ai_status: () => ai.status(ai.aiConfig(db)),
+    usage_today: () => usageSummary(),
     ai_run: async (w, { req }) => {
       const cfg = ai.aiConfig(db);
       if (req.task === "complete") {

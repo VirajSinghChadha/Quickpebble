@@ -234,6 +234,7 @@ export const ipc = {
   ctxUsage: () => call<ContextUsage>("ctx_usage", undefined, { chats: 0, messages: 0, projects: 0, bytes: 0 }),
   ctxStale: (days: number) => call<StaleReport>("ctx_stale", { days }, { days, chats: [], projects: [] }),
   ctxClear: (chatIds: number[], projectIds: number[]) => call<{ chats: number; projects: number }>("ctx_clear", { chatIds, projectIds }),
+  usageToday: () => call<UsageToday>("usage_today", undefined, { date: "", calls: 0, limit: 1000, level: "ok" }),
   /** Updates the status bar at the bottom of the screen (no-op outside the app). */
   screenOverlay: (state: ScreenStatus) => call<boolean>("screen_overlay", { state }, false),
   weatherSearch: (query: string) => call<Place[]>("weather_search", { query }),
@@ -368,8 +369,10 @@ export interface StaleRow { id: number; title: string; last_used: number; bytes:
 export interface StaleReport { days: number; chats: StaleRow[]; projects: StaleRow[] }
 export interface ContextUsage { chats: number; messages: number; projects: number; bytes: number }
 
+export interface UsageToday { date: string; calls: number; limit: number; level: "ok" | "near" | "over" }
+
 export interface ScreenStatus {
-  phase: "looking" | "thinking" | "acting" | "waiting" | "done" | "error" | "idle";
+  phase: "looking" | "thinking" | "acting" | "waiting" | "paused" | "done" | "error" | "idle";
   thinking?: string;
   next?: string;
   step?: number;
@@ -380,6 +383,12 @@ export interface ScreenStatus {
 export async function onAssistantHotkey(cb: () => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   return listen<unknown>("qp://assistant", () => cb());
+}
+
+/** Pause/Resume was pressed on the status bar, or its hotkey (Cmd/Ctrl+Alt+P). */
+export async function onScreenPause(cb: () => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<unknown>("qp://screen-pause", () => cb());
 }
 
 /** The status bar's Stop button was pressed. */

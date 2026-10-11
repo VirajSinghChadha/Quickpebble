@@ -379,3 +379,22 @@ def test_network_hiccups_are_retried_but_real_errors_are_not(monkeypatch):
     monkeypatch.setattr(gemini.HTTP, "post", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("down")))
     with pytest.raises(requests.ConnectionError):
         gemini.post("m", "k", {}, 5)
+
+
+def test_calls_to_gemini_are_counted_and_rate_limits_explained(monkeypatch):
+    from qp_agent import gemini
+
+    class Limited:
+        ok = False
+        status_code = 429
+        headers = {"content-type": "application/json"}
+        text = "{}"
+
+        def json(self):
+            return {"error": {"message": "quota"}}
+
+    before = gemini.CALLS
+    monkeypatch.setattr(gemini.HTTP, "post", lambda *a, **k: Limited())
+    with pytest.raises(gemini.AgentError, match="over its limit"):
+        gemini.propose("k", "m", G, "goal", [], "AAAA")
+    assert gemini.CALLS == before + 1                      # the refused request still counts toward the person's quota
