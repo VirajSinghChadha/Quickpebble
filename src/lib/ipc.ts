@@ -252,6 +252,9 @@ export const ipc = {
   downloadsList: () => call<DownloadItem[]>("downloads_list", undefined, []),
   downloadOpen: (id: number) => call<void>("download_open", { id }),
   downloadReveal: (id: number) => call<void>("download_reveal", { id }),
+  downloadUndoMove: (id: number) => call<void>("download_undo_move", { id }),
+  downloadRename: (id: number, name: string) => call<void>("download_rename", { id, name }),
+  downloadSuggestApply: (id: number, reply: string) => call<void>("download_suggest_apply", { id, reply }),
   downloadRemove: (id: number) => call<void>("download_remove", { id }),
   downloadsClearFinished: () => call<void>("downloads_clear_finished"),
   vaultStatus: () => call<{ exists: boolean; unlocked: boolean }>("vault_status", undefined, { exists: false, unlocked: false }),
@@ -370,6 +373,8 @@ export interface DownloadItem {
   finished: number | null;
   size: number | null;
   can_open: boolean;
+  can_undo?: boolean;
+  generic?: boolean;
 }
 
 export interface Project { id: number; name: string; notes: string; created: number; last_used: number; bytes: number; chats?: number; last_chat?: number | null }

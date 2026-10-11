@@ -49,6 +49,7 @@ export function SettingsPanel() {
   const [cookies, setCookies] = useState(true);
   const [precision, setPrecision] = useState("high");
   const [planPreview, setPlanPreview] = useState("big");
+  const [sortDl, setSortDl] = useState(false);
   const [usageLimit, setUsageLimit] = useState("1000");
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
@@ -80,6 +81,7 @@ export function SettingsPanel() {
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
       setHttpsOnly(s.https_only !== "false");
+      setSortDl(s.downloads_sort === "1");
       setAutoUpdate(s.auto_update_check !== "false");
       setRecallOn(s.recall_enabled === "true");
       setProxyMode(s.proxy_mode === "custom" ? "custom" : "direct");
@@ -168,6 +170,9 @@ export function SettingsPanel() {
           </Row>
           <Row label="HTTPS-only mode" hint="Upgrades http:// links to https://. You're warned before any site is opened insecurely.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={httpsOnly} onChange={(e) => { setHttpsOnly(e.target.checked); void save("https_only", String(e.target.checked)); }} aria-label="HTTPS-only mode" />
+          </Row>
+          <Row label="Sort downloads into folders" hint="Files land in Downloads/Images, PDFs, Documents and so on. Nothing is overwritten and each move can be undone from the Downloads panel.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={sortDl} onChange={(e) => { setSortDl(e.target.checked); void save("downloads_sort", e.target.checked ? "1" : "0"); }} aria-label="Sort downloads into folders" />
           </Row>
         </div>
 

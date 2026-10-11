@@ -12,7 +12,7 @@ import { parseChromeJson, parseNetscapeHtml } from "./bookmarks.mjs";
 import { usageSummary } from "./usage.mjs";
 import { buildReport } from "./diagnostics.mjs";
 
-const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen"]);
+const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen", "downloads_sort"]);
 const unsupported = (what) => () => { throw new Error(`${what} isn't available in the Chromium build yet.`); };
 
 export function buildCommands({ browser, db, downloads, extras = {} }) {
@@ -191,6 +191,9 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
     downloads_list: () => downloads.snapshot(),
     download_open: (_w, { id }) => downloads.open(id),
     download_reveal: (_w, { id }) => downloads.reveal(id),
+    download_undo_move: (_w, { id }) => downloads.undoMove(id),
+    download_rename: (_w, { id, name }) => downloads.rename(id, name),
+    download_suggest_apply: (_w, { id, reply }) => downloads.applySuggestion(id, reply),
     download_remove: (_w, { id }) => downloads.remove(id),
     downloads_clear_finished: () => downloads.clearFinished(),
 
