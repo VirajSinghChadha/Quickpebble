@@ -8,13 +8,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); if (!ok) failed++; };
 
-export async function run({ browser, commands, statusBar, safety, files }) {
+export async function run({ browser, commands, statusBar, safety, files, school }) {
   const win = browser.windows.get("main");
   commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
+  // A test window is often behind other windows; without this Chromium pauses its animations, so closing dialogs never finish
+  // fading out and the old ones stay on screen.
+  ui.setBackgroundThrottling(false);
   const js = (code) => ui.executeJavaScript(code);
   const until = async (code, ms = 8000) => { for (let t = 0; t < ms; t += 250) { if (await js(code).catch(() => false)) return true; await sleep(250); } return false; };
-  const closeDialogs = async () => { for (let i = 0; i < 6 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await sleep(400); } };
+  const closeDialogs = async () => { for (let i = 0; i < 6 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await until(`document.querySelectorAll('button[aria-label="Close"]').length < ${await js(`document.querySelectorAll('button[aria-label="Close"]').length`)}`, 3000); } };
   const openSettings = async () => { await closeDialogs(); await js(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Settings')?.click()`); return until(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent))`); };
 
   // ---------- status bar window
@@ -216,6 +219,18 @@ export async function run({ browser, commands, statusBar, safety, files }) {
   commands.files_remove_folder(win, { path: path.resolve(notes) });
   check("removing a folder forgets its index", commands.files_search(win, { query: "mitochondria" }).length === 0);
   fs.rmSync(notes, { recursive: true, force: true });
+  await closeDialogs();
+
+  // ---------- school: the panel, and a study reminder that opens the quiz
+  await closeDialogs();
+  const packId = commands.study_save(win, { pack: { title: "Smoke volcanoes", summary: "Magma rises.", flashcards: [{ q: "What is lava?", a: "Magma above ground" }], quiz: [{ q: "Where does magma form?", choices: ["In the mantle", "In clouds"], answer: 0, why: "Rock melts deep down." }] }, reminders: [Date.now() + 60_000] });
+  check("a study pack is saved with its reminder", commands.study_list(win).some((p) => p.id === packId && p.next));
+  school.remind(Date.now() + 120_000);
+  check("the reminder opens the School panel on that pack's quiz", await until(`!!document.querySelector('[aria-label="Study pack"]') && document.body.innerText.includes('Smoke volcanoes') && document.body.innerText.includes('Where does magma form?')`));
+  check("the School panel shows every tool", await js(`["Study packs","Timetable","Assignments","Slides to notes","Submit-checker","Practice partner"].every(t => !!document.querySelector('section[aria-label="' + t + '"]'))`));
+  await js(`[...document.querySelectorAll('[aria-label="Study pack"] button')].find(b => b.textContent === 'In the mantle')?.click()`);
+  check("answering a quiz question shows why", await until(`document.body.innerText.includes('Right. Rock melts deep down.')`));
+  commands.study_delete(win, { id: packId });
   await closeDialogs();
 
   // ---------- clean up the test data

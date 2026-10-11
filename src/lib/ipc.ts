@@ -247,6 +247,14 @@ export const ipc = {
   timelineNote: (title: string) => call<boolean>("timeline_note", { kind: "task", title, detail: "" }, false),
   timelineClear: () => call<void>("timeline_clear"),
   pageTrackers: (id: string) => call<{ host: string; count: number; blocked: boolean }[]>("page_trackers", { id }, []),
+  studySave: (pack: unknown, reminders: number[]) => call<number>("study_save", { pack, reminders }),
+  studyList: () => call<{ id: number; title: string; created: number; next: number | null }[]>("study_list", undefined, []),
+  studyGet: (id: number) => call<{ id: number; title: string; created: number; pack: unknown }>("study_get", { id }),
+  studyDelete: (id: number) => call<void>("study_delete", { id }),
+  timetableSaveIcs: (ics: string) => call<{ path: string; opened: boolean }>("timetable_save_ics", { ics }),
+  noteSave: (title: string, body: string, where: "notes" | "file") => call<{ saved: string } | null>("note_save", { title, body, where }),
+  slidesPdfText: (id: string) => call<string | null>("slides_pdf_text", { id }),
+  submitPickFiles: () => call<{ name: string; size: number }[]>("submit_pick_files", undefined, []),
   cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
   cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
   cleanInstallers: () => call<TaskView>("clean_installers"),
@@ -333,6 +341,10 @@ export async function onTabEvent(cb: (e: TabEvent) => void): Promise<UnlistenFn>
   if (!isTauri) return () => {};
   const label = windowLabel();
   return listen<TabEvent>("qp://tab", (e) => e.payload.window === label && cb(e.payload));
+}
+
+export async function onStudyReminder(cb: (e: { id: number; title: string }) => void): Promise<UnlistenFn> {
+  return listen<{ id: number; title: string }>("qp://study-reminder", (e) => cb(e.payload));
 }
 
 export async function onShortcut(cb: (action: string) => void): Promise<UnlistenFn> {

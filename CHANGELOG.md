@@ -26,6 +26,15 @@
 - **A timeline of my day** (opt-in, off by default): pages read, files downloaded, chats and assistant tasks, day by day, in Library → Timeline. Local only, 30 days, never from private windows, with Clear all.
 - **Check this page** (This site panel): ads and "sponsored" parts, when it was last updated (flags pages years old), who runs the site according to the page itself, and which tracking companies it tried to load. Each finding says how sure it is. Optionally compare the page's claims with pages you've read (Recall), after seeing exactly what is sent; disagreements are shown as a reason to look closer, never as proof.
 
+### Learning and school (command palette → School)
+- **Study packs:** pick a few tabs and get flashcards, a quiz and a one-page summary. Save it and short quizzes pop up later the same day (about 1, 3 and 7 hours later, never at night).
+- **Fill in my timetable:** reads your school portal's timetable, shows every class to check, then makes a calendar file. Your Calendar app asks before adding anything.
+- **Collect my assignments:** reads Google Classroom's To-do page (or a school site) and lists what's due this week in one note; copy it, add it to Apple Notes, or save it as a file.
+- **Slides to notes:** reads a PDF or scrolls through a slides page, then writes study notes with questions to check yourself.
+- **Submit-checker:** reads an assignment's file rules and checks the file you plan to hand in (type, name, size). It never submits.
+- **Practice partner:** reads the current quiz question aloud with your computer's own voice, or explains why your answer was wrong. It never answers or submits for you.
+- Every tool shows exactly what page text will be sent to the AI before it is.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.
