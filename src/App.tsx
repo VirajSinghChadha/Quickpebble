@@ -24,6 +24,9 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import { AuthGate } from "./components/AuthGate";
 import { Tour } from "./components/Tour";
 import { ReportDialog } from "./components/ReportDialog";
+import { TaskManager } from "./components/TaskManager";
+import { CrashedTab } from "./components/CrashedTab";
+import { RecoveryNotice } from "./components/RecoveryNotice";
 import { useTour } from "./store/useTour";
 import { useAccount } from "./store/useAccount";
 
@@ -76,6 +79,8 @@ export default function App() {
   }, []);
   const overlay = useStore((s) => s.overlay);
   const showNewTab = useStore((s) => !selectActive(s).url);
+  const crashed = useStore((s) => selectActive(s).crashed);
+  const activeTabId = useStore((s) => s.activeId);
   const priv = isPrivateWindow();
   const bar = useStore((s) => s.bookmarksBar);
 
@@ -89,7 +94,7 @@ export default function App() {
       </header>
       {/* Page webviews are positioned natively over this region. */}
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">{showNewTab && (priv ? <PrivateNewTab /> : <NewTabPage />)}</div>
+        <div className="min-w-0 flex-1">{showNewTab ? (priv ? <PrivateNewTab /> : <NewTabPage />) : crashed ? <CrashedTab id={activeTabId} /> : null}</div>
         <Sidebar />
       </div>
       <AnimatePresence>
@@ -107,6 +112,8 @@ export default function App() {
       {accountStatus !== "ready" && <AuthGate />}
       {accountStatus === "ready" && <Tour />}
       <ReportDialog />
+      <TaskManager />
+      <RecoveryNotice />
     </div>
     </MotionConfig>
   );

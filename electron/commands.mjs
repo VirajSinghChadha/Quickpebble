@@ -93,6 +93,9 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
 
     // ---- memory saver
     memory_saver_get: () => B.memory,
+    task_manager: (w) => B.taskManager(w),
+    tab_scroll_to: (w, { id, y }) => { const t = B.tab(w, id); t.restoreScrollY = Number.isFinite(y) ? Math.max(0, Math.min(1e7, Math.round(y))) : 0; },
+    tab_suspend: (w, { id }) => B.suspendTab(w, id),
     memory_saver_set: (_w, { config }) => { db.setSetting("memory_saver", JSON.stringify(config)); B.memory = { ...B.memory, ...config }; },
     memory_stats: () => B.memoryStats(),
 

@@ -11,6 +11,7 @@ import { StoragePanel } from "./StoragePanel";
 import { UsageMeter } from "./UsageMeter";
 import { useTour } from "../store/useTour";
 import { useReport } from "../store/useReport";
+import { useTaskManager } from "../store/useTaskManager";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -229,6 +230,9 @@ export function SettingsPanel() {
             <select className={selectCls} value={mem.mode} disabled={!mem.enabled} onChange={(e) => saveMem({ ...mem, mode: e.target.value as MemoryConfig["mode"], timeout_minutes: null })} aria-label="Memory Saver mode">
               <option value="balanced">Balanced</option><option value="maximum">Maximum savings</option>
             </select>
+          </Row>
+          <Row label="Task Manager" hint="See how much memory each tab really uses, and put heavy ones to sleep or close them.">
+            <button type="button" className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary" onClick={() => { close(); useTaskManager.getState().show(); }}>Open Task Manager</button>
           </Row>
           {stats && <p className="pb-1 text-[12px] text-text-secondary">{stats.suspended_tabs} of {stats.total_tabs} tabs suspended · ~{stats.estimated_saved_mb} MB saved (estimate) · system memory {Math.round(stats.system_used_pct)}% used</p>}
         </div>
