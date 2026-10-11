@@ -39,6 +39,18 @@ export function StoragePanel() {
   );
 }
 
+function Row({ title, last, size, checked, onToggle, extra }: { title: string; last: number; size: number; checked: boolean; onToggle: () => void; extra?: string }) {
+  return (
+    <li>
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2 hover:bg-surface-secondary">
+        <input type="checkbox" className="size-4 accent-primary" checked={checked} onChange={onToggle} />
+        <span className="min-w-0 flex-1"><span className="block truncate font-medium">{title}</span><span className="block text-[12px] text-text-secondary">{extra ? `${extra} · ` : ""}{formatBytes(size)}</span></span>
+        <span className="shrink-0 text-[12px] text-text-secondary" title={new Date(last * 1000).toLocaleString()}>last used {lastUsedLabel(last)}</span>
+      </label>
+    </li>
+  );
+}
+
 function CleanupDialog({ days, onClose, onDone }: { days: number; onClose: () => void; onDone: (message: string) => void }) {
   useHidePage();
   const [report, setReport] = useState<StaleReport | null>(null);
@@ -62,15 +74,6 @@ function CleanupDialog({ days, onClose, onDone }: { days: number; onClose: () =>
       onDone(`Erased ${r.chats} chat${r.chats === 1 ? "" : "s"} and ${r.projects} project${r.projects === 1 ? "" : "s"}, freeing about ${formatBytes(bytes)}.`);
     } catch (e) { setError(String(e)); setConfirming(false); }
   };
-  const Row = ({ title, last, size, checked, onToggle, extra }: { title: string; last: number; size: number; checked: boolean; onToggle: () => void; extra?: string }) => (
-    <li>
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2 hover:bg-surface-secondary">
-        <input type="checkbox" className="size-4 accent-primary" checked={checked} onChange={onToggle} />
-        <span className="min-w-0 flex-1"><span className="block truncate font-medium">{title}</span><span className="block text-[12px] text-text-secondary">{extra ? `${extra} · ` : ""}{formatBytes(size)}</span></span>
-        <span className="shrink-0 text-[12px] text-text-secondary" title={new Date(last * 1000).toLocaleString()}>last used {lastUsedLabel(last)}</span>
-      </label>
-    </li>
-  );
   return (
     <Modal onClose={onClose} label="Clear unused chats and notes" width="max-w-xl">
       <ModalHeader title={confirming ? "Confirm: erase these?" : "Unused chats and project notes"} onClose={onClose} />

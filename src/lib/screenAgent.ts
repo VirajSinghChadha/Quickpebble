@@ -88,13 +88,15 @@ export function isRisky(res: ScreenResponse, site: SitePerms): boolean {
 }
 
 export async function runScreenAgent(goal: string, io: ScreenIO, signal: { aborted: boolean }, maxSteps = MAX_SCREEN_STEPS, history: string[] = []): Promise<void> {
+  // Every way of failing also tells the status bar, so it never stays on screen showing a stale "working" state.
+  const fail = (text: string) => { io.onStatus?.({ phase: text === "Stopped." ? "idle" : "error", thinking: text }); io.onEvent({ kind: "error", text }); };
   let lastKey = "";
   let repeats = 0;
   let failures = 0;
   let verifyFails = 0;
   let unchanged = 0;
   for (let n = 0; n < maxSteps; n++) {
-    if (signal.aborted) { io.onStatus?.({ phase: "idle" }); return io.onEvent({ kind: "error", text: "Stopped." }); }
+    if (signal.aborted) return fail("Stopped.");
     await io.prepare?.().catch(() => {});
     const status = (s: ScreenStatus) => io.onStatus?.({ step: n + 1, max: maxSteps, ...s });
     status({ phase: "looking" });
@@ -103,14 +105,14 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       try {
         res = await io.propose(goal, history.slice(-12));
       } catch (e) {
-        if (attempt === PROPOSE_ATTEMPTS || !TRANSIENT.test(String(e))) return io.onEvent({ kind: "error", text: String(e) });
+        if (attempt === PROPOSE_ATTEMPTS || !TRANSIENT.test(String(e))) return fail(String(e));
         io.onEvent({ kind: "say", text: `Temporary problem, retrying (${attempt}/${PROPOSE_ATTEMPTS - 1})…` });
         await io.sleep(1500 * attempt);
-        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+        if (signal.aborted) return fail("Stopped.");
       }
     }
     if (!res) return;
-    if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+    if (signal.aborted) return fail("Stopped.");
     const { user, action } = res;
     if (user.thinking) io.onEvent({ kind: "say", text: user.thinking });
     if (action.type === "done") { status({ phase: "done", thinking: user.message || "Done." }); return io.onEvent({ kind: "final", text: user.message || "Done." }); }
@@ -123,7 +125,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
     repeats = key === lastKey ? repeats + 1 : 0;
     lastKey = key;
     const limit = action.type === "wait" ? MAX_WAITS_IN_A_ROW : HARD_STOP_REPEATS;
-    if (repeats >= limit) return io.onEvent({ kind: "error", text: "I tried the same thing several times without progress, so I stopped. Try rephrasing the task." });
+    if (repeats >= limit) return fail("I tried the same thing several times without progress, so I stopped. Try rephrasing the task.");
     if (repeats >= NUDGE_AFTER_REPEATS && action.type !== "wait") {
       history.push(`(note: "${describeScreenAction(action)}" was repeated ${repeats + 1} times and the screen did not change as expected — try a different cell, an offset inside the cell, a keyboard key, or scrolling)`);
     }
@@ -136,7 +138,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       io.onEvent({ kind: "say", text: action.type === "type" ? "Double-checking the answer before I enter it…" : "Double-checking before I submit…" });
       try {
         const v = await io.verify(goal, history.slice(-12), desc);
-        if (signal.aborted) return io.onEvent({ kind: "error", text: "Stopped." });
+        if (signal.aborted) return fail("Stopped.");
         if (v.ok) {
           verifyFails = 0;
           io.onEvent({ kind: "step", text: "Double-check passed", ok: true });
@@ -165,6 +167,7 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       const choice = await io.choose(`${warn}${tag}${user.message ? `${desc} — ${user.message}` : desc}`, risky || !!doubtful);
       if (signal.aborted || choice === "stop") {
         io.onEvent({ kind: "step", text: `${desc} — stopped`, ok: false });
+        io.onStatus?.({ phase: "idle" });
         return io.onEvent({ kind: "final", text: "Okay, I stopped. Tell me what to do differently." });
       }
       if (choice === "skip") {
@@ -189,11 +192,10 @@ export async function runScreenAgent(goal: string, io: ScreenIO, signal: { abort
       if (action.type !== "wait") await io.sleep(500);
     } catch (e) {
       io.onEvent({ kind: "step", text: `${desc} — ${String(e)}`, ok: false });
-      if (++failures >= MAX_ACTION_FAILURES) return io.onEvent({ kind: "error", text: String(e) });
+      if (++failures >= MAX_ACTION_FAILURES) return fail(String(e));
       history.push(`${history.length + 1}. (failed: ${desc} — ${String(e).slice(0, 120)}) — try something else`);
       await io.sleep(800);
     }
   }
-  io.onStatus?.({ phase: "error", thinking: `Stopped after ${maxSteps} steps.` });
-  io.onEvent({ kind: "error", text: `Stopped after ${maxSteps} steps. Say “continue” to keep going.` });
+  fail(`Stopped after ${maxSteps} steps. Say “continue” to keep going.`);
 }

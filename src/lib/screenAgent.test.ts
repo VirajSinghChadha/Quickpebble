@@ -197,6 +197,21 @@ describe("status bar updates", () => {
     await runScreenAgent("g", io, { aborted: false });
     expect(seen).toContain("waiting");
   });
+  it("never leaves the bar on a working state when a task fails", async () => {
+    const { io } = make([res({ type: "click", cell: "A1" })]);
+    io.propose = async () => { throw new Error("Gemini is down"); };
+    const seen: string[] = [];
+    io.onStatus = (s) => void seen.push(s.phase);
+    await runScreenAgent("g", io, { aborted: false });
+    expect(seen.at(-1)).toBe("error");
+  });
+  it("hides the bar when the person stops the task", async () => {
+    const { io } = make([res({ type: "click", cell: "A1", risk: "high" }, "Delete it"), res({ type: "done" }, "ok")], ["stop"]);
+    const seen: string[] = [];
+    io.onStatus = (s) => void seen.push(s.phase);
+    await runScreenAgent("g", io, { aborted: false });
+    expect(seen.at(-1)).toBe("idle");
+  });
   it("describes drag and open_app", () => {
     expect(describeScreenAction({ type: "drag", cell: "B2", to_cell: "K9" })).toBe("Drag from B2 to K9");
     expect(describeScreenAction({ type: "open_app", app: "Pages" })).toBe("Open Pages");

@@ -4,7 +4,7 @@
 import { BrowserWindow, ipcMain, screen } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { barBounds, lingerMs, sanitizeState } from "./overlay-state.mjs";
+import { barBounds, lingerMs, sanitizeState, STALE_MS } from "./overlay-state.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +26,7 @@ export class StatusBar {
       webPreferences: { preload: path.join(here, "preload-overlay.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
     });
     win.setAlwaysOnTop(true, "screen-saver");
-    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); // keeps the Dock icon as it is
     win.setContentProtection(true);                       // keeps the bar out of the agent's own screenshots
     win.setIgnoreMouseEvents(true, { forward: true });    // click-through except over the Stop button
     win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -44,8 +44,8 @@ export class StatusBar {
     const win = this.ensure();
     const place = () => { win.setBounds(barBounds(screen.getPrimaryDisplay().workArea)); win.webContents.send("qp-overlay:state", state); win.showInactive(); };
     if (win.webContents.isLoading()) win.webContents.once("did-finish-load", place); else place();
-    const linger = lingerMs(state.phase);
-    if (linger) this.hideTimer = setTimeout(() => this.hide(), linger);
+    // Finished and failed states fade away; a "working" state with no news for 90 seconds is stale and goes too.
+    this.hideTimer = setTimeout(() => this.hide(), lingerMs(state.phase) ?? STALE_MS);
   }
 
   hide() {

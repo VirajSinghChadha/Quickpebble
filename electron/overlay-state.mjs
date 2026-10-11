@@ -21,3 +21,6 @@ export function barBounds(workArea, width = 780, height = 132, margin = 18) {
 export function lingerMs(phase) {
   return phase === "done" ? 5000 : phase === "error" ? 8000 : phase === "idle" ? 0 : null;
 }
+
+/** A working state with no update for this long means the task died without saying so. */
+export const STALE_MS = 90000;

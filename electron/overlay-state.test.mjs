@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barBounds, lingerMs, sanitizeState } from "./overlay-state.mjs";
+import { barBounds, lingerMs, sanitizeState, STALE_MS } from "./overlay-state.mjs";
 
 describe("status bar state", () => {
   it("keeps valid updates and trims long text", () => {
@@ -28,5 +28,9 @@ describe("status bar state", () => {
     expect(lingerMs("error")).toBe(8000);
     expect(lingerMs("acting")).toBeNull();
     expect(lingerMs("idle")).toBe(0);
+  });
+  it("treats a working state with no news as stale after 90 seconds", () => {
+    expect(STALE_MS).toBe(90000);
+    expect(lingerMs("acting") ?? STALE_MS).toBe(90000);
   });
 });
