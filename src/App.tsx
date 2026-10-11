@@ -3,7 +3,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
 import { useEffect } from "react";
-import { ipc, isPrivateWindow, onDownloads, onAssistantHotkey, onLoginSeen, onScreenStop } from "./lib/ipc";
+import { ipc, isPrivateWindow, onDownloads, onAssistantHotkey, onLoginSeen, onScreenPause, onScreenStop } from "./lib/ipc";
 import { useChat } from "./store/useChat";
 import { BASE_CHROME, BOOKMARKS_BAR, selectActive, useStore } from "./store/useStore";
 import { NewTabPage } from "./components/NewTabPage";
@@ -35,6 +35,12 @@ export default function App() {
   useEffect(() => {
     let off = () => {};
     void onScreenStop(() => useChat.getState().stop()).then((u) => (off = u));
+    return () => off();
+  }, []);
+  // Pause/Resume from the status bar or its hotkey.
+  useEffect(() => {
+    let off = () => {};
+    void onScreenPause(() => useChat.getState().togglePause()).then((u) => (off = u));
     return () => off();
   }, []);
   // ⌘⇧Space from any app opens the assistant with the cursor in its message box.

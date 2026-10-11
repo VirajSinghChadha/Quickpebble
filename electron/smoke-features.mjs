@@ -26,6 +26,13 @@ export async function run({ browser, commands, statusBar }) {
   const shown = await bar.webContents.executeJavaScript(`JSON.stringify({ title: document.getElementById('title').textContent, count: document.getElementById('count').textContent, think: document.getElementById('think').textContent, next: document.getElementById('next').textContent })`);
   const s = JSON.parse(shown);
   check("status bar shows phase, step, thinking and next action", s.title === "Thinking" && /step 2 of 40/.test(s.count) && /desktop/.test(s.think) && /Open Notes/.test(s.next), shown);
+  commands.screen_overlay(win, { state: { phase: "paused", step: 3, max: 40 } });
+  await sleep(500);
+  const pausedUi = JSON.parse(await bar.webContents.executeJavaScript(`JSON.stringify({ title: document.getElementById('title').textContent, button: document.getElementById('pause').textContent, think: document.getElementById('think').textContent })`));
+  check("paused bar offers Resume and explains what to do", bar.isVisible() && pausedUi.title === "Paused" && pausedUi.button === "Resume" && /your step yourself/.test(pausedUi.think), JSON.stringify(pausedUi));
+  const flows = await bar.webContents.executeJavaScript(`new Promise((r) => { document.getElementById('pause').click(); setTimeout(() => r(true), 100); })`);
+  check("the Pause button on the bar is clickable", flows === true);
+  check("pause hotkey is registered", globalShortcut.isRegistered("CommandOrControl+Alt+P"));
   commands.screen_overlay(win, { state: { phase: "<img src=x onerror=alert(1)>", thinking: "<b>x</b>" } });
   await sleep(300);
   check("bad status is sanitised and hides the bar", !bar.isVisible());
@@ -80,6 +87,17 @@ export async function run({ browser, commands, statusBar }) {
   await js(`[...document.querySelectorAll('button')].find(b => /review what can be cleared/i.test(b.textContent))?.click()`);
   await sleep(1000);
   check("clean-up dialog opens with a safe empty state", await js(`/nothing has gone unused|unused chats and project notes/i.test(document.body.innerText)`));
+
+  // ---------- usage meter, plan setting
+  const u = commands.usage_today(win);
+  check("usage meter reports today's calls against a limit", Number.isInteger(u.calls) && u.limit === 1000 && u.level === "ok", JSON.stringify(u));
+  commands.settings_set(win, { key: "usage_limit", value: "250" });
+  check("daily limit can be changed", commands.usage_today(win).limit === 250);
+  check("a silly limit is refused", (() => { try { commands.settings_set(win, { key: "usage_limit", value: "3" }); return false; } catch { return true; } })());
+  commands.settings_set(win, { key: "screen_plan", value: "always" });
+  check("plan preview setting saves", commands.settings_get(win).screen_plan === "always");
+  check("unknown plan setting refused", (() => { try { commands.settings_set(win, { key: "screen_plan", value: "sometimes" }); return false; } catch { return true; } })());
+  check("settings show the usage meter and the plan option", await js(`document.body.innerText.includes('AI calls today') && !!document.querySelector('select[aria-label="Preview the plan"]') && !!document.querySelector('input[aria-label="Daily AI call limit"]')`));
 
   // ---------- clean up the test data
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });

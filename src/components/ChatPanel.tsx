@@ -1,7 +1,8 @@
 import { ContextBar } from "./ContextBar";
+import { UsageMeter } from "./UsageMeter";
 import { useEffect, useRef, useState } from "react";
 import { Answer } from "./Answer";
-import { Bot, Check, CircleAlert, ClipboardCopy, MousePointerClick, Send, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, CircleAlert, ClipboardCopy, MousePointerClick, Pause, Play, Send, Square, Trash2, X } from "lucide-react";
 import { useOllama } from "../hooks/useOllama";
 import { ipc } from "../lib/ipc";
 import { chatToMarkdown } from "../lib/exportChat";
@@ -17,7 +18,7 @@ const SUGGESTIONS = {
 };
 
 export function ChatPanel() {
-  const { items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
+  const { paused, togglePause, items, busy, mode, approvalMode, permissionRequest, preparingPermissions, modelOffer, editPermissions, screenApprovalMode, setScreenApprovalMode, approval, sourceTabIds, setSourceTabIds, webResearch, setWebResearch, recall, setRecall, includeCurrentPage, setIncludeCurrentPage, setMode, setApprovalMode, send, stop, clear } = useChat();
   const sourceTabs = useStore(s => s.tabs);
   const activeId = useStore(s => s.activeId);
   const [showSources, setShowSources] = useState(false);
@@ -202,8 +203,8 @@ export function ChatPanel() {
         <PermissionDialog />
         {approval && (
           <div role="alertdialog" aria-label="Approve action" className={`rounded-2xl border bg-surface p-3 shadow-pebble ${approval.risky ? "border-red-500/60" : "border-primary/50"}`}>
-            <p className="mb-2 flex items-center gap-2 font-medium"><MousePointerClick size={14} className={approval.risky ? "text-red-500" : "text-primary"} /> {approval.risky ? "This step looks risky" : "Allow this action?"}</p>
-            <p className="mb-3 break-words text-text-secondary">{approval.description}</p>
+            <p className="mb-2 flex items-center gap-2 font-medium"><MousePointerClick size={14} className={approval.risky ? "text-red-500" : "text-primary"} /> {approval.title ?? (approval.risky ? "This step looks risky" : "Allow this action?")}</p>
+            <p className="mb-3 whitespace-pre-line break-words text-text-secondary">{approval.description}</p>
             <div className="flex flex-col gap-1.5">
               {approval.options.map((o, i) => (
                 <button key={o.choice} type="button" autoFocus={i === 0} onClick={() => approval.resolve(o.choice)} className="flex items-center gap-2.5 rounded-lg border border-border px-2.5 py-1.5 text-left transition-colors duration-150 hover:bg-surface-secondary focus-visible:border-primary">
@@ -247,7 +248,10 @@ export function ChatPanel() {
             className="max-h-28 min-h-5 flex-1 resize-none bg-transparent outline-none placeholder:text-text-secondary"
           />
           {busy ? (
+            <>
+            {mode === "screen" && <button type="button" aria-label={paused ? "Resume" : "Pause"} title={paused ? "Resume: I'll look at the new screen and carry on" : "Pause so you can do a step yourself (Cmd/Ctrl+Alt+P)"} onClick={togglePause} className="grid size-7 shrink-0 place-items-center rounded-lg bg-amber-500 text-white">{paused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}</button>}
             <button type="button" aria-label="Stop" onClick={stop} className="grid size-7 shrink-0 place-items-center rounded-lg bg-red-500 text-white"><Square size={12} fill="currentColor" /></button>
+            </>
           ) : (
             <button type="button" aria-label="Send" onClick={submit} disabled={!text.trim()} className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-white disabled:opacity-40 dark:text-bg"><Send size={13} /></button>
           )}
@@ -257,6 +261,7 @@ export function ChatPanel() {
           {cloud && " — page content is sent to this provider."}
           {mode === "screen" && " Screen mode sends a screenshot of your whole screen to Google Gemini at every step. Move the mouse into a screen corner to abort."}
         </p>
+        {cloud && <UsageMeter compact />}
       </div>
     </div>
   );

@@ -4,16 +4,18 @@
 import { BrowserWindow, ipcMain, screen } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { barBounds, lingerMs, sanitizeState, STALE_MS } from "./overlay-state.mjs";
+import { barBounds, lingerMs, sanitizeState, staleMs } from "./overlay-state.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 export class StatusBar {
-  constructor(onStop) {
+  constructor(onStop, onPause) {
     this.onStop = onStop;
+    this.onPause = onPause;
     this.win = null;
     this.hideTimer = null;
     ipcMain.on("qp-overlay:stop", () => { this.onStop?.(); this.update({ phase: "idle" }); });
+    ipcMain.on("qp-overlay:pause", () => this.onPause?.());
     ipcMain.on("qp-overlay:hover", (e, on) => { if (this.win && e.sender === this.win.webContents) this.win.setIgnoreMouseEvents(!on, { forward: true }); });
   }
 
@@ -45,7 +47,7 @@ export class StatusBar {
     const place = () => { win.setBounds(barBounds(screen.getPrimaryDisplay().workArea)); win.webContents.send("qp-overlay:state", state); win.showInactive(); };
     if (win.webContents.isLoading()) win.webContents.once("did-finish-load", place); else place();
     // Finished and failed states fade away; a "working" state with no news for 90 seconds is stale and goes too.
-    this.hideTimer = setTimeout(() => this.hide(), lingerMs(state.phase) ?? STALE_MS);
+    this.hideTimer = setTimeout(() => this.hide(), lingerMs(state.phase) ?? staleMs(state.phase));
   }
 
   hide() {

@@ -3,6 +3,7 @@ import { runAgent, type AgentIO, type Mode } from "../lib/agent";
 import { runScreenAgent, type Choice, type ScreenMode } from "../lib/screenAgent";
 import { ipc, isPrivateWindow, type ChatMsg, type ChatSummary, type PageSnapshot, type Project } from "../lib/ipc";
 import { chatTitle, projectContext } from "../lib/context";
+import { approvedPlanNote, normalizeSetting, parsePlan, PLAN_PROMPT, planText, shouldPreview, type Plan } from "../lib/plan";
 import { answerPrompt, parseAnswer, sourceFromRecall, sourceFromSnapshot, type AnswerSource, type AnswerBlock } from "../lib/answers";
 import { selectActive, useStore } from "./useStore";
 import { parseSlash } from "../lib/slash";
@@ -45,7 +46,7 @@ interface ChatState {
   /** Offered when the person asks for something detailed: switch to a stronger model? */
   modelOffer: { current: string; models: ModelChoice[]; resolve: (model: string | null) => void } | null;
   editPermissions: () => Promise<void>;
-  approval: { description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
+  approval: { title?: string; description: string; risky: boolean; options: { choice: Choice; label: string }[]; resolve: (c: Choice) => void } | null;
   /** Saved chat this conversation is stored in (null until the first message), the active project, and the lists for the pickers. */
   chatId: number | null;
   projectId: number | null;
@@ -60,11 +61,15 @@ interface ChatState {
   setApprovalMode: (m: Mode) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
+  /** Pause/resume a running screen task so the person can take over for a step. */
+  paused: boolean;
+  togglePause: () => void;
   clear: () => void;
 }
 
 let nextId = 1;
 let signal = { aborted: false };
+let resumeGate: (() => void) | null = null;
 /** Actions the screen agent has taken this session; survives across messages, reset by Clear. */
 const screenHistory: string[] = [];
 /** Text of the page in the active tab, so the agent reads all of it and not just what is on screen. */
@@ -156,6 +161,30 @@ function screenGoal(prior: ChatMsg[], latest: string, context = ""): string {
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Asks the model for a short step list (one cheap text call, no screenshot). Never blocks the task: any failure means "no preview". */
+async function makePlan(goal: string): Promise<Plan | null> {
+  try {
+    return parsePlan(await ipc.aiChat(PLAN_PROMPT, [{ role: "user", content: goal.slice(0, 1500) }], true));
+  } catch {
+    return null;
+  }
+}
+
+/** Shows the plan with numbered choices. Resolves "allow" (run it), "skip" (run without a fixed plan) or "stop" (cancel). */
+function askPlan(plan: Plan): Promise<Choice> {
+  return new Promise<Choice>((resolve) => {
+    useChat.setState({
+      approval: {
+        title: "Here's my plan",
+        description: planText(plan),
+        risky: false,
+        options: [{ choice: "allow", label: "Run this plan" }, { choice: "skip", label: "Run it without a fixed plan" }, { choice: "stop", label: "Cancel" }],
+        resolve: (c) => { useChat.setState({ approval: null }); resolve(c); },
+      },
+    });
+  });
+}
 
 /** Numbered choices shown in the chat panel; resolves with the one the person picks. */
 function askChoice(description: string, risky: boolean, offerAuto: boolean): Promise<Choice> {
@@ -309,8 +338,22 @@ export const useChat = create<ChatState>((set, get) => ({
     void ipc.settingsSet("active_chat", "").catch(() => {});
   },
 
+  paused: false,
+  togglePause: () => {
+    const { busy, paused, mode } = get();
+    if (!busy || mode !== "screen") return;
+    if (paused) {
+      set({ paused: false });
+      const release = resumeGate; resumeGate = null; release?.();
+    } else {
+      set({ paused: true });
+      void ipc.screenOverlay({ phase: "paused" }).catch(() => {});
+    }
+  },
   stop: () => {
     signal.aborted = true;
+    set({ paused: false });
+    { const release = resumeGate; resumeGate = null; release?.(); }
     get().approval?.resolve("stop");
     get().permissionRequest?.resolve(null);
     get().modelOffer?.resolve(null);
@@ -390,11 +433,25 @@ export const useChat = create<ChatState>((set, get) => ({
           perms = await askPermissions(host, curated);
         }
         if (!perms) return void add("say", "Okay, I won't do anything without permissions. Send the task again when you're ready.");
+        // Preview the plan: for big tasks (or always, or never, per Settings) the person approves the whole plan before anything runs.
+        let goalWithPlan = goal;
+        const previewSetting = normalizeSetting((await ipc.settingsGet().catch(() => ({}) as Record<string, string>)).screen_plan);
+        if (previewSetting !== "never") {
+          void ipc.screenOverlay({ phase: "thinking", thinking: "Working out a plan…" }).catch(() => {});
+          const plan = await makePlan(goal);
+          void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
+          if (runSignal.aborted) return;
+          if (plan && shouldPreview(previewSetting, plan)) {
+            const choice = await askPlan(plan);
+            if (runSignal.aborted || choice === "stop") return void add("say", "Okay, I cancelled that. Nothing was done.");
+            if (choice === "allow") goalWithPlan = `${goal}\n\n${approvedPlanNote(plan)}`;
+          }
+        }
         sessionPerms.set(host, perms);
         activePerms = perms;
         if (runSignal.aborted) return;
         const io = makeIO();
-        await runScreenAgent(screenGoal(prior, goal, activeContext()), {
+        await runScreenAgent(screenGoal(prior, goalWithPlan, activeContext()), {
           propose: async (g, h) => ipc.screenPropose(g, h, activePerms.items, await activePageText()),
           verify: async (g, h, pending) => ipc.screenVerify(g, h, pending, await activePageText()),
           act: ipc.screenAct,
@@ -407,6 +464,8 @@ export const useChat = create<ChatState>((set, get) => ({
           sleep,
           onEvent: io.onEvent,
           onStatus: (st) => void ipc.screenOverlay(st).catch(() => {}),
+          isPaused: () => get().paused,
+          waitForResume: () => new Promise<void>((resolve) => { resumeGate = resolve; }),
         }, runSignal, undefined, screenHistory);
       } else {
         const ctx = activeContext();
@@ -418,7 +477,7 @@ export const useChat = create<ChatState>((set, get) => ({
       get().approval?.resolve("stop");
       void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
     get().permissionRequest?.resolve(null);
-      set({ busy: false });
+      set({ busy: false, paused: false });
     }
   },
 }));
