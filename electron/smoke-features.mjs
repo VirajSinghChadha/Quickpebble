@@ -10,6 +10,7 @@ const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"} 
 
 export async function run({ browser, commands, statusBar }) {
   const win = browser.windows.get("main");
+  commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
   const js = (code) => ui.executeJavaScript(code);
 

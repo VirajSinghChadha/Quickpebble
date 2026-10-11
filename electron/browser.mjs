@@ -1,7 +1,7 @@
 // Windows, tabs, layout, sessions (port of browser.rs). Every tab is a real Chromium WebContentsView.
 import { summarize as summarizeTasks } from "./taskmanager.mjs";
 import { noteProblem } from "./diagnostics.mjs";
-import { app, BaseWindow, WebContentsView, Menu, dialog, session, shell, clipboard } from "electron";
+import { app, nativeTheme, BaseWindow, WebContentsView, Menu, dialog, session, shell, clipboard } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { allowNavigation, httpsUpgrade, normalizeInput, parseUrl } from "./security.mjs";
 import { installBlocker } from "./adblock.mjs";
 import { remember } from "./recall.mjs";
+import { LinkPreviews } from "./linkpreview.mjs";
 import { HoverCard } from "./hovercard.mjs";
 import { shouldSuspend, defaultMemoryConfig } from "./memory-saver.mjs";
 
@@ -30,6 +31,8 @@ export class Browser {
     this.appUrl = appUrl;
     this.devtools = devtools;
     this.hoverCard = new HoverCard();
+    this.linkPreviews = new LinkPreviews();
+    this.linkToken = 0;
     this.windows = new Map(); // label -> window state
     this.byContents = new Map(); // webContents.id -> { win, tab }
     this.uiByContents = new Map(); // ui webContents.id -> window state
@@ -283,7 +286,7 @@ export class Browser {
     wc.on("before-input-event", (event, input) => {
       if (input.type !== "keyDown" || !(isMac ? input.meta : input.control) || input.alt) return;
       const k = input.key.toLowerCase();
-      const combos = { t: ["new-tab", "reopen-tab"], w: ["close-tab"], l: ["focus-address"], r: ["reload", "reader"], d: ["bookmark"], "[": ["back"], "]": ["forward"], p: [null, "palette"], a: [null, "tab-search"], n: [null, "private"], j: ["assistant"], f: ["find"], y: ["library"], b: [null, "bookmarks-bar"], "=": ["zoom-in"], "+": [null, "zoom-in"], "-": ["zoom-out"], "0": ["zoom-reset"] };
+      const combos = { t: ["new-tab", "reopen-tab"], w: ["close-tab"], l: ["assistant", "focus-address"], r: ["reload", "reader"], d: ["bookmark"], "[": ["back"], "]": ["forward"], p: [null, "palette"], a: [null, "tab-search"], n: [null, "private"], j: ["assistant"], f: ["find"], y: ["library"], b: [null, "bookmarks-bar"], "=": ["zoom-in"], "+": [null, "zoom-in"], "-": ["zoom-out"], "0": ["zoom-reset"] };
       const hit = combos[k]?.[input.shift ? 1 : 0];
       if (!hit) return;
       event.preventDefault();
@@ -306,7 +309,7 @@ export class Browser {
   // ---------------------------------------------------------------- navigation
   navigate(win, id, input, allowHttp = false) {
     const t = this.tab(win, id);
-    const url = normalizeInput(input, this.setting("search_engine") || "ghostsearch");
+    const url = normalizeInput(input, this.setting("search_engine") || "google", this.setting("search_lang") || "en");
     if (!url) throw new Error("empty address");
     if (!allowNavigation(url, this.setting("block_trackers") !== "false")) throw new Error("Blocked by tracker protection. Turn it off for this site in the Site panel to open it.");
     if (allowHttp && url.protocol === "http:") this.httpAllowed.add(url.hostname);
@@ -406,9 +409,27 @@ export class Browser {
       this.emitTab(win, t);
     } else if (cmd === "qp_shortcut") {
       if (SHORTCUTS.has(args?.action)) this.emitUi(win, "qp://shortcut", { window: win.label, action: args.action });
+    } else if (cmd === "qp_link_hover") {
+      void this.linkHover(win, t, args);
     } else if (cmd === "qp_login_seen") {
       this.onLoginSeen?.(win, t, args);
     }
+  }
+
+  /** A link was hovered in a page (or the pointer left it). Shows the address, plus title and description if the person turned that on. */
+  async linkHover(win, t, a) {
+    const mine = ++this.linkToken;
+    if (!a?.url || win.active !== t.id) return this.hoverCard.hide(win);
+    let u;
+    try { u = new URL(String(a.url)); } catch { return; }
+    if (!/^https?:$/.test(u.protocol)) return;
+    const num = (n, d = 0) => (Number.isFinite(Number(n)) ? Number(n) : d);
+    const anchor = { x: num(a.x), y: num(a.y) + win.chrome, width: num(a.w), height: num(a.h) };
+    const host = u.hostname.replace(/^www\./, "");
+    const dark = nativeTheme.shouldUseDarkColors;
+    const show = (meta) => { if (mine === this.linkToken) this.hoverCard.show(win, { title: meta?.title || host, host: `${host}${u.pathname.length > 1 ? u.pathname.slice(0, 40) : ""}`, desc: meta?.description || "", dark, anchor, link: true }); };
+    show(null);
+    if (this.setting("link_preview") === "1" && !win.private) { const meta = await this.linkPreviews.get(u.href); if (meta) show(meta); }
   }
 
   pageScript(wcId) {

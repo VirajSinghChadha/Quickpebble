@@ -10,7 +10,7 @@ export function defaultModel(provider) {
 }
 
 export function aiConfig(db) {
-  const provider = db.getSetting("ai_provider") || "ollama";
+  const provider = db.getSetting("ai_provider") || "gemini";
   return { provider, model: db.getSetting("ai_model") || defaultModel(provider), ollamaUrl: db.getSetting("ollama_url") || DEFAULT_OLLAMA_URL };
 }
 

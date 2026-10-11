@@ -43,7 +43,7 @@ export function SettingsPanel() {
   const upd = useUpdater();
   const [mem, setMem] = useState<MemoryConfig>(defaultMemory);
   const [stats, setStats] = useState<MemoryStats | null>(null);
-  const [engine, setEngine] = useState("ghostsearch");
+  const [engine, setEngine] = useState("google");
   const [searxUrl, setSearxUrl] = useState("");
   const [blockLevel, setBlockLevel] = useState("high");
   const [chromeUa, setChromeUa] = useState(true);
@@ -51,9 +51,11 @@ export function SettingsPanel() {
   const [precision, setPrecision] = useState("high");
   const [planPreview, setPlanPreview] = useState("big");
   const [sortDl, setSortDl] = useState(false);
+  const [lang, setLang] = useState("en");
+  const [linkPreview, setLinkPreview] = useState(false);
   const [importing, setImporting] = useState(false);
   const [usageLimit, setUsageLimit] = useState("1000");
-  const [provider, setProvider] = useState("ollama");
+  const [provider, setProvider] = useState("gemini");
   const [model, setModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [researchKey, setResearchKey] = useState("");
@@ -71,7 +73,7 @@ export function SettingsPanel() {
     void ipc.memorySaverGet().then(setMem);
     void ipc.memoryStats().then(setStats);
     void ipc.settingsGet().then((s) => {
-      setEngine(s.search_engine ?? "ghostsearch");
+      setEngine(s.search_engine ?? "google");
       setSearxUrl(s.ghost_searx_url ?? "");
       setBlockLevel(s.block_trackers === "false" ? "off" : s.block_level === "strict" ? "strict" : "standard");
       setChromeUa(s.chrome_ua !== "false");
@@ -79,11 +81,13 @@ export function SettingsPanel() {
       setPrecision(s.screen_precision === "standard" ? "standard" : "high");
       setUsageLimit(s.usage_limit || "1000");
       setPlanPreview(s.screen_plan === "always" || s.screen_plan === "never" ? s.screen_plan : "big");
-      setProvider(s.ai_provider ?? "ollama");
+      setProvider(s.ai_provider ?? "gemini");
       setModel(s.ai_model ?? "");
       setOllamaUrl(s.ollama_url ?? "http://localhost:11434");
       setHttpsOnly(s.https_only !== "false");
       setSortDl(s.downloads_sort === "1");
+      setLang(s.search_lang || "en");
+      setLinkPreview(s.link_preview === "1");
       setAutoUpdate(s.auto_update_check !== "false");
       setRecallOn(s.recall_enabled === "true");
       setProxyMode(s.proxy_mode === "custom" ? "custom" : "direct");
@@ -142,6 +146,14 @@ export function SettingsPanel() {
             <select className={selectCls} value={engine} onChange={(e) => { setEngine(e.target.value); void save("search_engine", e.target.value); }} aria-label="Search engine">
               {ENGINES.map((e) => <option key={e} value={e}>{ENGINE_LABELS[e] ?? e[0].toUpperCase() + e.slice(1)}</option>)}
             </select>
+          </Row>
+          <Row label="Search language" hint="Asks Google, Bing, DuckDuckGo and Brave for results in this language. English by default.">
+            <select className={selectCls} value={lang} onChange={(e) => { setLang(e.target.value); void save("search_lang", e.target.value); }} aria-label="Search language">
+              {[["en", "English"], ["es", "Español"], ["fr", "Français"], ["de", "Deutsch"], ["pt", "Português"], ["it", "Italiano"], ["ar", "العربية"], ["hi", "हिन्दी"], ["ja", "日本語"], ["zh", "中文"]].map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+            </select>
+          </Row>
+          <Row label="Link previews with titles" hint="Hovering a link always shows its address. Turn this on to also look up the page's title and description, which tells that site you hovered. Never used in private windows.">
+            <input type="checkbox" role="switch" className="size-4 accent-primary" checked={linkPreview} onChange={(e) => { setLinkPreview(e.target.checked); void save("link_preview", e.target.checked ? "1" : "0"); }} aria-label="Link previews with titles" />
           </Row>
           {engine === "ghostsearch" && (
             <div className="space-y-1.5 pb-2">

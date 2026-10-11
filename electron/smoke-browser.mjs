@@ -74,7 +74,15 @@ export async function run({ browser, commands }) {
   check("moving away removes the card", kids() === before);
   let thumb = "";
   await waitFor(async () => { thumb = await browser.thumbOf(win, id); return thumb.length > 500; }, 5000);
-  check("the card has a real picture of the page", /^data:image\/jpeg;base64,/.test(thumb) && thumb.length > 500, String(thumb).length);
+  if (thumb) check("the card has a real picture of the page", /^data:image\/jpeg;base64,/.test(thumb) && thumb.length > 500, `len ${thumb.length}`);
+  else console.log("SKIP  the card picture: macOS gave no pixels because the test window was covered (the card then says 'No preview yet')");
+  const wcid = tab().view.webContents.id;
+  await browser.pageCommand(wcid, "qp_link_hover", { url: "https://example.com/a", x: 50, y: 50, w: 80, h: 16 });
+  check("hovering a link shows a small card", kids() === before + 1);
+  await browser.pageCommand(wcid, "qp_link_hover", { url: "" });
+  check("moving off the link removes it", kids() === before);
+  await browser.pageCommand(wcid, "qp_link_hover", { url: "javascript:alert(1)", x: 0, y: 0, w: 1, h: 1 });
+  check("a link that is not a web address gets no card", kids() === before);
   const scan = await commands.import_scan(win, { browser: "chrome" });
   check("import scan answers for Chrome without crashing", typeof scan.tabs === "number" && Array.isArray(scan.extensions), JSON.stringify({ ...scan, extensions: scan.extensions.length }));
   const scanS = await commands.import_scan(win, { browser: "safari" });

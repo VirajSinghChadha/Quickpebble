@@ -17,9 +17,12 @@ describe("asking about tabs", () => {
     expect(parseFind("no json", tabs)).toEqual([]);
     expect(parseFind('{"tabs":"1"}', tabs)).toEqual([]);
   });
-  it("only accepts the allowed groups", () => {
-    const r = parseSort('{"groups":{"School":[1,3],"Work":[2,1],"Hacking":[2]}}', tabs);
+  it("accepts made-up group names but cleans them and caps how many", () => {
+    const r = parseSort('{"groups":{"School":[1,3],"Work":[2,1],"<b>Hacking</b>":[2]}}', tabs);
     expect([...r]).toEqual([["a", "School"], ["c", "School"], ["b", "Work"]]);
+    expect([...parseSort('{"groups":{"volcano research!!":[1,3],"inbox":[2]}}', tabs)]).toEqual([["a", "volcano research"], ["c", "volcano research"], ["b", "inbox"]]);
+    const many = Object.fromEntries(["a","b","c","d","e","f","g"].map((n, i) => [`group ${n}`, [(i % 3) + 1]]));
+    expect(new Set(parseSort(JSON.stringify({ groups: many }), tabs).values()).size).toBeLessThanOrEqual(3);
     expect(parseSort("{}", tabs).size).toBe(0);
   });
 });

@@ -64,8 +64,21 @@ export function httpsUpgrade(url) {
   return u;
 }
 
+const LANG = /^[a-z]{2}$/;
+/** Asks the search engine for results and its page in this language (two letters, "en" by default in the browser). */
+export function searchLang(engine, lang) {
+  if (!LANG.test(lang)) return "";
+  switch (engine) {
+    case "google": return `&hl=${lang}&lr=lang_${lang}`;
+    case "bing": return `&setlang=${lang}`;
+    case "duckduckgo": return `&kl=${lang === "en" ? "us-en" : "wt-wt"}`;
+    case "brave": return `&lang=${lang}`;
+    default: return "";
+  }
+}
+
 /** Turns whatever the user typed into a loadable URL (or a search URL). */
-export function normalizeInput(input, engine = "ghostsearch") {
+export function normalizeInput(input, engine = "ghostsearch", lang = "") {
   const s = String(input ?? "").trim();
   if (!s) return null;
   const direct = parseUrl(s);
@@ -80,5 +93,5 @@ export function normalizeInput(input, engine = "ghostsearch") {
     if (u && (u.hostname.includes(".") || u.hostname === "localhost")) return u;
   }
   const base = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.ghostsearch;
-  return new URL(base + encodeURIComponent(s).replace(/%20/g, "+"));
+  return new URL(base + encodeURIComponent(s).replace(/%20/g, "+") + searchLang(engine, lang));
 }

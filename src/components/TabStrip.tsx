@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Copy, Pin, PinOff, Plus, Search, Volume2, VolumeX, X, Camera, Moon, Sparkles } from "lucide-react";
-import { GROUPS, useStore, type GroupName, type Tab } from "../store/useStore";
+import { cleanGroupName, groupsInUse, useStore, type BuiltinGroup, type GroupName, type Tab } from "../store/useStore";
 import { tabLabel } from "../lib/url";
 import { orderForStrip, toggled } from "../lib/tabGroups";
 import { ipc } from "../lib/ipc";
@@ -10,13 +10,17 @@ import { Favicon } from "./Favicon";
 import { IconButton } from "./IconButton";
 import { WindowControls } from "./Toolbar";
 
-const GROUP_COLOR: Record<GroupName, string> = {
+const BUILTIN_COLOR: Record<BuiltinGroup, string> = {
   School: "bg-group-school",
   Work: "bg-group-work",
   Personal: "bg-group-personal",
   Entertainment: "bg-group-entertainment",
   Shopping: "bg-group-shopping",
 };
+
+const CUSTOM_COLORS = ["bg-primary", "bg-accent", "bg-group-work", "bg-group-personal", "bg-group-shopping", "bg-group-entertainment"];
+/** Fixed colors for the built-in groups; a stable color from the name for any other. */
+const groupColor = (g: GroupName): string => BUILTIN_COLOR[g as BuiltinGroup] ?? CUSTOM_COLORS[[...g].reduce((n, c) => n + c.charCodeAt(0), 0) % CUSTOM_COLORS.length];
 
 interface MenuState {
   tab: Tab;
@@ -31,7 +35,7 @@ export function TabStrip() {
   const [collapsed, setCollapsed] = useState<Set<GroupName>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("qp.collapsedGroups") ?? "[]") as string[];
-      return new Set(GROUPS.filter((g) => saved.includes(g)));
+      return new Set(saved.map(cleanGroupName).filter((g): g is string => !!g));
     } catch {
       return new Set();
     }
@@ -39,7 +43,7 @@ export function TabStrip() {
   useEffect(() => {
     try { localStorage.setItem("qp.collapsedGroups", JSON.stringify([...collapsed])); } catch { /* storage unavailable */ }
   }, [collapsed]);
-  const items = orderForStrip(tabs, GROUPS, collapsed, activeId);
+  const items = orderForStrip(tabs, groupsInUse(tabs), collapsed, activeId);
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   useEffect(() => setMenuOpen(menu !== null), [menu, setMenuOpen]);
@@ -145,7 +149,7 @@ function PebbleTab({
         ${tab.pinned ? "w-10 shrink-0 justify-center px-0" : "max-w-56 min-w-28 flex-1 basis-0"}
         ${active ? "bg-surface text-text-primary shadow-pebble" : "text-text-secondary hover:bg-surface-secondary"}`}
     >
-      {tab.group && <span className={`absolute inset-x-3 -top-px h-0.5 rounded-full ${GROUP_COLOR[tab.group]}`} aria-hidden />}
+      {tab.group && <span className={`absolute inset-x-3 -top-px h-0.5 rounded-full ${groupColor(tab.group)}`} aria-hidden />}
       {tab.loading ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-primary" aria-label="Loading" /> : <Favicon src={tab.favicon} url={tab.url} />}
       {!tab.pinned && (
         <>
@@ -213,8 +217,8 @@ function TabMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
       <Item icon={t.muted ? <Volume2 size={14} /> : <VolumeX size={14} />} onClick={() => toggleMute(t.id)}>{t.muted ? "Unmute tab" : "Mute tab"}</Item>
       <div className="my-1 h-px bg-border" />
       <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-text-secondary">Group</p>
-      {GROUPS.map((g) => (
-        <Item key={g} icon={<span className={`block size-2.5 rounded-full ${GROUP_COLOR[g]}`} />} onClick={() => setGroup(t.id, t.group === g ? null : g)}>
+      {groupsInUse(useStore.getState().tabs).map((g) => (
+        <Item key={g} icon={<span className={`block size-2.5 rounded-full ${groupColor(g)}`} />} onClick={() => setGroup(t.id, t.group === g ? null : g)}>
           {g}
           {t.group === g && <span className="ml-auto text-primary">✓</span>}
         </Item>

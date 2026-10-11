@@ -1,3 +1,4 @@
+import { GeminiKeyGuide } from "./GeminiKeyGuide";
 import { ContextBar } from "./ContextBar";
 import { UsageMeter } from "./UsageMeter";
 import { useEffect, useRef, useState } from "react";
@@ -26,7 +27,7 @@ export function ChatPanel() {
   const follow = useRef(true);
   const composer = useRef<HTMLTextAreaElement>(null);
   const hasPage = useStore((s) => !!selectActive(s).url);
-  const { status } = useOllama(30000);
+  const { status, refresh: refreshAi } = useOllama(30000);
   const [text, setText] = useState("");
   const [recallStats, setRecallStats] = useState<{ pages: number; enabled: boolean } | null>(null);
   const [exported, setExported] = useState(false);
@@ -78,6 +79,7 @@ export function ChatPanel() {
   };
   const cloud = status && status.provider !== "ollama";
 
+  if (status && status.provider === "gemini" && !status.has_key) return <div className="h-full overflow-y-auto"><GeminiKeyGuide onSaved={() => void refreshAi()} /></div>;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ContextBar />

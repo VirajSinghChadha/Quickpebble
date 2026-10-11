@@ -1,5 +1,5 @@
 /** Native port of the "Tab Therapist" Chrome extension: health score, duplicates, organising, saved tabs. */
-import type { GroupName, Tab } from "../store/useStore";
+import type { BuiltinGroup, GroupName, Tab } from "../store/useStore";
 
 export interface Analysis {
   total: number;
@@ -53,7 +53,7 @@ export function analyze(tabs: Tab[], activeId: string): Analysis {
   return { total: tabs.length, duplicates, inactive, score, message, recommendation };
 }
 
-const CATEGORIES: Record<Exclude<GroupName, "Personal">, string[]> = {
+const CATEGORIES: Record<Exclude<BuiltinGroup, "Personal">, string[]> = {
   School: ["docs.google.com", "classroom.google.com", "khanacademy.org", "quizlet.com", "wikipedia.org", "coursera.org", "edx.org"],
   Work: ["github.com", "slack.com", "notion.so", "figma.com", "linear.app", "atlassian.net", "gitlab.com"],
   Entertainment: ["youtube.com", "netflix.com", "spotify.com", "reddit.com", "twitch.tv", "disneyplus.com"],

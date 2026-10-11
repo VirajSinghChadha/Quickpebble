@@ -2,8 +2,18 @@ import { create } from "zustand";
 import { ipc, isPrivateWindow, type DownloadItem, type TabEvent } from "../lib/ipc";
 import { defaultHome, homeToSettings, parseHome, type HomeSettings } from "../lib/home";
 
-export type GroupName = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
-export const GROUPS: GroupName[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
+export type BuiltinGroup = "School" | "Work" | "Personal" | "Entertainment" | "Shopping";
+/** A group is any short name. The five built-in ones have fixed colors; names the AI (or you) make up get a color from their name. */
+export type GroupName = string;
+export const GROUPS: BuiltinGroup[] = ["School", "Work", "Personal", "Entertainment", "Shopping"];
+/** Letters, numbers and spaces only, short, so a model can't smuggle markup or a huge label into the tab strip. */
+export const cleanGroupName = (raw: unknown): string | null => {
+  const n = String(raw ?? "").replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 20).trim();
+  if (!n) return null;
+  return GROUPS.find((g) => g.toLowerCase() === n.toLowerCase()) ?? n;
+};
+/** Built-in groups first, then any custom ones in the order they appear. */
+export const groupsInUse = (tabs: readonly { group: GroupName | null }[]): GroupName[] => [...GROUPS, ...new Set(tabs.flatMap((t) => (t.group && !(GROUPS as string[]).includes(t.group) ? [t.group] : [])))];
 export type Sidebar = null | "assistant" | "therapist" | "bookmarks" | "site" | "passwords" | "downloads";
 export const SIDEBAR_WIDTH = 380;
 export const BASE_CHROME = 92;
