@@ -221,6 +221,16 @@ export async function run({ browser, commands, statusBar, safety, files, school 
   fs.rmSync(notes, { recursive: true, force: true });
   await closeDialogs();
 
+  // ---------- theme names under every swatch
+  await openSettings();
+  const names = ["Pebble", "Ocean", "Forest", "Sunset", "Lavender", "Rose", "Graphite", "Aurora", "Sunrise", "Twilight"];
+  const swatchNames = await js(`JSON.stringify(["Light mode color theme", "Dark mode color theme"].map((g) => [...document.querySelectorAll('[aria-label="' + g + '"] button')].map((b) => { const n = b.querySelector('.swatch-name'); const r = n?.getBoundingClientRect(); return n && r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden' ? n.textContent : ''; })))`);
+  check("every theme swatch shows its name, in both rows", JSON.stringify(JSON.parse(swatchNames)) === JSON.stringify([names, names]), swatchNames);
+  await js(`document.querySelector('[aria-label="Light mode color theme"] button[aria-label="Aurora (teal + violet)"]').click()`);
+  check("picking a theme shows its full name in the hint", await until(`document.body.innerText.includes('Aurora (teal + violet). Each mode keeps its own colors')`));
+  await js(`document.querySelector('[aria-label="Light mode color theme"] button[aria-label="Pebble"]').click()`);
+  await closeDialogs();
+
   // ---------- school: the panel, and a study reminder that opens the quiz
   await closeDialogs();
   const packId = commands.study_save(win, { pack: { title: "Smoke volcanoes", summary: "Magma rises.", flashcards: [{ q: "What is lava?", a: "Magma above ground" }], quiz: [{ q: "Where does magma form?", choices: ["In the mantle", "In clouds"], answer: 0, why: "Rock melts deep down." }] }, reminders: [Date.now() + 60_000] });

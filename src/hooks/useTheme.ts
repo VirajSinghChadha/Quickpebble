@@ -1,18 +1,22 @@
 import { useEffect } from "react";
 import { useStore } from "../store/useStore";
 
+/** The ten colour themes. `name` is shown under each swatch; `label` (with the colours of the two-colour ones) is the full name. */
 export const PRESETS = [
-  { id: "pebble", label: "Pebble", color: "#2563eb" },
-  { id: "ocean", label: "Ocean", color: "#0891b2" },
-  { id: "forest", label: "Forest", color: "#16a34a" },
-  { id: "sunset", label: "Sunset", color: "#ea580c" },
-  { id: "lavender", label: "Lavender", color: "#7c3aed" },
-  { id: "rose", label: "Rose", color: "#e11d48" },
-  { id: "graphite", label: "Graphite", color: "#374151" },
-  { id: "aurora", label: "Aurora (teal + violet)", color: "linear-gradient(135deg,#0d9488,#7c3aed)" },
-  { id: "sunrise", label: "Sunrise (orange + pink)", color: "linear-gradient(135deg,#f97316,#ec4899)" },
-  { id: "twilight", label: "Twilight (indigo + cyan)", color: "linear-gradient(135deg,#4f46e5,#06b6d4)" },
+  { id: "pebble", name: "Pebble", label: "Pebble", color: "#2563eb" },
+  { id: "ocean", name: "Ocean", label: "Ocean", color: "#0891b2" },
+  { id: "forest", name: "Forest", label: "Forest", color: "#16a34a" },
+  { id: "sunset", name: "Sunset", label: "Sunset", color: "#ea580c" },
+  { id: "lavender", name: "Lavender", label: "Lavender", color: "#7c3aed" },
+  { id: "rose", name: "Rose", label: "Rose", color: "#e11d48" },
+  { id: "graphite", name: "Graphite", label: "Graphite", color: "#374151" },
+  { id: "aurora", name: "Aurora", label: "Aurora (teal + violet)", color: "linear-gradient(135deg,#0d9488,#7c3aed)" },
+  { id: "sunrise", name: "Sunrise", label: "Sunrise (orange + pink)", color: "linear-gradient(135deg,#f97316,#ec4899)" },
+  { id: "twilight", name: "Twilight", label: "Twilight (indigo + cyan)", color: "linear-gradient(135deg,#4f46e5,#06b6d4)" },
 ] as const;
+
+/** The full name of a theme, for hints: "Aurora (teal + violet)". */
+export const presetLabel = (id: string): string => PRESETS.find((p) => p.id === id)?.label ?? PRESETS[0].label;
 
 /** Light and dark mode each get their own color theme ("dual themes"). */
 export function useTheme(): void {
