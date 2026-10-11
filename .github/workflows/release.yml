@@ -60,6 +60,7 @@ jobs:
       # Without Apple/Windows certificates the builds are unsigned (see docs/SIGNING.md); set CSC_LINK and
       # CSC_KEY_PASSWORD (and the APPLE_* variables for notarisation) as repository secrets to sign them.
       - name: Package and upload to the release
+        shell: bash
         run: |
           # Unsigned builds: empty certificate variables would be read as a (missing) file path, so drop them.
           if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; fi
