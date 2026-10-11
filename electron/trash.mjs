@@ -43,7 +43,13 @@ export async function moveToTrash(p, { systemTrash, platform = process.platform,
   }
   fs.mkdirSync(dir, { recursive: true });
   const to = trashTarget(dir, path.basename(p), (x) => fs.existsSync(x));
-  fs.renameSync(p, to);
+  try { fs.renameSync(p, to); }
+  catch (e) {
+    // Apps installed for all users can belong to the system; the system Trash asks for the password itself.
+    if (!["EACCES", "EPERM"].includes(e.code) || !systemTrash) throw e;
+    await systemTrash(p);
+    return null;
+  }
   if (platform !== "darwin") {
     try { fs.mkdirSync(path.join(path.dirname(dir), "info"), { recursive: true }); fs.writeFileSync(path.join(path.dirname(dir), "info", `${path.basename(to)}.trashinfo`), trashInfo(p)); }
     catch { /* the file is in the Trash either way; only the file manager's "restore" note is missing */ }

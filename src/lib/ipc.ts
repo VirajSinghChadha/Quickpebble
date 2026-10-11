@@ -238,6 +238,22 @@ export const ipc = {
   protectedAdd: () => call<string[]>("protected_add"),
   protectedRemove: (path: string) => call<string[]>("protected_remove", { path }),
   folderPick: (title: string) => call<string | null>("folder_pick", { title }),
+  cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
+  cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
+  cleanInstallers: () => call<TaskView>("clean_installers"),
+  cleanAppsScan: (days: number) => call<ForgottenApp[]>("clean_apps_scan", { days }, []),
+  cleanAppsReview: (paths: string[]) => call<TaskView>("clean_apps_review", { paths }),
+  cleanTidy: (folders: ("desktop" | "downloads")[]) => call<TaskView>("clean_tidy", { folders }),
+  cleanRenameCandidates: (folder: string) => call<RenameCandidates>("clean_rename_candidates", { folder }),
+  cleanRenameSuggest: (paths: string[]) => call<{ view: TaskView; failed: { name: string; error: string }[] }>("clean_rename_suggest", { paths }),
+  cleanPhotosScan: (folder: string) => call<{ view: TaskView; unsure: number }>("clean_photos_scan", { folder }),
+  cleanPhotosUnsure: () => call<{ path: string; name: string; size: number | null }[]>("clean_photos_unsure", undefined, []),
+  cleanPhotosAi: (paths: string[]) => call<{ view: TaskView; unsure: number; failed: { name: string; error: string }[] }>("clean_photos_ai", { paths }),
+  systemSlow: () => call<SlowReport>("system_slow"),
+  appsRunning: (hours: number) => call<{ running: { name: string; bundle: string | null }[]; tracking: boolean; since: number | null; unused: { name: string; lastSeen: number | null }[] }>("apps_running", { hours }),
+  appsQuitReview: (names: string[]) => call<TaskView>("apps_quit_review", { names }),
+  loginItems: () => call<LoginItem[]>("login_items", undefined, []),
+  loginItemsReview: (names: string[]) => call<TaskView>("login_items_review", { names }),
   screenVerify: async (goal: string, history: string[], pending: string, pageText?: string) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
@@ -367,6 +383,14 @@ export interface ScreenResponse {
   /** Watch mode only: the JPEG (base64) the model looked at. Kept in memory, never saved. */
   shot?: string;
 }
+
+export interface DiskItem { path: string; size: number; note: string }
+export interface DiskReport { total: number; partial: boolean; scanned: number; folders: { path: string; size: number }[]; groups: { id: string; title: string; count: number; bytes: number; top: DiskItem[] }[] }
+export interface ForgottenApp { name: string; path: string; lastUsed: number | null; size: number | null; leftovers: number; leftoverBytes: number }
+export interface RenameCandidates { folder: string; files: { path: string; name: string; mode: "picture" | "text"; size: number | null }[]; provider: string; model: string }
+export interface AppLoad { name: string; cpu: number; mem: number; processes: number; app: boolean; why?: string; canQuit?: boolean }
+export interface SlowReport { cpus: number; load: number | null; memUsed: number; memTotal: number; groups: AppLoad[]; culprits: AppLoad[]; note: string }
+export interface LoginItem { kind: "login_item" | "launch_agent" | "run_key"; name: string; path: string | null; note: string }
 
 /** One change in the "Recent changes" list. */
 export interface ActionEntry { id: number; task: string; task_title: string; kind: string; what: string; src: string | null; dst: string | null; at: number; undone: boolean; can_undo: boolean }

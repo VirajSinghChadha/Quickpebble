@@ -13,7 +13,7 @@ const clip = (v, n) => String(v ?? "").slice(0, n);
 export function undoStep(entry, exists) {
   if (entry.undone) return { error: "Already undone." };
   if (!FILE_KINDS.has(entry.kind)) return { custom: true };
-  if (!entry.dst) return { error: entry.kind === "trash" ? "It went to the Recycle Bin: restore it from there." : "There's no record of where it went." };
+  if (!entry.dst) return { error: entry.kind === "trash" ? "It went to the system Trash (or Recycle Bin): put it back from there." : "There's no record of where it went." };
   if (!exists(entry.dst)) return { error: `“${path.basename(entry.dst)}” is no longer where it was put.` };
   if (exists(entry.src)) return { error: `Something called “${path.basename(entry.src)}” is already back in its old place.` };
   return { from: entry.dst, to: entry.src };

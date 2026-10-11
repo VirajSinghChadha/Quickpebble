@@ -100,7 +100,7 @@ describe("undo", () => {
     expect(undoStep(e, () => false).error).toMatch(/no longer where/);
     expect(undoStep(e, () => true).error).toMatch(/already back/);
     expect(undoStep({ ...e, undone: true }, () => true).error).toMatch(/Already/);
-    expect(undoStep({ kind: "trash", src: "/a/x", dst: null }, () => true).error).toMatch(/Recycle Bin/);
+    expect(undoStep({ kind: "trash", src: "/a/x", dst: null }, () => true).error).toMatch(/system Trash/);
     expect(undoStep({ kind: "setting" }, () => true)).toEqual({ custom: true });
   });
   it("puts files back, one at a time or a whole task, and never overwrites", () => {

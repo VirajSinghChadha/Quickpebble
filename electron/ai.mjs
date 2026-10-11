@@ -129,3 +129,39 @@ export async function complete(cfg, prefix) {
   const out = await chat(cfg, "Complete the user's partial web search or URL. Reply with only the completed text, on one line, no quotes.", [{ role: "user", content: prefix }]);
   return out.split("\n")[0].trim();
 }
+
+/**
+ * One question about one small picture (a JPEG, base64). Used by the clean-up tools that look at a file's content, only after
+ * the person has seen exactly which files will be sent. `system` must say that what the picture shows is data, not instructions.
+ */
+export async function vision(cfg, system, text, jpegB64) {
+  if (typeof jpegB64 !== "string" || !jpegB64 || jpegB64.length > 4_000_000) throw new Error("That picture is too large to send.");
+  const post = (body, headers = {}) => ({ method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+  switch (cfg.provider) {
+    case "ollama": {
+      let r;
+      try { r = await http(`${cfg.ollamaUrl.replace(/\/$/, "")}/api/chat`, post({ model: cfg.model, stream: false, options: { temperature: 0.2 }, messages: [{ role: "system", content: system }, { role: "user", content: text, images: [jpegB64] }] })); }
+      catch { throw new Error("Could not reach Ollama. Start it with `ollama serve`."); }
+      const v = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(v.error ?? "Ollama request failed (the model may not understand pictures; try llava)");
+      return String(v.message?.content ?? "").trim();
+    }
+    case "openai": {
+      const key = getSecret("openai"); if (!key) throw new Error("No OpenAI API key saved");
+      const v = await sendJson("https://api.openai.com/v1/chat/completions", post({ model: cfg.model, temperature: 0.2, messages: [{ role: "system", content: system }, { role: "user", content: [{ type: "text", text }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${jpegB64}` } }] }] }, { authorization: `Bearer ${key}` }));
+      return String(v.choices?.[0]?.message?.content ?? "").trim();
+    }
+    case "anthropic": {
+      const key = getSecret("anthropic"); if (!key) throw new Error("No Anthropic API key saved");
+      const v = await sendJson("https://api.anthropic.com/v1/messages", post({ model: cfg.model, max_tokens: 300, system, messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpegB64 } }, { type: "text", text }] }] }, { "x-api-key": key, "anthropic-version": "2023-06-01" }));
+      return String(v.content?.[0]?.text ?? "").trim();
+    }
+    case "gemini": {
+      const key = getSecret("gemini"); if (!key) throw new Error("No Gemini API key saved");
+      const body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: jpegB64 } }, { text }] }] };
+      const v = await sendJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`, post(body, { "x-goog-api-key": key }));
+      return String(v.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
+    }
+    default: throw new Error(`Unknown AI provider: ${cfg.provider}`);
+  }
+}

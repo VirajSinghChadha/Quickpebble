@@ -74,6 +74,13 @@ export function SafetySettings({ save }: { save: (key: string, value: string) =>
         </div>
         <button type="button" onClick={() => useStore.getState().setOverlay("changes")} className="shrink-0 rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary">Open</button>
       </div>
+      <div className="flex items-center justify-between gap-4 py-2.5">
+        <div>
+          <p className="font-medium">Clean up and speed up</p>
+          <p className="text-[12px] text-text-secondary">Find what's eating your disk, old installers, forgotten apps, untidy folders, unclear file names, slow apps and login items. Always a list first.</p>
+        </div>
+        <button type="button" onClick={() => useStore.getState().setOverlay("cleanup")} className="shrink-0 rounded-lg border border-border px-3 py-1.5 hover:bg-surface-secondary">Open clean-up</button>
+      </div>
     </div>
   );
 }

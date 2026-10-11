@@ -56,7 +56,7 @@ export function ChangesPanel() {
                 {g.rows.map((r) => (
                   <li key={r.id} className="flex items-center gap-3 px-3 py-1.5 text-[12.5px]">
                     <span className={`min-w-0 flex-1 break-words ${r.undone ? "text-text-secondary line-through" : ""}`} title={[r.src, r.dst].filter(Boolean).join(" → ")}>{r.what}</span>
-                    {r.undone ? <span className="text-[11.5px] text-text-secondary">Undone</span> : r.can_undo ? <button type="button" onClick={() => void run(() => ipc.actionUndo(r.id))} className="rounded-lg border border-border px-2 py-0.5 text-[12px] hover:bg-surface-secondary">Undo</button> : <span className="text-[11.5px] text-text-secondary">{r.kind === "trash" ? "In the Recycle Bin" : "Can't be undone"}</span>}
+                    {r.undone ? <span className="text-[11.5px] text-text-secondary">Undone</span> : r.can_undo ? <button type="button" onClick={() => void run(() => ipc.actionUndo(r.id))} className="rounded-lg border border-border px-2 py-0.5 text-[12px] hover:bg-surface-secondary">Undo</button> : <span className="text-[11.5px] text-text-secondary">{r.kind === "trash" ? "In the system Trash" : "Can't be undone"}</span>}
                   </li>
                 ))}
               </ul>

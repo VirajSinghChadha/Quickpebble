@@ -9,6 +9,17 @@
 - **Watch mode** (opt-in, off by default): see the exact screenshot Screen mode looked at, what it thinks and what it will do next. The picture is only kept in memory.
 - **Protected folders.** Choose folders Quick Pebble must never touch. File tasks refuse them outright; Screen mode is told to keep out and must ask before any step that mentions one.
 
+### Clean up and speed up (Settings → Assistant safety → Open clean-up, or the command palette)
+- **Find what's eating your disk:** old downloads, `node_modules` folders, app caches, simulator and Xcode data, and very big files, from names and sizes only. The scan is capped to stay quick and says when it stopped early.
+- **Old installers** (.dmg, .pkg, setup files) for apps you already have.
+- **Forgotten apps** (macOS): apps not opened in months with their size and the leftovers in your Library; removing one sends the app and its leftovers to the Trash. Apple's apps are never listed, and apps that are open can't be removed.
+- **Tidy up Desktop and Downloads** into kind folders, with undo.
+- **Rename by content:** `IMG_4021.jpg` → "Beach trip - sunset". You see exactly what is sent to the AI (a small picture of each file, or the start of a text file) before anything is.
+- **Photo triage:** spots screenshots and receipts among photos from their names and screen-sized PNGs; optionally the AI looks at up to 40 unclear ones. Only moved after you confirm.
+- **Why is my Mac slow?** Names the apps using the most processor and memory and offers to quit them politely.
+- **Quit apps you haven't touched** (opt-in: Quick Pebble notices which app is in front once a minute, on this computer only). Apps with unsaved work are left open.
+- **Login items:** see what starts when you log in and turn items off; Undo turns them back on.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.

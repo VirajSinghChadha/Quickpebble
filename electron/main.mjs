@@ -14,6 +14,7 @@ import { ScreenAgent } from "./screen.mjs";
 import { StatusBar } from "./overlay.mjs";
 import { ContextStore } from "./context.mjs";
 import { createSafety } from "./safety.mjs";
+import { createCleanup } from "./cleanup.mjs";
 import { initUsage } from "./usage.mjs";
 import { installDiagnostics } from "./diagnostics.mjs";
 import { Updater } from "./updater.mjs";
@@ -75,6 +76,8 @@ app.whenReady().then(async () => {
   downloads = new Downloads(db, browser, (items) => { for (const w of browser.windows.values()) browser.emitUi(w, "qp://downloads", items); });
   safety = createSafety(db);
   downloads.attachLog(safety.log);
+  const cleanup = createCleanup({ db, safety });
+  app.on("will-quit", () => cleanup.stop());
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
   browser.onDownload = (e, item, wc) => downloads.handle(e, item, wc);
   browser.ghost = ghostHandler(db);
@@ -90,7 +93,7 @@ app.whenReady().then(async () => {
   app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands(), safety: safety.commands } });
+  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands(), safety: { ...safety.commands, ...cleanup.commands } } });
   commands.session_recovered = () => { const was = recovered; recovered = false; return was; };
   session.defaultSession.setUserAgent(chromeUserAgent());
 

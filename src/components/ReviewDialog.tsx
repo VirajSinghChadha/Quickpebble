@@ -21,7 +21,7 @@ function ReviewBody() {
         <ModalHeader title={`Done: ${receipt.title}`} onClose={close} />
         <div className="space-y-3 overflow-y-auto px-5 pb-5">
           <p className="flex items-center gap-2"><CheckCircle2 size={16} className="text-group-personal" /> {receipt.done.length} done{receipt.bytes ? ` · ${formatBytes(receipt.bytes)} freed or moved` : ""}{receipt.failed.length ? ` · ${receipt.failed.length} skipped` : ""}</p>
-          {receipt.done.length > 0 && <ul className="max-h-48 space-y-0.5 overflow-y-auto text-[12px] text-text-secondary">{receipt.done.map((d, n) => <li key={n}>✓ {d.what}{!d.undoable && " (restore it from the Recycle Bin if needed)"}</li>)}</ul>}
+          {receipt.done.length > 0 && <ul className="max-h-48 space-y-0.5 overflow-y-auto text-[12px] text-text-secondary">{receipt.done.map((d, n) => <li key={n}>✓ {d.what}{!d.undoable && " (put it back from the Trash if needed)"}</li>)}</ul>}
           {receipt.failed.length > 0 && <ul className="max-h-32 space-y-0.5 overflow-y-auto text-[12px] text-red-500">{receipt.failed.map((f, n) => <li key={n}>✗ {f.what}: {f.error}</li>)}</ul>}
           <p className="text-[12px] text-text-secondary">Deleted items went to the Trash, not away for good. This receipt and every change are kept in Recent changes, where each one can be undone.</p>
           {error && <p role="alert" className="text-[12px] text-red-500">{error}</p>}

@@ -13,6 +13,9 @@ export async function run({ browser, commands, statusBar, safety }) {
   commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
   const js = (code) => ui.executeJavaScript(code);
+  const until = async (code, ms = 8000) => { for (let t = 0; t < ms; t += 250) { if (await js(code).catch(() => false)) return true; await sleep(250); } return false; };
+  const closeDialogs = async () => { for (let i = 0; i < 6 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await sleep(400); } };
+  const openSettings = async () => { await closeDialogs(); await js(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Settings')?.click()`); return until(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent))`); };
 
   // ---------- status bar window
   commands.screen_overlay(win, { state: { phase: "thinking", thinking: "I can see the desktop and the Dock.", next: "Open Notes", step: 2, max: 40 } });
@@ -134,14 +137,13 @@ export async function run({ browser, commands, statusBar, safety }) {
   check("bad safety settings are refused", ["screen_watch:yes", "screen_app_permissions:[1]", 'screen_app_permissions:{"a/b":"allow"}', "protected_folders:{}"].every((kv) => { const [key, ...v] = kv.split(":"); try { commands.settings_set(win, { key, value: v.join(":") }); return false; } catch { return true; } }));
   commands.settings_set(win, { key: "screen_app_permissions", value: JSON.stringify({ Notes: "allow", Mail: "deny" }) });
   commands.settings_set(win, { key: "screen_watch", value: "1" });
-  for (let i = 0; i < 5 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await sleep(400); }
-  await js(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Settings')?.click()`);
-  await sleep(1200);
+  await openSettings();
+  await until(`document.querySelector('[aria-label="App permissions"]')?.innerText.includes('Mail')`);
   check("settings has an Assistant safety section with Watch mode", await js(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent)) && document.querySelector('input[aria-label="Watch mode"]')?.checked === true`));
   check("settings list app answers with Revoke and Forget", await js(`(() => { const t = document.querySelector('[aria-label="App permissions"]')?.innerText ?? ''; return /Notes\\s*Allowed/.test(t) && /Mail\\s*Not allowed/.test(t) && /Revoke/.test(t) && /Forget/.test(t); })()`));
   check("settings list the protected folder", await js(`(document.querySelector('[aria-label="Protected folders"]')?.innerText ?? '').includes('Locked')`));
   await js(`[...document.querySelectorAll('[aria-label="App permissions"] button')].find(b => b.textContent === 'Revoke')?.click()`);
-  await sleep(500);
+  await until(`!document.querySelector('[aria-label="App permissions"]')?.innerText.includes('Notes')`);
   check("revoking an app forgets it", JSON.parse(commands.settings_get(win).screen_app_permissions).Notes === undefined);
   await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open' && b.closest('[aria-label="Assistant safety"]'))?.click()`);
   await sleep(900);
@@ -153,6 +155,47 @@ export async function run({ browser, commands, statusBar, safety }) {
   commands.settings_set(win, { key: "screen_watch", value: "0" });
   commands.settings_set(win, { key: "protected_folders", value: "[]" });
   fs.rmSync(box, { recursive: true, force: true });
+
+  // ---------- Mac clean-up (reads only, except inside a throwaway folder)
+  const pics = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-photos-"));
+  const png = Buffer.alloc(32); png.writeUInt32BE(0x89504e47, 0); png.write("IHDR", 12, "ascii"); png.writeUInt32BE(1179, 16); png.writeUInt32BE(2556, 20);
+  fs.writeFileSync(path.join(pics, "IMG_0001.PNG"), png);
+  fs.writeFileSync(path.join(pics, "Screenshot 2026-10-01 at 09.00.00.png"), png);
+  fs.writeFileSync(path.join(pics, "Coffee receipt.jpg"), "x");
+  fs.writeFileSync(path.join(pics, "beach.jpg"), "x");
+  const ph = await commands.clean_photos_scan(win, { folder: pics });
+  check("photo triage suggests screenshots and receipts only", ph.view.ready === 3 && ph.unsure === 1 && ph.view.items.every((i) => /Screenshots|Receipts/.test(i.to)), JSON.stringify(ph.view.items.map((i) => i.what)));
+  const phr = await commands.task_confirm(win, { id: ph.view.id, picks: ph.view.items.map((i) => i.i) });
+  check("confirmed photo moves happen and can be undone", phr.done.length === 3 && fs.existsSync(path.join(pics, "Receipts", "Coffee receipt.jpg")) && commands.actions_undo_task(win, { task: ph.view.id }).undone === 3 && fs.existsSync(path.join(pics, "Coffee receipt.jpg")));
+  fs.writeFileSync(path.join(pics, "scan0003.pdf"), "%PDF-1.4");
+  const rc = await commands.clean_rename_candidates(win, { folder: pics });
+  check("rename by content finds unclear names and says how each is looked at", rc.files.some((f) => f.name === "scan0003.pdf" && f.mode === "picture") && !rc.files.some((f) => f.name === "beach.jpg") && !!rc.provider);
+  check("a system folder can't be chosen to rename in", await commands.clean_rename_candidates(win, { folder: "/usr/bin" }).then(() => false, () => true));
+  fs.rmSync(pics, { recursive: true, force: true });
+  const slow = await commands.system_slow(win);
+  check("why-is-it-slow reads real processes", slow.groups.length > 3 && slow.memTotal > 0, `${slow.groups.length} apps, culprits: ${slow.culprits.map((c) => c.name).join(", ") || "none"}`);
+  const ra = await commands.apps_running(win, { hours: 48 });
+  check("running apps are listed and unused-app tracking starts off", ra.running.length > 0 && ra.tracking === false && ra.unused.length === 0, `${ra.running.length} open`);
+  const tidy = await commands.clean_tidy(win, { folders: ["desktop", "downloads"] });
+  check("Desktop/Downloads tidy-up only plans moves that stay in those folders", tidy.items.every((i) => i.kind === "move" && (i.problem === null || /protected/.test(i.problem))), `${tidy.ready} planned`);
+  commands.task_cancel(win, { id: tidy.id });
+  const inst = await commands.clean_installers(win);
+  check("old installer search runs and only lists installers", inst.items.every((i) => /\.(dmg|pkg|mpkg|zip)$/i.test(i.path)), `${inst.items.length} found`);
+  commands.task_cancel(win, { id: inst.id });
+  await openSettings();
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open clean-up')?.click()`);
+  await until(`!!document.querySelector('section[aria-label="Login items"]')`);
+  const tools = await js(`[...document.querySelectorAll('section[aria-label]')].map(s => s.getAttribute('aria-label')).join(',')`);
+  check("the clean-up panel shows every tool", ["Disk", "Installers", "Forgotten apps", "Tidy", "Rename by content", "Photo triage", "Slow", "Quit unused apps", "Login items"].every((t) => tools.includes(t)), tools);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Plan the tidy-up…')?.click()`);
+  await sleep(1500);
+  check("planning opens the review list and nothing has changed yet", await js(`/Nothing has changed yet/.test(document.body.innerText) && !!document.querySelector('[aria-label="Changes to review"]')`));
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel')?.click()`);
+  await sleep(400);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Check now')?.click()`);
+  for (let i = 0; i < 32 && !(await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`)); i++) await sleep(250);
+  check("the slow-Mac check shows memory in the panel", await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`), await js(`(document.querySelector('section[aria-label="Slow"]')?.innerText ?? 'no section').slice(0, 300)`));
+  await closeDialogs();
 
   // ---------- clean up the test data
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });

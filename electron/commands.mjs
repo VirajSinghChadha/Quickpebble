@@ -13,7 +13,7 @@ import * as importer from "./importer.mjs";
 import { usageSummary } from "./usage.mjs";
 import { buildReport } from "./diagnostics.mjs";
 
-const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen", "downloads_sort", "search_lang", "link_preview", "protected_folders", "screen_app_permissions", "screen_watch"]);
+const SETTING_KEYS = new Set(["account_session", "recall_enabled", "screen_precision", "home_weather", "home_weather_place", "home_weather_unit", "home_news", "home_news_source", "home_tiles", "home_cards", "home_onboarded", "cookie_banners", "chrome_ua", "block_level", "site_profiles", "screen_permissions", "screen_model", "https_only", "auto_update_check", "theme", "newtab_layout", "search_engine", "block_trackers", "ai_provider", "ai_model", "ollama_url", "profiles", "proxy_mode", "proxy_server", "ghost_searx_url", "active_project", "active_chat", "ctx_stale_days", "screen_plan", "usage_limit", "tour_seen", "downloads_sort", "search_lang", "link_preview", "protected_folders", "screen_app_permissions", "screen_watch", "app_activity"]);
 /** {"Notes": "allow", "Mail": "deny", …}: plain app names only, two possible answers. */
 export function validAppPerms(json) {
   try {
@@ -112,7 +112,7 @@ export function buildCommands({ browser, db, downloads, extras = {} }) {
       if (key === "account_session" && value && (value.length > 16384 || !jsonOk(value))) throw new Error("invalid account session");
       if (["site_profiles", "screen_permissions", "profiles"].includes(key) && (value.length > 65536 || !jsonOk(value))) throw new Error(`invalid ${key}`);
       if (key === "ghost_searx_url" && value && !/^https?:$/.test(parseUrl(value)?.protocol ?? "")) throw new Error("The SearXNG address must start with http:// or https://");
-      if (key === "screen_watch" && !["0", "1"].includes(value)) throw new Error("screen_watch is 0 or 1");
+      if ((key === "screen_watch" || key === "app_activity") && !["0", "1"].includes(value)) throw new Error(`${key} is 0 or 1`);
       if (key === "protected_folders" && (value.length > 65536 || !jsonOk(value) || !Array.isArray(JSON.parse(value)))) throw new Error("invalid protected folders");
       if (key === "screen_app_permissions" && (value.length > 65536 || !validAppPerms(value))) throw new Error("invalid app permissions");
       if (key === "ollama_url" && !/^https?:$/.test(parseUrl(value)?.protocol ?? "")) throw new Error("Ollama URL must be http(s)");

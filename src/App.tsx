@@ -1,5 +1,6 @@
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { ChangesPanel } from "./components/ChangesPanel";
+import { CleanupPanel } from "./components/CleanupPanel";
 import { ReviewDialog } from "./components/ReviewDialog";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
@@ -110,6 +111,7 @@ export default function App() {
         {overlay === "profiles" && <ProfilesPanel key="profiles" />}
         {overlay === "https" && <HttpsPrompt key="https" />}
         {overlay === "changes" && <ChangesPanel key="changes" />}
+        {overlay === "cleanup" && <CleanupPanel key="cleanup" />}
       </AnimatePresence>
       <UpdatePrompt />
       {accountStatus !== "ready" && <AuthGate />}
