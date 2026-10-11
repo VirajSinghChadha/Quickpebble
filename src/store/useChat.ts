@@ -409,6 +409,18 @@ export const useChat = create<ChatState>((set, get) => ({
         if (slashTabs.length < 2) return void add("error", "Open at least two loaded pages to compare them.");
       }
     }
+    // A routine's shortcut phrase ("tidy up") runs that routine; the person still sees its steps first.
+    if (!slash) {
+      const { matchTrigger } = await import("../lib/routines");
+      const hit = matchTrigger(goal, await ipc.routinesList().catch(() => []));
+      if (hit) {
+        add("user", goal);
+        add("say", `That's your “${hit.name}” routine. Check its steps below, then run it.`);
+        const { useRoutines } = await import("./useRoutines");
+        useRoutines.getState().ask(hit);
+        return;
+      }
+    }
     if (!upgradeOffered && wantsUpgrade(goal)) {
       upgradeOffered = true; // ask once per session so it never nags
       await offerUpgrade();

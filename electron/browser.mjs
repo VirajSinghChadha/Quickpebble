@@ -398,6 +398,7 @@ export class Browser {
       const u = parseUrl(r.url);
       if (!u || !/^https?:$/.test(u.protocol)) return;
       const titleChanged = t.title !== r.title;
+      if (win.teach && t.url !== r.url) this.onTeach?.(win, t, { kind: "nav", url: r.url, title: r.title });
       t.url = r.url;
       t.title = String(r.title ?? "").slice(0, 300);
       t.favicon = String(r.favicon ?? "").slice(0, 2048) || t.favicon;
@@ -411,6 +412,8 @@ export class Browser {
       if (SHORTCUTS.has(args?.action)) this.emitUi(win, "qp://shortcut", { window: win.label, action: args.action });
     } else if (cmd === "qp_link_hover") {
       void this.linkHover(win, t, args);
+    } else if (cmd === "qp_teach") {
+      if (win.teach && !win.private) this.onTeach?.(win, t, args);
     } else if (cmd === "qp_login_seen") {
       this.onLoginSeen?.(win, t, args);
     }
@@ -445,6 +448,7 @@ export class Browser {
       .replace("__QP_BLOCKED__", JSON.stringify(blocked))
       .replace("__QP_BLOCK__", trackers ? "true" : "false")
       .replace("__QP_COOKIES__", this.setting("cookie_banners") === "false" ? "false" : "true")
+      .replace("__QP_TEACH__", win.teach && !win.private ? "true" : "false")
       .replace("__QP_STRICT__", this.setting("block_level") === "strict" ? "true" : "false");
   }
 

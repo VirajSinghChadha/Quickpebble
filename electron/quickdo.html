@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Do this for me</title>
+<style>
+:root{--bg:#fff;--fg:#172033;--mut:#64748b;--line:rgba(15,23,42,.14);--soft:#f1f5f9;--acc:#2563eb;--warn:#b45309}
+@media(prefers-color-scheme:dark){:root{--bg:#141c2c;--fg:#f1f5f9;--mut:#9fb0c6;--line:rgba(255,255,255,.14);--soft:#1e293b;--acc:#60a5fa;--warn:#fbbf24}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+main{height:100%;display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid var(--line);border-radius:14px}
+header{display:flex;align-items:center;justify-content:space-between;-webkit-app-region:drag}
+h1{font-size:14px}
+button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;-webkit-app-region:no-drag}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button:disabled{opacity:.45;cursor:default}
+.mut{color:var(--mut);font-size:12px}
+.copied{max-height:88px;overflow:auto;white-space:pre-wrap;background:var(--soft);border-radius:8px;padding:8px;font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border-radius:999px;font-size:12px;padding:3px 10px}
+input,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none}
+input:focus,textarea:focus{border-color:var(--acc)}
+textarea{flex:1;min-height:110px;resize:none}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.note{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.warn{color:var(--warn)}
+[hidden]{display:none!important}
+</style></head>
+<body><main aria-label="Do this for me">
+  <header><h1>Do this for me</h1><button id="close" aria-label="Close">Close</button></header>
+  <p id="source" class="mut"></p>
+  <div id="copied" class="copied" aria-label="Copied text"></div>
+  <textarea id="manual" placeholder="Nothing copied. Paste or type the text here…" aria-label="Text to work on" hidden></textarea>
+  <div class="chips" id="chips"></div>
+  <form id="form" class="row"><input id="ins" placeholder="What should I do with it?" aria-label="Instruction" maxlength="500" autocomplete="off"><button class="primary" id="go" type="submit">Draft it</button></form>
+  <p id="send" class="note"></p>
+  <p id="status" class="mut" role="status"></p>
+  <textarea id="draft" aria-label="Draft" hidden></textarea>
+  <div class="row" id="actions" hidden>
+    <button id="copy">Copy draft</button>
+    <button id="paste" hidden></button>
+    <span class="mut">Nothing is sent: you decide what to do with the draft.</span>
+  </div>
+  <div class="note warn" id="confirm" hidden></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const CHIPS = ["Reply politely", "Turn these notes into a table", "Make it shorter", "Fix spelling and grammar", "Summarise in 3 bullet points"];
+let s = { text: "", app: null, provider: "your AI provider", canPaste: false };
+const text = () => (s.text || $("manual").value).slice(0, 8000);
+function render() {
+  $("source").textContent = s.text ? `Using the text you copied${s.app ? ` (you were in ${s.app})` : ""}:` : "Copy some text first (⌘C or Ctrl+C), then press the shortcut. Or paste it below.";
+  $("copied").hidden = !s.text; $("copied").textContent = s.text.slice(0, 1200) + (s.text.length > 1200 ? " …" : "");
+  $("manual").hidden = !!s.text;
+  updateSend();
+  $("draft").hidden = true; $("actions").hidden = true; $("confirm").hidden = true; $("status").textContent = "";
+  $("paste").hidden = !s.canPaste; $("paste").textContent = s.app ? `Paste into ${s.app}…` : "";
+  $("ins").focus();
+}
+function updateSend() { $("send").textContent = `What will be sent to ${s.provider}: your instruction and the ${text().length.toLocaleString()} characters of text above. Nothing else.`; }
+CHIPS.forEach((c) => { const b = document.createElement("button"); b.type = "button"; b.textContent = c; b.onclick = () => { $("ins").value = c; $("ins").focus(); }; $("chips").appendChild(b); });
+$("manual").addEventListener("input", updateSend);
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ins = $("ins").value.trim();
+  if (ins.length < 2 || !text().trim()) { $("status").textContent = "Copy some text and say what to do with it."; return; }
+  $("go").disabled = true; $("status").textContent = "Drafting…";
+  try { const d = await window.quickdo.run(ins, text()); $("draft").value = d; $("draft").hidden = false; $("actions").hidden = false; $("status").textContent = "Here's a draft. You can edit it."; }
+  catch (err) { $("status").textContent = String(err && err.message || err).replace(/^Error invoking remote method '[^']*': (Error: )?/, ""); }
+  finally { $("go").disabled = false; }
+});
+$("copy").onclick = async () => { await window.quickdo.copy($("draft").value); $("status").textContent = "Copied. Paste it wherever you like."; };
+$("paste").onclick = () => {
+  const c = $("confirm");
+  c.hidden = false; c.textContent = "";
+  c.append(`This pastes the draft where your cursor is in ${s.app}. It won't press Enter or send anything. `);
+  const yes = document.createElement("button"); yes.textContent = "Paste it"; yes.className = "primary";
+  const no = document.createElement("button"); no.textContent = "Cancel";
+  yes.onclick = async () => { try { await window.quickdo.paste($("draft").value); } catch (err) { $("status").textContent = String(err && err.message || err).replace(/^Error invoking remote method '[^']*': (Error: )?/, ""); c.hidden = true; } };
+  no.onclick = () => { c.hidden = true; };
+  c.append(yes, " ", no);
+};
+$("close").onclick = () => window.quickdo.close();
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") window.quickdo.close(); });
+window.quickdo.onOpen((st) => { s = st; render(); });
+window.quickdo.state().then((st) => { if (st) { s = st; render(); } });
+</script>
+</body></html>

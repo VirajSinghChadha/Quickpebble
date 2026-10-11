@@ -18,6 +18,8 @@ import { createCleanup } from "./cleanup.mjs";
 import { FileIndex } from "./fileindex.mjs";
 import { Timeline } from "./timeline.mjs";
 import { School } from "./school.mjs";
+import { Routines } from "./routines.mjs";
+import { QuickDo } from "./quickdo.mjs";
 import { initUsage } from "./usage.mjs";
 import { installDiagnostics } from "./diagnostics.mjs";
 import { Updater } from "./updater.mjs";
@@ -85,6 +87,10 @@ app.whenReady().then(async () => {
   const timeline = new Timeline(db);
   const school = new School(db, browser);
   app.on("will-quit", () => school.stop());
+  const routines = new Routines(db, browser);
+  app.on("will-quit", () => routines.stop());
+  const quickdo = new QuickDo(db);
+  app.on("will-quit", () => quickdo.destroy());
   browser.onVisit = (url, title) => { try { timeline.note("page", title, url); } catch { /* never block browsing */ } };
   browser.onSession = (ses) => { applyProxy().catch(() => {}); if (ses.storagePath) extensions?.loadEnabledInto(ses).catch(() => {}); };
   browser.onDownload = (e, item, wc) => downloads.handle(e, item, wc);
@@ -101,7 +107,7 @@ app.whenReady().then(async () => {
   app.on("will-quit", () => { screen.stop(); statusBar.destroy(); });
   const vault = new Vault(db, browser);
   browser.onLoginSeen = (w, t, a) => vault.loginSeen(w, t, a);
-  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands(), safety: { ...safety.commands, ...cleanup.commands, ...files.commands(dialog), ...timeline.commands(), ...school.commands() } } });
+  commands = buildCommands({ browser, db, downloads, extras: { context: new ContextStore(db).commands(), applyProxy, filters, vault: vault.commands(), extensions, updater, screen: screen.commands(), safety: { ...safety.commands, ...cleanup.commands, ...files.commands(dialog), ...timeline.commands(), ...school.commands(), ...routines.commands() } } });
   commands.session_recovered = () => { const was = recovered; recovered = false; return was; };
   session.defaultSession.setUserAgent(chromeUserAgent());
 
@@ -135,11 +141,12 @@ app.whenReady().then(async () => {
     });
   } catch { /* another app owns the shortcut; the assistant is still one click away */ }
   try { globalShortcut.register("CommandOrControl+Alt+P", () => toWindows("qp://screen-pause")); } catch { /* the Pause button on the bar still works */ }
+  quickdo.register();   // "Do this for me" from any app; if another app owns the shortcut, it's simply unavailable
   app.on("will-quit", () => globalShortcut.unregisterAll());
   // Developer-only end-to-end checks (QP_SMOKE_*=1); the files are not shipped in packaged builds.
   const runs = { QP_SMOKE_GHOST: "smoke-ghost", QP_SMOKE_SHOTS: "smoke-shots", QP_SMOKE_SCREEN: "smoke-screen", QP_SMOKE_EXT: "smoke-ext", QP_SMOKE_UI: "smoke-ui", QP_SMOKE_WEB: "smoke-web", QP_SMOKE_FEATURES: "smoke-features", QP_SMOKE_AGENT: "smoke-agent", QP_SMOKE_BROWSER: "smoke-browser", QP_SMOKE: "smoke" };
   const hit = Object.keys(runs).find((k) => process.env[k] === "1");
-  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar, safety, files, timeline, school })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
+  if (hit) import(`./${runs[hit]}.mjs`).then((m) => m.run({ browser, commands, db, filters, filtersReady, extensions, screenAgent: screen, statusBar, safety, files, timeline, school, routines, quickdo })).catch((e) => { console.error(`${hit} FAIL`, e); app.exit(1); });
 });
 
 app.on("second-instance", () => { const w = [...(browser?.windows.values() ?? [])][0]; if (w) { if (w.win.isMinimized()) w.win.restore(); w.win.focus(); } });

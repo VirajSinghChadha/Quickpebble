@@ -255,6 +255,15 @@ export const ipc = {
   noteSave: (title: string, body: string, where: "notes" | "file") => call<{ saved: string } | null>("note_save", { title, body, where }),
   slidesPdfText: (id: string) => call<string | null>("slides_pdf_text", { id }),
   submitPickFiles: () => call<{ name: string; size: number }[]>("submit_pick_files", undefined, []),
+  routinesList: () => call<import("./routines").Routine[]>("routines_list", undefined, []),
+  routineSave: (routine: unknown, id?: number) => call<number>("routine_save", { routine, id }),
+  routineDelete: (id: number) => call<void>("routine_delete", { id }),
+  routineTeachStart: () => call<boolean>("routine_teach_start"),
+  routineTeachStop: () => call<import("./routines").Step[]>("routine_teach_stop", undefined, []),
+  routineExport: (id: number) => call<string | null>("routine_export", { id }),
+  routineImport: () => call<{ file: string; token?: string; routine?: Omit<import("./routines").Routine, "id">; problems?: string[] } | null>("routine_import"),
+  routineImportConfirm: (token: string) => call<number>("routine_import_confirm", { token }),
+  routineOpenApp: (app: string) => call<boolean>("routine_open_app", { app }),
   cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
   cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
   cleanInstallers: () => call<TaskView>("clean_installers"),
@@ -345,6 +354,10 @@ export async function onTabEvent(cb: (e: TabEvent) => void): Promise<UnlistenFn>
 
 export async function onStudyReminder(cb: (e: { id: number; title: string }) => void): Promise<UnlistenFn> {
   return listen<{ id: number; title: string }>("qp://study-reminder", (e) => cb(e.payload));
+}
+
+export async function onRoutineDue(cb: (e: { id: number }) => void): Promise<UnlistenFn> {
+  return listen<{ id: number }>("qp://routine-due", (e) => cb(e.payload));
 }
 
 export async function onShortcut(cb: (action: string) => void): Promise<UnlistenFn> {

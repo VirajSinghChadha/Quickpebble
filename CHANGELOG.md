@@ -35,6 +35,15 @@
 - **Practice partner:** reads the current quiz question aloud with your computer's own voice, or explains why your answer was wrong. It never answers or submits for you.
 - Every tool shows exactly what page text will be sent to the AI before it is.
 
+### Routines and shortcuts (command palette → Routines)
+- **Teach it by showing:** press "Teach a routine", do the task once (in the browser and other apps), press Stop, and review the steps it saw: the pages you opened, what you clicked and typed, choices you made and apps you switched to. Passwords, card numbers and one-time codes are never recorded; those steps say "you type this yourself".
+- **Running a routine always shows every step first.** Steps that send, submit, buy, pay, delete or sign in stop for their own OK, and you can skip or stop at any point.
+- **Reminders, not autopilot:** schedule a routine ("Fridays at 16:00") and you get a notification with the steps ready to approve. It never runs by itself.
+- **Teach it a shortcut:** give a routine a phrase like "tidy up", then just say it to the assistant.
+- **Share routines:** export one as a `.qproutine` file; importing shows every step and needs your OK, and a file with any step outside the allowed kinds is refused with the reason.
+- **"Do this for me" from any app** (Ctrl+Shift+Space on Mac, Ctrl+Alt+Space on Windows): copy text anywhere, press the shortcut, say what to do ("reply politely", "turn these notes into a table"). You see what will be sent; the draft is only copied, or pasted where your cursor is after a separate click. It never sends anything.
+- The assistant now names fields by their visible label (for example "Search term") rather than a hidden form name, so routines and page tasks find the right field.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.

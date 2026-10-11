@@ -250,7 +250,8 @@
     const st = getComputedStyle(el);
     return st.visibility !== "hidden" && st.display !== "none" && parseFloat(st.opacity) > 0.05;
   };
-  const labelOf = (el) => clean(el.getAttribute("aria-label") || el.innerText || el.value || el.placeholder || el.title || el.alt || el.name || (el.labels && el.labels[0] && el.labels[0].innerText));
+  // What a person would call it: its visible label comes before its value or hidden form name.
+  const labelOf = (el) => clean(el.getAttribute("aria-label") || el.innerText || (el.labels && el.labels[0] && el.labels[0].innerText) || el.placeholder || el.value || el.title || el.alt || el.name);
   const OPS = {
     snapshot() {
       els = Array.from(document.querySelectorAll(SEL)).filter(visible).slice(0, 120);
@@ -375,6 +376,25 @@
       return { ok: true };
     },
   };
+  // ---- teach by showing: only while the person records a routine. Secret fields are never read.
+  let teaching = __QP_TEACH__;
+  Object.defineProperty(window, "__qpTeach", { value: (v) => { teaching = !!v; } });
+  const SECRET = (el) => el.type === "password" || /cc-|one-time-code|card|cvc|cvv|iban|ssn|\bpin\b|otp/i.test(`${el.autocomplete || ""} ${el.name || ""} ${el.id || ""}`);
+  const fieldLabel = (el) => clean(el.getAttribute("aria-label") || (el.labels && el.labels[0] && el.labels[0].innerText) || el.placeholder || el.title || el.name || el.id || el.type);
+  document.addEventListener("click", (e) => {
+    if (!teaching || !e.isTrusted) return;
+    const el = e.target && e.target.closest && e.target.closest(SEL);
+    if (!el || (el.tagName === "INPUT" && !/^(submit|button|checkbox|radio)$/.test(el.type)) || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return;
+    invoke("qp_teach", { kind: "click", label: labelOf(el), tag: el.tagName.toLowerCase() });
+  }, true);
+  document.addEventListener("change", (e) => {
+    if (!teaching || !e.isTrusted) return;
+    const el = e.target;
+    if (!el || !("value" in el) || /^(submit|button|checkbox|radio|file|hidden)$/.test(el.type || "")) return;
+    if (el.tagName === "SELECT") return invoke("qp_teach", { kind: "select", label: fieldLabel(el), text: clean(el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : "", 80) });
+    invoke("qp_teach", { kind: "type", label: fieldLabel(el), text: SECRET(el) ? "" : clean(String(el.value), 300), secret: SECRET(el) });
+  }, true);
+
   window.__qpAgent = {
     // Electron can return a value from executeJavaScript, so the main process calls this directly.
     call(op, args) {

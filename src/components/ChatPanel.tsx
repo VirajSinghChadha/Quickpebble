@@ -1,5 +1,6 @@
 import { GeminiKeyGuide } from "./GeminiKeyGuide";
 import { AppPermissionCard, WatchCard } from "./SafetyCards";
+import { RoutineRunCard } from "./RoutineRunCard";
 import { ContextBar } from "./ContextBar";
 import { UsageMeter } from "./UsageMeter";
 import { useEffect, useRef, useState } from "react";
@@ -215,6 +216,7 @@ export function ChatPanel() {
         )}
         <PermissionDialog />
         <AppPermissionCard />
+        <RoutineRunCard />
         <WatchCard />
         {approval && (
           <div role="alertdialog" aria-label="Approve action" className={`rounded-2xl border bg-surface p-3 shadow-pebble ${approval.risky ? "border-red-500/60" : "border-primary/50"}`}>
