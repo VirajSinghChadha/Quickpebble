@@ -158,3 +158,25 @@ def test_non_ascii_text_is_pasted_on_windows(monkeypatch):
     monkeypatch.setattr(executor.pyautogui, "hotkey", lambda *k: calls.append(("keys", k)))
     executor._paste("héllo 你好")
     assert calls == [("clip", "héllo 你好"), ("keys", ("ctrl", "v"))]
+
+
+@pytest.mark.skipif(_sys.platform != "darwin", reason="macOS key events")
+def test_mac_shortcuts_are_sent_with_their_modifier_flags(monkeypatch):
+    from qp_agent import executor
+    import Quartz
+    posted = []
+    monkeypatch.setattr(Quartz, "CGEventPost", lambda tap, ev: posted.append(Quartz.CGEventGetFlags(ev)))
+    monkeypatch.setattr(executor.time, "sleep", lambda s: None)
+    assert executor.mac_shortcut(["command", "w"]) is True
+    assert len(posted) == 2 and all(f & Quartz.kCGEventFlagMaskCommand for f in posted)
+    assert executor.mac_shortcut(["w"]) is False          # a plain key is typed normally
+    assert executor.mac_shortcut(["command", "nonsense"]) is False
+
+
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
+def test_key_actions_go_through_press_keys(monkeypatch):
+    from qp_agent import executor
+    seen = []
+    monkeypatch.setattr(executor, "press_keys", lambda keys: seen.append(keys))
+    executor.perform(Action(type="key", key="cmd+shift+s"), Grid(cols=26, rows=16))
+    assert seen == [["command", "shift", "s"]]

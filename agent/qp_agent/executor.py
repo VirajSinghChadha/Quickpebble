@@ -123,6 +123,41 @@ def screen_changed(before: list[int] | None, after: list[int] | None) -> bool | 
     return sum(abs(a - b) for a, b in zip(before, after)) / (len(before) * 255) > 0.004
 
 
+_MAC_MODIFIERS = {"command": "kCGEventFlagMaskCommand", "ctrl": "kCGEventFlagMaskControl", "option": "kCGEventFlagMaskAlternate", "shift": "kCGEventFlagMaskShift"}
+
+
+def mac_shortcut(keys: list[str]) -> bool:
+    """Press a shortcut such as cmd+w by sending the key with the modifier flags attached.
+    pyautogui presses the modifier and the key so quickly that macOS often treats the key as plain typing (cmd+w typed a "w").
+    Returns False if it can't, so the caller can fall back."""
+    try:
+        import Quartz
+        from pyautogui import _pyautogui_osx as osx
+        flags, main = 0, None
+        for k in keys:
+            if k in _MAC_MODIFIERS:
+                flags |= getattr(Quartz, _MAC_MODIFIERS[k])
+            else:
+                main = k
+        code = osx.keyboardMapping.get(main) if main else None
+        if code is None or not flags:
+            return False
+        for down in (True, False):
+            ev = Quartz.CGEventCreateKeyboardEvent(None, code, down)
+            Quartz.CGEventSetFlags(ev, flags)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+            time.sleep(0.04)
+        return True
+    except Exception:
+        return False
+
+
+def press_keys(keys: list[str]) -> None:
+    if sys.platform == "darwin" and len(keys) > 1 and mac_shortcut(keys):
+        return
+    pyautogui.hotkey(*keys, interval=0.08)
+
+
 def perform(action: Action, grid: Grid) -> None:
     width, height = pyautogui.size()   # screen points (what the mouse uses), not Retina pixels
     if action.type in ("click", "double_click", "right_click", "scroll"):
@@ -143,6 +178,6 @@ def perform(action: Action, grid: Grid) -> None:
     elif action.type == "type":
         _type_text(action.text)
     elif action.type == "key":
-        pyautogui.hotkey(*[KEY_NAMES.get(p.lower(), p.lower()) for p in action.key.split("+")])
+        press_keys([KEY_NAMES.get(p.lower(), p.lower()) for p in action.key.split("+")])
     elif action.type == "wait":
         time.sleep(1.0)
