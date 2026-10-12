@@ -89,6 +89,8 @@ jobs:
           old=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v1."))][0]')
           [ -n "$old" ] || exit 0
           mkdir feed && gh release download "$old" --repo "$GITHUB_REPOSITORY" -p latest.json -D feed
+          # Its download links say "latest", which would now point at this release. Pin them to the release that holds the files.
+          sed -i "s#/releases/latest/download/#/releases/download/$old/#g" feed/latest.json
           gh release upload "$TAG" feed/latest.json --repo "$GITHUB_REPOSITORY" --clobber
 
   homebrew:
