@@ -139,7 +139,8 @@ button:not(:disabled):active { transform: scale(.985); }
 input[type="checkbox"][role="switch"] { cursor: pointer; }
 .swatch { width: 26px; height: 26px; border-radius: 999px; border: 2px solid var(--color-border); transition: transform 160ms var(--ease-pebble), border-color 160ms, box-shadow 160ms; }
 .swatch:hover { transform: scale(1.1); }
-.swatch[aria-pressed="true"] { border-color: var(--color-text-primary); box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary); }
+.swatch[aria-pressed="true"], .swatch[data-pressed="true"] { border-color: var(--color-text-primary); box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary); }
+span.swatch { display: block; }
 @media (prefers-reduced-motion: reduce) { [role="dialog"], [role="alertdialog"], .answer-card, [role="alert"] { animation: none; } .swatch:hover { transform: none; } }
 
 /* Duotone themes: two accent colors and a soft gradient behind the new-tab page. */

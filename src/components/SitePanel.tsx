@@ -5,6 +5,7 @@ import { hostOf } from "../lib/url";
 import { LANGUAGES, translatePage, type Item } from "../lib/translate";
 import { parseProfiles, withProfile, type SiteProfile } from "../lib/siteProfiles";
 import { selectActive, useStore } from "../store/useStore";
+import { PageCheck } from "./PageCheck";
 
 /** Per-site preferences in the side panel: zoom, tracker blocking, muting. Applied every time the site loads. */
 function TranslateSection({ tabId }: { tabId: string }) {
@@ -107,6 +108,7 @@ export function SitePanel() {
         </div>
       </header>
       <TranslateSection tabId={tab.id} />
+      <PageCheck tabId={tab.id} url={tab.url ?? ""} />
       <p className="text-[12px] text-text-secondary">These choices are saved for {host} and applied each time it loads.</p>
 
       <section className="space-y-1.5">

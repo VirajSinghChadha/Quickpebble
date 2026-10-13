@@ -5,7 +5,7 @@ import { useUpdater } from "../store/useUpdater";
 import { useOllama } from "../hooks/useOllama";
 import { useStore, type Layout, type Theme } from "../store/useStore";
 import { Modal, ModalHeader } from "./Modal";
-import { PRESETS } from "../hooks/useTheme";
+import { PRESETS, presetLabel } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 import { ImportDialog } from "./ImportDialog";
 import { StoragePanel } from "./StoragePanel";
@@ -13,6 +13,8 @@ import { UsageMeter } from "./UsageMeter";
 import { useTour } from "../store/useTour";
 import { useReport } from "../store/useReport";
 import { useTaskManager } from "../store/useTaskManager";
+import { SafetySettings } from "./SafetySettings";
+import { MemorySettings } from "./MemorySettings";
 
 const ENGINES = ["ghostsearch", "google", "brave", "duckduckgo", "bing", "startpage", "ecosia"];
 const ENGINE_LABELS: Record<string, string> = { ghostsearch: "GhostSearch (private, no Google)" };
@@ -31,6 +33,20 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 const selectCls = "rounded-lg border border-border bg-surface px-2 py-1.5";
+
+/** The ten colour themes as swatches, each with its name underneath. */
+function ThemeSwatches({ group, value, onPick }: { group: string; value: string; onPick: (id: (typeof PRESETS)[number]["id"]) => void }) {
+  return (
+    <div className="grid shrink-0 grid-cols-5 gap-x-1.5 gap-y-2" role="group" aria-label={group}>
+      {PRESETS.map((p) => (
+        <button key={p.id} type="button" aria-pressed={value === p.id} aria-label={p.label} title={p.label} onClick={() => onPick(p.id)} className="flex w-14 flex-col items-center gap-1 rounded-lg p-0.5 focus-visible:outline-2">
+          <span className="swatch" aria-hidden="true" style={{ background: p.color }} data-pressed={value === p.id} />
+          <span className={`swatch-name text-[10.5px] leading-none ${value === p.id ? "font-semibold text-text-primary" : "text-text-secondary"}`}>{p.name}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function SettingsPanel() {
   const account = useAccount();
@@ -120,19 +136,11 @@ export function SettingsPanel() {
               <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
             </select>
           </Row>
-          <Row label="Light mode theme" hint="Each mode keeps its own colors. Switch Theme above to see them.">
-            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Light mode color theme">
-              {PRESETS.map((p) => (
-                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetLight === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("light", p.id)} />
-              ))}
-            </div>
+          <Row label="Light mode theme" hint={`${presetLabel(presetLight)}. Each mode keeps its own colors. Switch Theme above to see them.`}>
+            <ThemeSwatches group="Light mode color theme" value={presetLight} onPick={(id) => setPreset("light", id)} />
           </Row>
-          <Row label="Dark mode theme">
-            <div className="flex flex-wrap justify-end gap-2" role="group" aria-label="Dark mode color theme">
-              {PRESETS.map((p) => (
-                <button key={p.id} type="button" className="swatch" style={{ background: p.color }} aria-pressed={presetDark === p.id} aria-label={p.label} title={p.label} onClick={() => setPreset("dark", p.id)} />
-              ))}
-            </div>
+          <Row label="Dark mode theme" hint={presetLabel(presetDark)}>
+            <ThemeSwatches group="Dark mode color theme" value={presetDark} onPick={(id) => setPreset("dark", id)} />
           </Row>
           <Row label="Wallpaper" hint="A quiet pattern on the new tab page that matches your color theme.">
             <input type="checkbox" role="switch" className="size-4 accent-primary" checked={wallpaper} onChange={(e) => setWallpaper(e.target.checked)} aria-label="Wallpaper" />
@@ -311,6 +319,8 @@ export function SettingsPanel() {
           </p>
           {msg && <p role="alert" className="pt-1 text-[12px] text-red-500">{msg}</p>}
         </div>
+        <MemorySettings save={save} />
+        <SafetySettings save={save} />
         <section className="py-4" aria-label="Web research settings">
           <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Web research</h3>
           <p className="mb-3 text-xs leading-relaxed text-text-secondary">Add your Brave Search API key to let the assistant find sources beyond your open tabs. Searches run only when you enable “Search the web for sources” in chat. Your question goes to Brave; excerpts go to your chosen AI provider. Your key stays in the OS keychain.</p>

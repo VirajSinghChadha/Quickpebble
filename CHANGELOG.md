@@ -1,5 +1,60 @@
 # Changelog
 
+## Unreleased
+
+### Safety foundation
+- **Recent changes with Undo.** Every file Quick Pebble moves, renames or sends to the Trash for you is listed with an Undo button, plus "Undo this whole task". Undo never overwrites something newer. Download sorting and renames are listed too. Clicks the assistant makes inside other apps can't be undone from here, and the list says so.
+- **List first, then confirm, then a receipt.** Anything that deletes, moves or renames shows the full list first; nothing happens until you tick and confirm. Deleting always means the Trash. Every confirmed task leaves a receipt.
+- **Safe mode for apps.** The first time Screen mode is about to work in an app, it asks you, for that app only: just this task, always, or no. Answers can be revoked in Settings → Assistant safety.
+- **Watch mode** (opt-in, off by default): see the exact screenshot Screen mode looked at, what it thinks and what it will do next. The picture is only kept in memory.
+- **Protected folders.** Choose folders Quick Pebble must never touch. File tasks refuse them outright; Screen mode is told to keep out and must ask before any step that mentions one.
+
+### Clean up and speed up (Settings → Assistant safety → Open clean-up, or the command palette)
+- **Find what's eating your disk:** old downloads, `node_modules` folders, app caches, simulator and Xcode data, and very big files, from names and sizes only. The scan is capped to stay quick and says when it stopped early.
+- **Old installers** (.dmg, .pkg, setup files) for apps you already have.
+- **Forgotten apps** (macOS): apps not opened in months with their size and the leftovers in your Library; removing one sends the app and its leftovers to the Trash. Apple's apps are never listed, and apps that are open can't be removed.
+- **Tidy up Desktop and Downloads** into kind folders, with undo.
+- **Rename by content:** `IMG_4021.jpg` → "Beach trip - sunset". You see exactly what is sent to the AI (a small picture of each file, or the start of a text file) before anything is.
+- **Photo triage:** spots screenshots and receipts among photos from their names and screen-sized PNGs; optionally the AI looks at up to 40 unclear ones. Only moved after you confirm.
+- **Why is my Mac slow?** Names the apps using the most processor and memory and offers to quit them politely.
+- **Quit apps you haven't touched** (opt-in: Quick Pebble notices which app is in front once a minute, on this computer only). Apps with unsaved work are left open.
+- **Login items:** see what starts when you log in and turn items off; Undo turns them back on.
+
+### Memory and knowledge
+- **Answer from my files.** Choose folders of notes, PDFs and documents (txt, md, html, rtf, docx, pdf) in Settings; they're indexed in Quick Pebble's own database on this computer. Tick "Search my files" in the assistant: it lists which excerpts it would send and waits for your OK, then answers with citations to your files. Protected folders are never read.
+- **Workspaces that remember.** A saved workspace now also keeps the assistant chat and the project brief, and one click brings them all back with the tabs.
+- **A timeline of my day** (opt-in, off by default): pages read, files downloaded, chats and assistant tasks, day by day, in Library → Timeline. Local only, 30 days, never from private windows, with Clear all.
+- **Check this page** (This site panel): ads and "sponsored" parts, when it was last updated (flags pages years old), who runs the site according to the page itself, and which tracking companies it tried to load. Each finding says how sure it is. Optionally compare the page's claims with pages you've read (Recall), after seeing exactly what is sent; disagreements are shown as a reason to look closer, never as proof.
+
+### Learning and school (command palette → School)
+- **Study packs:** pick a few tabs and get flashcards, a quiz and a one-page summary. Save it and short quizzes pop up later the same day (about 1, 3 and 7 hours later, never at night).
+- **Fill in my timetable:** reads your school portal's timetable, shows every class to check, then makes a calendar file. Your Calendar app asks before adding anything.
+- **Collect my assignments:** reads Google Classroom's To-do page (or a school site) and lists what's due this week in one note; copy it, add it to Apple Notes, or save it as a file.
+- **Slides to notes:** reads a PDF or scrolls through a slides page, then writes study notes with questions to check yourself.
+- **Submit-checker:** reads an assignment's file rules and checks the file you plan to hand in (type, name, size). It never submits.
+- **Practice partner:** reads the current quiz question aloud with your computer's own voice, or explains why your answer was wrong. It never answers or submits for you.
+- Every tool shows exactly what page text will be sent to the AI before it is.
+
+### Routines and shortcuts (command palette → Routines)
+- **Teach it by showing:** press "Teach a routine", do the task once (in the browser and other apps), press Stop, and review the steps it saw: the pages you opened, what you clicked and typed, choices you made and apps you switched to. Passwords, card numbers and one-time codes are never recorded; those steps say "you type this yourself".
+- **Running a routine always shows every step first.** Steps that send, submit, buy, pay, delete or sign in stop for their own OK, and you can skip or stop at any point.
+- **Reminders, not autopilot:** schedule a routine ("Fridays at 16:00") and you get a notification with the steps ready to approve. It never runs by itself.
+- **Teach it a shortcut:** give a routine a phrase like "tidy up", then just say it to the assistant.
+- **Share routines:** export one as a `.qproutine` file; importing shows every step and needs your OK, and a file with any step outside the allowed kinds is refused with the reason.
+- **"Do this for me" from any app** (Ctrl+Shift+Space on Mac, Ctrl+Alt+Space on Windows): copy text anywhere, press the shortcut, say what to do ("reply politely", "turn these notes into a table"). You see what will be sent; the draft is only copied, or pasted where your cursor is after a separate click. It never sends anything.
+- The assistant now names fields by their visible label (for example "Search term") rather than a hidden form name, so routines and page tasks find the right field.
+
+### Compare prices (command palette → Compare prices). Never buys.
+- "Find the cheapest of this in five shops": checks the search pages of the major shops in your country and puts what they show in one table: price and currency, shop, stock, delivery note if shown, a link, and when it was checked.
+- Shops come from a data file per country (UAE: Sharaf DG, Amazon.ae, Noon, Jumbo, Carrefour, Lulu, Virgin Megastore, Emax; plus Saudi Arabia, UK, US, India, Germany, France, Canada, Australia and Singapore). Pick the country in the panel, and add or remove shops.
+- Read-only by design: each shop is opened in a hidden window with an empty session (no account, no cookies, no cart), pop-ups, downloads and links to other sites are refused, and nothing is clicked.
+- Honest results: a price is only shown if that number is really on the shop's page; otherwise it says it couldn't be read. Shops that ask for a robot check are listed as unreadable. Used, refurbished, accessories and different editions are flagged, and "Cheapest match" only counts new offers that look like the same product.
+- You see what will be sent to the AI (each page's text and the product name) before it runs.
+
+### Look and docs
+- **Theme names:** every colour swatch in Settings now shows its name (Pebble, Ocean, Forest, Sunset, Lavender, Rose, Graphite, Aurora, Sunrise, Twilight), and the row says the selected theme's full name, for example "Aurora (teal + violet)".
+- A new README with download buttons, install steps for non-technical people, every feature with its own screenshot, and every network request listed under Privacy. All screenshots were retaken in the Aurora theme, plus a gallery of all ten themes in light and dark.
+
 ## 2.1.0
 
 - **Pause and take over.** Pause or stop Screen mode from the status bar at the bottom of your screen or with Cmd/Ctrl+Alt+P, and carry on by hand.

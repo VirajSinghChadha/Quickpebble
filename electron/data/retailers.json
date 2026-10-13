@@ -1,0 +1,74 @@
+{
+  "_about": "Major shops per country for price comparison, keyed by ISO country code. {q} is replaced with the search words. Add a country or a shop here; people can also add or remove shops in the app. Search addresses were written by hand and may change when a shop redesigns its site.",
+  "AE": { "name": "United Arab Emirates", "currency": "AED", "shops": [
+    { "name": "Sharaf DG", "search": "https://uae.sharafdg.com/?q={q}&post_type=product" },
+    { "name": "Amazon.ae", "search": "https://www.amazon.ae/s?k={q}" },
+    { "name": "Noon", "search": "https://www.noon.com/uae-en/search/?q={q}" },
+    { "name": "Jumbo", "search": "https://www.jumbo.ae/catalogsearch/result/?q={q}" },
+    { "name": "Carrefour UAE", "search": "https://www.carrefouruae.com/mafuae/en/search?keyword={q}" },
+    { "name": "Lulu Hypermarket", "search": "https://www.luluhypermarket.com/en-ae/search?q={q}" },
+    { "name": "Virgin Megastore", "search": "https://www.virginmegastore.ae/en/search/?text={q}" },
+    { "name": "Emax", "search": "https://www.emaxme.com/search?q={q}" }
+  ] },
+  "SA": { "name": "Saudi Arabia", "currency": "SAR", "shops": [
+    { "name": "Amazon.sa", "search": "https://www.amazon.sa/s?k={q}" },
+    { "name": "Noon", "search": "https://www.noon.com/saudi-en/search/?q={q}" },
+    { "name": "Jarir", "search": "https://www.jarir.com/sa-en/catalogsearch/result?search={q}" },
+    { "name": "Extra", "search": "https://www.extra.com/en-sa/search/?text={q}" },
+    { "name": "Carrefour KSA", "search": "https://www.carrefourksa.com/mafsau/en/search?keyword={q}" }
+  ] },
+  "GB": { "name": "United Kingdom", "currency": "GBP", "shops": [
+    { "name": "Amazon.co.uk", "search": "https://www.amazon.co.uk/s?k={q}" },
+    { "name": "Argos", "search": "https://www.argos.co.uk/search/{q}/" },
+    { "name": "Currys", "search": "https://www.currys.co.uk/search?q={q}" },
+    { "name": "John Lewis", "search": "https://www.johnlewis.com/search?search-term={q}" },
+    { "name": "Very", "search": "https://www.very.co.uk/search/{q}" },
+    { "name": "GAME", "search": "https://www.game.co.uk/en/search/?q={q}" }
+  ] },
+  "US": { "name": "United States", "currency": "USD", "shops": [
+    { "name": "Amazon.com", "search": "https://www.amazon.com/s?k={q}" },
+    { "name": "Best Buy", "search": "https://www.bestbuy.com/site/searchpage.jsp?st={q}" },
+    { "name": "Walmart", "search": "https://www.walmart.com/search?q={q}" },
+    { "name": "Target", "search": "https://www.target.com/s?searchTerm={q}" },
+    { "name": "Newegg", "search": "https://www.newegg.com/p/pl?d={q}" }
+  ] },
+  "IN": { "name": "India", "currency": "INR", "shops": [
+    { "name": "Amazon.in", "search": "https://www.amazon.in/s?k={q}" },
+    { "name": "Flipkart", "search": "https://www.flipkart.com/search?q={q}" },
+    { "name": "Croma", "search": "https://www.croma.com/searchB?q={q}" },
+    { "name": "Reliance Digital", "search": "https://www.reliancedigital.in/search?q={q}" },
+    { "name": "Vijay Sales", "search": "https://www.vijaysales.com/search/{q}" }
+  ] },
+  "DE": { "name": "Germany", "currency": "EUR", "shops": [
+    { "name": "Amazon.de", "search": "https://www.amazon.de/s?k={q}" },
+    { "name": "MediaMarkt", "search": "https://www.mediamarkt.de/de/search.html?query={q}" },
+    { "name": "Saturn", "search": "https://www.saturn.de/de/search.html?query={q}" },
+    { "name": "Otto", "search": "https://www.otto.de/suche/{q}/" }
+  ] },
+  "FR": { "name": "France", "currency": "EUR", "shops": [
+    { "name": "Amazon.fr", "search": "https://www.amazon.fr/s?k={q}" },
+    { "name": "Fnac", "search": "https://www.fnac.com/SearchResult/ResultList.aspx?Search={q}" },
+    { "name": "Darty", "search": "https://www.darty.com/nav/recherche?text={q}" },
+    { "name": "Boulanger", "search": "https://www.boulanger.com/resultats?tr={q}" }
+  ] },
+  "CA": { "name": "Canada", "currency": "CAD", "shops": [
+    { "name": "Amazon.ca", "search": "https://www.amazon.ca/s?k={q}" },
+    { "name": "Best Buy Canada", "search": "https://www.bestbuy.ca/en-ca/search?search={q}" },
+    { "name": "Walmart Canada", "search": "https://www.walmart.ca/search?q={q}" },
+    { "name": "The Source", "search": "https://www.thesource.ca/en-ca/search?text={q}" }
+  ] },
+  "AU": { "name": "Australia", "currency": "AUD", "shops": [
+    { "name": "Amazon.com.au", "search": "https://www.amazon.com.au/s?k={q}" },
+    { "name": "JB Hi-Fi", "search": "https://www.jbhifi.com.au/search?query={q}" },
+    { "name": "Harvey Norman", "search": "https://www.harveynorman.com.au/catalogsearch/result/?q={q}" },
+    { "name": "The Good Guys", "search": "https://www.thegoodguys.com.au/SearchDisplay?searchTerm={q}" },
+    { "name": "Big W", "search": "https://www.bigw.com.au/search?text={q}" }
+  ] },
+  "SG": { "name": "Singapore", "currency": "SGD", "shops": [
+    { "name": "Amazon.sg", "search": "https://www.amazon.sg/s?k={q}" },
+    { "name": "Lazada", "search": "https://www.lazada.sg/catalog/?q={q}" },
+    { "name": "Shopee", "search": "https://shopee.sg/search?keyword={q}" },
+    { "name": "Challenger", "search": "https://www.challenger.sg/search?q={q}" },
+    { "name": "Courts", "search": "https://www.courts.com.sg/catalogsearch/result/?q={q}" }
+  ] }
+}

@@ -68,3 +68,17 @@ describe("workspaces", () => {
     expect(useStore.getState().tabs).toEqual([original]);
   });
 });
+
+describe("workspaces that remember", () => {
+  it("keep the assistant chat and project with the tabs, and drop junk ids", () => {
+    storage();
+    const tabs = [{ id: "1", url: "https://a.example", title: "A", favicon: "", pinned: false, group: null }] as never;
+    const w = createWorkspace("Science fair", tabs, { chatId: 12, projectId: 3 });
+    expect(w).toMatchObject({ chatId: 12, projectId: 3 });
+    persistWorkspaces([w, { ...w, id: "x", chatId: -1 as never, projectId: "7" as never }]);
+    const back = loadWorkspaces();
+    expect(back[0]).toMatchObject({ chatId: 12, projectId: 3 });
+    expect(back[1]).toMatchObject({ chatId: null, projectId: null });
+    expect(createWorkspace("Plain", tabs)).toMatchObject({ chatId: null, projectId: null });
+  });
+});

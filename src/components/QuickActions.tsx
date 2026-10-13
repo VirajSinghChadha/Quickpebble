@@ -61,6 +61,11 @@ export function QuickActions() {
       { id: "extensions", title: "Manage Extensions", icon: Puzzle, run: () => s.setOverlay("extensions") },
       { id: "library", title: "Open History & Bookmarks", hint: `${modKey}Y`, icon: History, run: () => s.setOverlay("library") },
       { id: "recall", title: "Search Pages I've Read (Recall)", icon: Brain, run: () => s.setOverlay("library") },
+      { id: "changes", title: "Recent Changes and Undo", icon: History, run: () => s.setOverlay("changes") },
+      { id: "prices", title: "Compare Prices in Local Shops", icon: History, run: () => s.setOverlay("prices") },
+      { id: "routines", title: "Routines: Teach, Run, Share", icon: History, run: () => s.setOverlay("routines") },
+      { id: "school", title: "School: Study Pack, Timetable, Assignments, Slides, Submit-Checker", icon: History, run: () => s.setOverlay("school") },
+      { id: "cleanup", title: "Clean Up Your Mac (disk, apps, tidy-up, speed)", icon: History, run: () => s.setOverlay("cleanup") },
       { id: "profiles", title: "Profiles (separate logins, e.g. Google accounts)", icon: UserRound, run: () => s.setOverlay("profiles") },
       { id: "reopen", title: "Reopen Closed Tab", hint: `${modKey}⇧T`, icon: RotateCcw, run: () => s.reopenTab() },
       { id: "find", title: "Find in Page", hint: `${modKey}F`, icon: Search, run: () => void ipc.tabFind(selectActive(useStore.getState()).id) },
@@ -81,7 +86,7 @@ export function QuickActions() {
   const shown = commands.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase()));
   const run = (c: Cmd | undefined) => {
     if (!c) return;
-    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library", "recall", "profiles"].includes(c.id);
+    const keepOpen = ["search-tabs", "privacy", "settings", "extensions", "library", "recall", "profiles", "changes", "cleanup", "school", "routines", "prices"].includes(c.id);
     if (!keepOpen) close();
     void c.run();
   };

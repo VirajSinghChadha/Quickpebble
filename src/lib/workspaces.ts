@@ -13,7 +13,11 @@ export interface Workspace {
   name: string;
   createdAt: number;
   tabs: WorkspaceTab[];
+  /** The assistant chat and the project (with its brief) that belong with these tabs; restored together. */
+  chatId?: number | null;
+  projectId?: number | null;
 }
+const id = (v: unknown): number | null => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : null);
 const KEY = "qp.workspaces.v1";
 
 export function pageUrl(value: unknown): value is string {
@@ -26,10 +30,10 @@ export function workspaceTabs(tabs: Pick<Tab, "url" | "title" | "favicon" | "pin
   return tabs.filter((t) => pageUrl(t.url)).map(({ url, title, favicon, pinned, group }) => ({ url, title, favicon, pinned, group }));
 }
 
-export function createWorkspace(name: string, tabs: Tab[]): Workspace {
+export function createWorkspace(name: string, tabs: Tab[], context: { chatId?: number | null; projectId?: number | null } = {}): Workspace {
   const pages = workspaceTabs(tabs);
   if (!name.trim() || !pages.length) throw new Error("Enter a name and open at least one web page.");
-  return { id: crypto.randomUUID(), name: name.trim().slice(0, 80), createdAt: Date.now(), tabs: pages };
+  return { id: crypto.randomUUID(), name: name.trim().slice(0, 80), createdAt: Date.now(), tabs: pages, chatId: id(context.chatId), projectId: id(context.projectId) };
 }
 
 export function loadWorkspaces(): Workspace[] {
@@ -39,7 +43,7 @@ export function loadWorkspaces(): Workspace[] {
     if (!Array.isArray(data)) return [];
     return data.filter((w) => typeof w?.id === "string" && typeof w.name === "string" &&
       w.name.trim() && Number.isFinite(w.createdAt) && Array.isArray(w.tabs)).map((w) => ({
-      id: w.id, name: w.name, createdAt: w.createdAt,
+      id: w.id, name: w.name, createdAt: w.createdAt, chatId: id(w.chatId), projectId: id(w.projectId),
       tabs: w.tabs.filter((t: WorkspaceTab) => pageUrl(t?.url)).map((t: WorkspaceTab) => ({
         url: t.url, title: typeof t.title === "string" ? t.title : t.url,
         favicon: typeof t.favicon === "string" ? t.favicon : "", pinned: t.pinned === true,

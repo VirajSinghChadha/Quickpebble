@@ -1,4 +1,13 @@
 import { AnimatePresence, MotionConfig } from "framer-motion";
+import { ChangesPanel } from "./components/ChangesPanel";
+import { CleanupPanel } from "./components/CleanupPanel";
+import { SchoolPanel } from "./components/SchoolPanel";
+import { useSchool } from "./store/useSchool";
+import { onRoutineDue, onStudyReminder } from "./lib/ipc";
+import { RoutinesPanel, TeachingBar } from "./components/RoutinesPanel";
+import { PricesPanel } from "./components/PricesPanel";
+import { useRoutines } from "./store/useRoutines";
+import { ReviewDialog } from "./components/ReviewDialog";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { useContentVisibility, useTabs } from "./hooks/useTabs";
 import { useTheme } from "./hooks/useTheme";
@@ -39,6 +48,10 @@ export default function App() {
   useEffect(() => { if (!isPrivateWindow()) void useAccount.getState().init(); else useAccount.setState({ status: "ready" }); }, []);
   // Once signed in (or in a private window), find out whether the first-run tour is due.
   useEffect(() => { if (accountStatus === "ready") void useTour.getState().init(); }, [accountStatus]);
+  // A routine's reminder opens its steps for approval (it never runs by itself).
+  useEffect(() => { const off = onRoutineDue((e) => { void ipc.routinesList().then((l) => { const r = l.find((x) => x.id === e.id); if (r) useRoutines.getState().ask(r); }); }); return () => { void off.then((f) => f()); }; }, []);
+  // A spaced study reminder opens the School panel on that pack's quiz.
+  useEffect(() => { const off = onStudyReminder((e) => { useSchool.getState().setOpenPack(e.id); useStore.getState().setOverlay("school"); }); return () => { void off.then((f) => f()); }; }, []);
   // The status bar's Stop button stops the running screen task.
   useEffect(() => {
     let off = () => {};
@@ -107,12 +120,19 @@ export default function App() {
         {overlay === "library" && <Library key="library" />}
         {overlay === "profiles" && <ProfilesPanel key="profiles" />}
         {overlay === "https" && <HttpsPrompt key="https" />}
+        {overlay === "changes" && <ChangesPanel key="changes" />}
+        {overlay === "cleanup" && <CleanupPanel key="cleanup" />}
+        {overlay === "school" && <SchoolPanel key="school" />}
+        {overlay === "routines" && <RoutinesPanel key="routines" />}
+        {overlay === "prices" && <PricesPanel key="prices" />}
       </AnimatePresence>
       <UpdatePrompt />
       {accountStatus !== "ready" && <AuthGate />}
       {accountStatus === "ready" && <Tour />}
       <ReportDialog />
       <TaskManager />
+      <ReviewDialog />
+      <TeachingBar />
       <RecoveryNotice />
     </div>
     </MotionConfig>

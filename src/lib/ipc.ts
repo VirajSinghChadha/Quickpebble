@@ -118,7 +118,7 @@ export interface PageSnapshot {
   text: string;
   elements: { i: number; tag: string; type?: string; label: string; href?: string; value?: string; disabled?: boolean; offscreen?: boolean }[];
 }
-export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text";
+export type AgentOp = "snapshot" | "click" | "type" | "select" | "scroll" | "press" | "collect_text" | "apply_text" | "restore_text" | "page_facts";
 export interface ExtensionInfo {
   id: string;
   name: string;
@@ -222,10 +222,71 @@ export const ipc = {
     call<string>("ai_chat", { req: { system, messages, json } }, "The assistant only works inside the Quick Pebble app."),
   agentExec: <T = unknown>(tabId: string, op: AgentOp, args: Record<string, unknown> = {}) =>
     call<T>("agent_exec", { tabId, op, args }),
-  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string) => {
+  screenPropose: async (goal: string, history: string[], categories?: { id: string; label: string }[], pageText?: string, watch = false) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
-    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText });
+    return call<ScreenResponse>("screen_propose", { goal, history, categories, pageText, watch });
   },
+  actionsList: (limit = 200) => call<ActionEntry[]>("actions_list", { limit }, []),
+  actionUndo: (id: number) => call<boolean>("action_undo", { id }),
+  actionsUndoTask: (task: string) => call<{ undone: number; failed: { id: number; error: string }[] }>("actions_undo_task", { task }),
+  actionsClear: () => call<void>("actions_clear"),
+  taskView: (id: string) => call<TaskView>("task_view", { id }),
+  taskConfirm: (id: string, picks: number[]) => call<Receipt>("task_confirm", { id, picks }),
+  taskCancel: (id: string) => call<void>("task_cancel", { id }, undefined),
+  receiptsList: (limit = 50) => call<Receipt[]>("receipts_list", { limit }, []),
+  protectedList: () => call<string[]>("protected_list", undefined, []),
+  protectedAdd: () => call<string[]>("protected_add"),
+  protectedRemove: (path: string) => call<string[]>("protected_remove", { path }),
+  folderPick: (title: string) => call<string | null>("folder_pick", { title }),
+  filesFolders: () => call<FileFolder[]>("files_folders", undefined, []),
+  filesAddFolder: () => call<FileFolder[] | null>("files_add_folder"),
+  filesRemoveFolder: (path: string) => call<FileFolder[]>("files_remove_folder", { path }),
+  filesReindex: () => call<{ path: string; files: number; skipped: number; capped: boolean }[]>("files_reindex"),
+  filesSearch: (query: string, limit = 5) => call<FileHit[]>("files_search", { query, limit }, []),
+  timelineDay: (day: string) => call<{ on: boolean; events: TimelineEvent[] }>("timeline_day", { day }, { on: false, events: [] }),
+  timelineNote: (title: string) => call<boolean>("timeline_note", { kind: "task", title, detail: "" }, false),
+  timelineClear: () => call<void>("timeline_clear"),
+  pageTrackers: (id: string) => call<{ host: string; count: number; blocked: boolean }[]>("page_trackers", { id }, []),
+  studySave: (pack: unknown, reminders: number[]) => call<number>("study_save", { pack, reminders }),
+  studyList: () => call<{ id: number; title: string; created: number; next: number | null }[]>("study_list", undefined, []),
+  studyGet: (id: number) => call<{ id: number; title: string; created: number; pack: unknown }>("study_get", { id }),
+  studyDelete: (id: number) => call<void>("study_delete", { id }),
+  timetableSaveIcs: (ics: string) => call<{ path: string; opened: boolean }>("timetable_save_ics", { ics }),
+  noteSave: (title: string, body: string, where: "notes" | "file") => call<{ saved: string } | null>("note_save", { title, body, where }),
+  slidesPdfText: (id: string) => call<string | null>("slides_pdf_text", { id }),
+  submitPickFiles: () => call<{ name: string; size: number }[]>("submit_pick_files", undefined, []),
+  routinesList: () => call<import("./routines").Routine[]>("routines_list", undefined, []),
+  routineSave: (routine: unknown, id?: number) => call<number>("routine_save", { routine, id }),
+  routineDelete: (id: number) => call<void>("routine_delete", { id }),
+  routineTeachStart: () => call<boolean>("routine_teach_start"),
+  routineTeachStop: () => call<import("./routines").Step[]>("routine_teach_stop", undefined, []),
+  routineExport: (id: number) => call<string | null>("routine_export", { id }),
+  routineImport: () => call<{ file: string; token?: string; routine?: Omit<import("./routines").Routine, "id">; problems?: string[] } | null>("routine_import"),
+  routineImportConfirm: (token: string) => call<number>("routine_import_confirm", { token }),
+  routineOpenApp: (app: string) => call<boolean>("routine_open_app", { app }),
+  pricesConfig: () => call<PriceConfig>("prices_config"),
+  pricesSetCountry: (country: string) => call<PriceConfig>("prices_set_country", { country }),
+  pricesShopAdd: (shop: { name: string; search: string }) => call<PriceConfig>("prices_shop_add", { shop }),
+  pricesShopRemove: (name: string) => call<PriceConfig>("prices_shop_remove", { name }),
+  pricesShopsReset: () => call<PriceConfig>("prices_shops_reset"),
+  pricesCheck: (query: string, shops: string[]) => call<{ query: string; rows: PriceRow[]; currency: string; cancelled?: boolean }>("prices_check", { query, shops }),
+  pricesCancel: () => call<void>("prices_cancel"),
+  cleanDiskScan: () => call<DiskReport>("clean_disk_scan"),
+  cleanDiskReview: (group: string) => call<TaskView>("clean_disk_review", { group }),
+  cleanInstallers: () => call<TaskView>("clean_installers"),
+  cleanAppsScan: (days: number) => call<ForgottenApp[]>("clean_apps_scan", { days }, []),
+  cleanAppsReview: (paths: string[]) => call<TaskView>("clean_apps_review", { paths }),
+  cleanTidy: (folders: ("desktop" | "downloads")[]) => call<TaskView>("clean_tidy", { folders }),
+  cleanRenameCandidates: (folder: string) => call<RenameCandidates>("clean_rename_candidates", { folder }),
+  cleanRenameSuggest: (paths: string[]) => call<{ view: TaskView; failed: { name: string; error: string }[] }>("clean_rename_suggest", { paths }),
+  cleanPhotosScan: (folder: string) => call<{ view: TaskView; unsure: number }>("clean_photos_scan", { folder }),
+  cleanPhotosUnsure: () => call<{ path: string; name: string; size: number | null }[]>("clean_photos_unsure", undefined, []),
+  cleanPhotosAi: (paths: string[]) => call<{ view: TaskView; unsure: number; failed: { name: string; error: string }[] }>("clean_photos_ai", { paths }),
+  systemSlow: () => call<SlowReport>("system_slow"),
+  appsRunning: (hours: number) => call<{ running: { name: string; bundle: string | null }[]; tracking: boolean; since: number | null; unused: { name: string; lastSeen: number | null }[] }>("apps_running", { hours }),
+  appsQuitReview: (names: string[]) => call<TaskView>("apps_quit_review", { names }),
+  loginItems: () => call<LoginItem[]>("login_items", undefined, []),
+  loginItemsReview: (names: string[]) => call<TaskView>("login_items_review", { names }),
   screenVerify: async (goal: string, history: string[], pending: string, pageText?: string) => {
     if (!isTauri) throw new Error("Screen control only works inside the Quick Pebble app.");
     return call<{ ok: boolean; problems: string }>("screen_verify", { goal, history, pending, pageText });
@@ -298,6 +359,18 @@ export async function onTabEvent(cb: (e: TabEvent) => void): Promise<UnlistenFn>
   return listen<TabEvent>("qp://tab", (e) => e.payload.window === label && cb(e.payload));
 }
 
+export async function onStudyReminder(cb: (e: { id: number; title: string }) => void): Promise<UnlistenFn> {
+  return listen<{ id: number; title: string }>("qp://study-reminder", (e) => cb(e.payload));
+}
+
+export async function onRoutineDue(cb: (e: { id: number }) => void): Promise<UnlistenFn> {
+  return listen<{ id: number }>("qp://routine-due", (e) => cb(e.payload));
+}
+
+export async function onPricesProgress(cb: (e: { done: number; total: number; shop: string }) => void): Promise<UnlistenFn> {
+  return listen<{ done: number; total: number; shop: string }>("qp://prices-progress", (e) => cb(e.payload));
+}
+
 export async function onShortcut(cb: (action: string) => void): Promise<UnlistenFn> {
   if (!isTauri) return () => {};
   const label = windowLabel();
@@ -350,7 +423,31 @@ export interface ScreenUser {
 export interface ScreenResponse {
   user: ScreenUser;
   action: ScreenAction;
+  /** The app in front when the screenshot was taken (macOS and Windows), for the per-app permission. */
+  app?: string;
+  /** Watch mode only: the JPEG (base64) the model looked at. Kept in memory, never saved. */
+  shot?: string;
 }
+
+export interface FileFolder { path: string; files: number; indexed_at: number | null; skipped: number }
+export interface FileHit { path: string; name: string; snippet: string }
+export interface TimelineEvent { at: number; kind: "page" | "task" | "download" | "chat" | "change"; title: string; detail: string; site?: string; count?: number }
+export interface PriceConfig { country: string; currency: string; countries: { code: string; name: string }[]; shops: { name: string; search: string; custom?: boolean }[] }
+export interface PriceRow { shop: string; status: "ok" | "blocked" | "no_results" | "error"; note?: string; checkedAt: number; searchUrl: string; title?: string; price: number | null; currency?: string; inStock?: boolean | null; condition?: string; delivery?: string; url?: string; match?: "same" | "unsure" | "different"; why?: string; priceNote?: string; cheapest?: boolean }
+export interface DiskItem { path: string; size: number; note: string }
+export interface DiskReport { total: number; partial: boolean; scanned: number; folders: { path: string; size: number }[]; groups: { id: string; title: string; count: number; bytes: number; top: DiskItem[] }[] }
+export interface ForgottenApp { name: string; path: string; lastUsed: number | null; size: number | null; leftovers: number; leftoverBytes: number }
+export interface RenameCandidates { folder: string; files: { path: string; name: string; mode: "picture" | "text"; size: number | null }[]; provider: string; model: string }
+export interface AppLoad { name: string; cpu: number; mem: number; processes: number; app: boolean; why?: string; canQuit?: boolean }
+export interface SlowReport { cpus: number; load: number | null; memUsed: number; memTotal: number; groups: AppLoad[]; culprits: AppLoad[]; note: string }
+export interface LoginItem { kind: "login_item" | "launch_agent" | "run_key"; name: string; path: string | null; note: string }
+
+/** One change in the "Recent changes" list. */
+export interface ActionEntry { id: number; task: string; task_title: string; kind: string; what: string; src: string | null; dst: string | null; at: number; undone: boolean; can_undo: boolean }
+/** A dry-run list waiting for the person's OK. Items with a problem are shown but can't be ticked. */
+export interface TaskItem { i: number; kind: string; path?: string; display?: string; to?: string; size: number | null; note: string; label: string; what: string; problem: string | null }
+export interface TaskView { id: string; title: string; items: TaskItem[]; ready: number; bytes: number }
+export interface Receipt { id: string; title: string; at: number; done: { what: string; undoable: boolean }[]; failed: { what: string; error: string }[]; bytes: number; skipped: number }
 
 export interface VaultEntry {
   id: number;

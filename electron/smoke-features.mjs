@@ -8,11 +8,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`); if (!ok) failed++; };
 
-export async function run({ browser, commands, statusBar }) {
+export async function run({ browser, commands, statusBar, safety, files, school }) {
   const win = browser.windows.get("main");
   commands.settings_set(win, { key: "ai_provider", value: "ollama" });   // these checks are about the chat itself, not the Gemini key guide
   const ui = win.ui.webContents;
+  // A test window is often behind other windows; without this Chromium pauses its animations, so closing dialogs never finish
+  // fading out and the old ones stay on screen.
+  ui.setBackgroundThrottling(false);
   const js = (code) => ui.executeJavaScript(code);
+  const until = async (code, ms = 8000) => { for (let t = 0; t < ms; t += 250) { if (await js(code).catch(() => false)) return true; await sleep(250); } return false; };
+  const closeDialogs = async () => { for (let i = 0; i < 6 && (await js(`!!document.querySelector('button[aria-label="Close"]')`)); i++) { await js(`document.querySelector('button[aria-label="Close"]')?.click()`); await until(`document.querySelectorAll('button[aria-label="Close"]').length < ${await js(`document.querySelectorAll('button[aria-label="Close"]').length`)}`, 3000); } };
+  const openSettings = async () => { await closeDialogs(); await js(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Settings')?.click()`); return until(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent))`); };
 
   // ---------- status bar window
   commands.screen_overlay(win, { state: { phase: "thinking", thinking: "I can see the desktop and the Dock.", next: "Open Notes", step: 2, max: 40 } });
@@ -112,6 +118,130 @@ export async function run({ browser, commands, statusBar }) {
   check("an old chat can be squashed to one summary", squashed.saved > 0 && afterSquash.items.length === 1 && afterSquash.items[0].kind === "summary");
   check("the project knows how many chats it has", commands.ctx_projects(win).find((p) => p.id === pid)?.chats >= 2);
   commands.ctx_clear(win, { chatIds: [squashChat], projectIds: [] });
+
+  // ---------- safety foundation: dry run, confirm, receipt, undo, protected folders, settings
+  const box = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-safety-"));
+  for (const n of ["a.txt", "b.txt", "keep.txt"]) fs.writeFileSync(path.join(box, n), n);
+  fs.mkdirSync(path.join(box, "Locked"));
+  fs.writeFileSync(path.join(box, "Locked", "secret.txt"), "x");
+  commands.settings_set(win, { key: "protected_folders", value: JSON.stringify([path.join(box, "Locked")]) });
+  check("protected folders are listed", commands.protected_list(win)[0] === path.join(box, "Locked"));
+  const items = [...["a.txt", "b.txt", "keep.txt"].map((n) => ({ kind: "move", path: path.join(box, n), to: path.join(box, "Sorted", n), size: 5 })), { kind: "move", path: path.join(box, "Locked", "secret.txt"), to: path.join(box, "Sorted", "secret.txt") }, { kind: "trash", path: "/etc/hosts" }];
+  const view = safety.tasks.preview({ title: "Smoke tidy", roots: [box], items });
+  check("a dry run lists everything and changes nothing", view.items.length === 5 && fs.existsSync(path.join(box, "a.txt")) && !fs.existsSync(path.join(box, "Sorted")));
+  check("protected and outside paths are refused in the list", /protected/.test(view.items[3].problem) && !!view.items[4].problem && view.ready === 3, JSON.stringify(view.items.map((i) => i.problem)));
+  const receipt = await commands.task_confirm(win, { id: view.id, picks: [0, 1, 3, 4] });
+  check("confirm does only the ticked, allowed items", receipt.done.length === 2 && fs.existsSync(path.join(box, "Sorted", "a.txt")) && fs.existsSync(path.join(box, "keep.txt")) && fs.existsSync(path.join(box, "Locked", "secret.txt")), JSON.stringify(receipt));
+  check("a receipt is saved", commands.receipts_list(win, {})[0]?.id === view.id);
+  check("each change is in the undo list", commands.actions_list(win, {}).filter((r) => r.task === view.id).length === 2);
+  const undone = commands.actions_undo_task(win, { task: view.id });
+  check("undo this whole task puts the files back", undone.undone === 2 && fs.existsSync(path.join(box, "a.txt")) && fs.existsSync(path.join(box, "b.txt")));
+  check("a used list can't be confirmed twice", await commands.task_confirm(win, { id: view.id, picks: [2] }).then(() => false, () => true));
+  check("bad safety settings are refused", ["screen_watch:yes", "screen_app_permissions:[1]", 'screen_app_permissions:{"a/b":"allow"}', "protected_folders:{}"].every((kv) => { const [key, ...v] = kv.split(":"); try { commands.settings_set(win, { key, value: v.join(":") }); return false; } catch { return true; } }));
+  commands.settings_set(win, { key: "screen_app_permissions", value: JSON.stringify({ Notes: "allow", Mail: "deny" }) });
+  commands.settings_set(win, { key: "screen_watch", value: "1" });
+  await openSettings();
+  await until(`document.querySelector('[aria-label="App permissions"]')?.innerText.includes('Mail')`);
+  check("settings has an Assistant safety section with Watch mode", await js(`[...document.querySelectorAll('h3')].some(h => /assistant safety/i.test(h.textContent)) && document.querySelector('input[aria-label="Watch mode"]')?.checked === true`));
+  check("settings list app answers with Revoke and Forget", await js(`(() => { const t = document.querySelector('[aria-label="App permissions"]')?.innerText ?? ''; return /Notes\\s*Allowed/.test(t) && /Mail\\s*Not allowed/.test(t) && /Revoke/.test(t) && /Forget/.test(t); })()`));
+  check("settings list the protected folder", await js(`(document.querySelector('[aria-label="Protected folders"]')?.innerText ?? '').includes('Locked')`));
+  await js(`[...document.querySelectorAll('[aria-label="App permissions"] button')].find(b => b.textContent === 'Revoke')?.click()`);
+  await until(`!document.querySelector('[aria-label="App permissions"]')?.innerText.includes('Notes')`);
+  check("revoking an app forgets it", JSON.parse(commands.settings_get(win).screen_app_permissions).Notes === undefined);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open' && b.closest('[aria-label="Assistant safety"]'))?.click()`);
+  await sleep(900);
+  check("Recent changes shows the task with its undone items", await js(`document.body.innerText.includes('Recent changes') && document.body.innerText.includes('Smoke tidy') && /Undone/.test(document.body.innerText)`));
+  await js(`[...document.querySelectorAll('[role="tab"]')].find(b => b.textContent === 'Receipts')?.click()`);
+  await sleep(300);
+  check("Recent changes shows the receipt", await js(`/Smoke tidy[\\s\\S]*2 done/.test(document.body.innerText)`));
+  await js(`document.querySelector('button[aria-label="Close"]')?.click()`);
+  commands.settings_set(win, { key: "screen_watch", value: "0" });
+  commands.settings_set(win, { key: "protected_folders", value: "[]" });
+  fs.rmSync(box, { recursive: true, force: true });
+
+  // ---------- Mac clean-up (reads only, except inside a throwaway folder)
+  const pics = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-photos-"));
+  const png = Buffer.alloc(32); png.writeUInt32BE(0x89504e47, 0); png.write("IHDR", 12, "ascii"); png.writeUInt32BE(1179, 16); png.writeUInt32BE(2556, 20);
+  fs.writeFileSync(path.join(pics, "IMG_0001.PNG"), png);
+  fs.writeFileSync(path.join(pics, "Screenshot 2026-10-01 at 09.00.00.png"), png);
+  fs.writeFileSync(path.join(pics, "Coffee receipt.jpg"), "x");
+  fs.writeFileSync(path.join(pics, "beach.jpg"), "x");
+  const ph = await commands.clean_photos_scan(win, { folder: pics });
+  check("photo triage suggests screenshots and receipts only", ph.view.ready === 3 && ph.unsure === 1 && ph.view.items.every((i) => /Screenshots|Receipts/.test(i.to)), JSON.stringify(ph.view.items.map((i) => i.what)));
+  const phr = await commands.task_confirm(win, { id: ph.view.id, picks: ph.view.items.map((i) => i.i) });
+  check("confirmed photo moves happen and can be undone", phr.done.length === 3 && fs.existsSync(path.join(pics, "Receipts", "Coffee receipt.jpg")) && commands.actions_undo_task(win, { task: ph.view.id }).undone === 3 && fs.existsSync(path.join(pics, "Coffee receipt.jpg")));
+  fs.writeFileSync(path.join(pics, "scan0003.pdf"), "%PDF-1.4");
+  const rc = await commands.clean_rename_candidates(win, { folder: pics });
+  check("rename by content finds unclear names and says how each is looked at", rc.files.some((f) => f.name === "scan0003.pdf" && f.mode === "picture") && !rc.files.some((f) => f.name === "beach.jpg") && !!rc.provider);
+  check("a system folder can't be chosen to rename in", await commands.clean_rename_candidates(win, { folder: "/usr/bin" }).then(() => false, () => true));
+  fs.rmSync(pics, { recursive: true, force: true });
+  const slow = await commands.system_slow(win);
+  check("why-is-it-slow reads real processes", slow.groups.length > 3 && slow.memTotal > 0, `${slow.groups.length} apps, culprits: ${slow.culprits.map((c) => c.name).join(", ") || "none"}`);
+  const ra = await commands.apps_running(win, { hours: 48 });
+  check("running apps are listed and unused-app tracking starts off", ra.running.length > 0 && ra.tracking === false && ra.unused.length === 0, `${ra.running.length} open`);
+  const tidy = await commands.clean_tidy(win, { folders: ["desktop", "downloads"] });
+  check("Desktop/Downloads tidy-up only plans moves that stay in those folders", tidy.items.every((i) => i.kind === "move" && (i.problem === null || /protected/.test(i.problem))), `${tidy.ready} planned`);
+  commands.task_cancel(win, { id: tidy.id });
+  const inst = await commands.clean_installers(win);
+  check("old installer search runs and only lists installers", inst.items.every((i) => /\.(dmg|pkg|mpkg|zip)$/i.test(i.path)), `${inst.items.length} found`);
+  commands.task_cancel(win, { id: inst.id });
+  await openSettings();
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open clean-up')?.click()`);
+  await until(`!!document.querySelector('section[aria-label="Login items"]')`);
+  const tools = await js(`[...document.querySelectorAll('section[aria-label]')].map(s => s.getAttribute('aria-label')).join(',')`);
+  check("the clean-up panel shows every tool", ["Disk", "Installers", "Forgotten apps", "Tidy", "Rename by content", "Photo triage", "Slow", "Quit unused apps", "Login items"].every((t) => tools.includes(t)), tools);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Plan the tidy-up…')?.click()`);
+  await sleep(1500);
+  check("planning opens the review list and nothing has changed yet", await js(`/Nothing has changed yet/.test(document.body.innerText) && !!document.querySelector('[aria-label="Changes to review"]')`));
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel')?.click()`);
+  await sleep(400);
+  await js(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Check now')?.click()`);
+  for (let i = 0; i < 32 && !(await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`)); i++) await sleep(250);
+  check("the slow-Mac check shows memory in the panel", await js(`/Memory: .+ of .+ in use/.test(document.body.innerText)`), await js(`(document.querySelector('section[aria-label="Slow"]')?.innerText ?? 'no section').slice(0, 300)`));
+  await closeDialogs();
+
+  // ---------- answer from my files
+  const notes = fs.mkdtempSync(path.join(app.getPath("temp"), "qp-notes-"));
+  fs.writeFileSync(path.join(notes, "biology.md"), "# Biology\nMitochondria are the powerhouse of the cell and make ATP.");
+  fs.writeFileSync(path.join(notes, "history.html"), "<h1>History</h1><p>The Treaty of Versailles was signed in 1919.</p>");
+  files.addFolder(notes);
+  await files.indexFolder(notes);
+  check("my files are indexed on this computer", commands.files_folders(win).some((f) => f.path === path.resolve(notes) && f.files === 2));
+  const hits = commands.files_search(win, { query: "what makes ATP in the cell?" });
+  check("searching my files finds the right excerpt", hits[0]?.name === "biology.md" && /powerhouse/.test(hits[0].snippet), JSON.stringify(hits[0]));
+  await openSettings();   // as a person would: add the folder in Settings, then go back to the assistant
+  await closeDialogs();
+  await until(`!!document.querySelector('aside textarea')`);
+  await js(`[...document.querySelectorAll('button,[role=tab],[role=radio]')].find(b => /^ask$/i.test(b.textContent.trim()))?.click()`);
+  check("Ask mode offers “Search my files” once folders are indexed", await until(`/Search my files \\(2 indexed/.test(document.body.innerText)`));
+  await openSettings();
+  check("settings list the indexed folder", await until(`(document.querySelector('[aria-label="Indexed folders"]')?.innerText ?? '').includes('2 files')`));
+  commands.files_remove_folder(win, { path: path.resolve(notes) });
+  check("removing a folder forgets its index", commands.files_search(win, { query: "mitochondria" }).length === 0);
+  fs.rmSync(notes, { recursive: true, force: true });
+  await closeDialogs();
+
+  // ---------- theme names under every swatch
+  await openSettings();
+  const names = ["Pebble", "Ocean", "Forest", "Sunset", "Lavender", "Rose", "Graphite", "Aurora", "Sunrise", "Twilight"];
+  const swatchNames = await js(`JSON.stringify(["Light mode color theme", "Dark mode color theme"].map((g) => [...document.querySelectorAll('[aria-label="' + g + '"] button')].map((b) => { const n = b.querySelector('.swatch-name'); const r = n?.getBoundingClientRect(); return n && r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden' ? n.textContent : ''; })))`);
+  check("every theme swatch shows its name, in both rows", JSON.stringify(JSON.parse(swatchNames)) === JSON.stringify([names, names]), swatchNames);
+  await js(`document.querySelector('[aria-label="Light mode color theme"] button[aria-label="Aurora (teal + violet)"]').click()`);
+  check("picking a theme shows its full name in the hint", await until(`document.body.innerText.includes('Aurora (teal + violet). Each mode keeps its own colors')`));
+  await js(`document.querySelector('[aria-label="Light mode color theme"] button[aria-label="Pebble"]').click()`);
+  await closeDialogs();
+
+  // ---------- school: the panel, and a study reminder that opens the quiz
+  await closeDialogs();
+  const packId = commands.study_save(win, { pack: { title: "Smoke volcanoes", summary: "Magma rises.", flashcards: [{ q: "What is lava?", a: "Magma above ground" }], quiz: [{ q: "Where does magma form?", choices: ["In the mantle", "In clouds"], answer: 0, why: "Rock melts deep down." }] }, reminders: [Date.now() + 60_000] });
+  check("a study pack is saved with its reminder", commands.study_list(win).some((p) => p.id === packId && p.next));
+  school.remind(Date.now() + 120_000);
+  check("the reminder opens the School panel on that pack's quiz", await until(`!!document.querySelector('[aria-label="Study pack"]') && document.body.innerText.includes('Smoke volcanoes') && document.body.innerText.includes('Where does magma form?')`));
+  check("the School panel shows every tool", await js(`["Study packs","Timetable","Assignments","Slides to notes","Submit-checker","Practice partner"].every(t => !!document.querySelector('section[aria-label="' + t + '"]'))`));
+  await js(`[...document.querySelectorAll('[aria-label="Study pack"] button')].find(b => b.textContent === 'In the mantle')?.click()`);
+  check("answering a quiz question shows why", await until(`document.body.innerText.includes('Right. Rock melts deep down.')`));
+  commands.study_delete(win, { id: packId });
+  await closeDialogs();
 
   // ---------- clean up the test data
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });

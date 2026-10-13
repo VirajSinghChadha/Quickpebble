@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Bookmark, Brain, Clock, Search, Trash2 } from "lucide-react";
+import { Bookmark, Brain, CalendarDays, Clock, Search, Trash2 } from "lucide-react";
+import { TimelineView } from "./TimelineView";
 import { ipc, type Bookmark as Bm, type HistoryEntry, type RecallHit } from "../lib/ipc";
 import { displayUrl, hostOf } from "../lib/url";
 import { selectActive, useStore } from "../store/useStore";
@@ -8,7 +9,7 @@ import { Modal, ModalHeader } from "./Modal";
 
 /** ⌘Y: search history and bookmarks. */
 export function Library() {
-  const [tab, setTab] = useState<"history" | "bookmarks" | "memory">("history");
+  const [tab, setTab] = useState<"history" | "bookmarks" | "memory" | "timeline">("history");
   const [q, setQ] = useState("");
   const [hist, setHist] = useState<HistoryEntry[]>([]);
   const [marks, setMarks] = useState<Bm[]>([]);
@@ -45,15 +46,16 @@ export function Library() {
       <ModalHeader title="Library" onClose={close} />
       <div className="flex items-center gap-2 border-b border-border px-5 py-3">
         <div className="flex rounded-lg bg-surface-secondary p-0.5">
-          {([["history", "History", Clock], ["bookmarks", "Bookmarks", Bookmark], ["memory", "Memory", Brain]] as const).map(([id, label, Icon]) => (
+          {([["history", "History", Clock], ["bookmarks", "Bookmarks", Bookmark], ["memory", "Memory", Brain], ["timeline", "Timeline", CalendarDays]] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-medium ${tab === id ? "bg-surface shadow-pebble" : "text-text-secondary"}`}><Icon size={13} /> {label}</button>
           ))}
         </div>
-        <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-border px-2.5 focus-within:border-primary">
+        {tab !== "timeline" && <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-border px-2.5 focus-within:border-primary">
           <Search size={14} className="text-text-secondary" />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={tab === "memory" ? "Search the text of pages you've read" : `Search ${tab}`} aria-label={`Search ${tab}`} className="flex-1 bg-transparent outline-none" />
-        </div>
+        </div>}
       </div>
+      {tab === "timeline" && <TimelineView open={open} />}
       {tab === "memory" && recall && (
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2 text-[12px] text-text-secondary">
           <span>{recall.enabled ? `Recall is on · ${recall.pages} pages remembered on this computer. Logins, payments, webmail and private windows are never saved.` : "Recall is off. Turn it on to search the text of pages you read, stored only on this computer."}</span>
@@ -63,7 +65,7 @@ export function Library() {
           </span>
         </div>
       )}
-      <ul className="overflow-y-auto p-2">
+      {tab !== "timeline" && <ul className="overflow-y-auto p-2">
         {rows.length === 0 && <li className="px-3 py-8 text-center text-text-secondary">{tab === "memory" && !q.trim() ? "Type to search the pages you've read." : "Nothing found."}</li>}
         {rows.map((r) => (
           <li key={r.url}>
@@ -75,7 +77,7 @@ export function Library() {
             {tab === "memory" && <div className="flex items-start gap-2 px-3 pb-2 pl-10"><p className="min-w-0 flex-1 text-[12px] leading-relaxed text-text-secondary">{r.snippet}</p><button type="button" aria-label="Forget this page" title="Forget this page" onClick={() => void forget(r.url)} className="grid size-6 shrink-0 place-items-center rounded-md text-text-secondary hover:bg-surface-secondary"><Trash2 size={12} /></button></div>}
           </li>
         ))}
-      </ul>
+      </ul>}
     </Modal>
   );
 }
