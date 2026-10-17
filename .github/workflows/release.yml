@@ -129,11 +129,21 @@ jobs:
           TAG: ${{ needs.create-release.outputs.tag }}
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx latest.json
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          # The Chromium (2.x) app is the main line now, so a 1.x release must not take over "latest" (download buttons and
+          # the Homebrew cask follow it). Pin the update file's download links to this release so they work either way.
+          mkdir feed && gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p latest.json -D feed
+          sed -i "s#/releases/latest/download/#/releases/download/$TAG/#g" feed/latest.json
+          gh release upload "$TAG" feed/latest.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
+          # Installed 1.3.x apps from before this change read releases/latest/download/latest.json, which is whatever release
+          # is "latest". Put the new update file there too so they still find this version.
+          latest=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName,isLatest --jq '.[]|select(.isLatest)|.tagName')
+          if [ -n "$latest" ] && [ "$latest" != "$TAG" ]; then gh release upload "$latest" feed/latest.json --repo "$GITHUB_REPOSITORY" --clobber; fi
 
   homebrew:
     name: Update Homebrew cask
     needs: [create-release, publish]
+    if: false   # the Homebrew cask follows the Chromium line (see the main branch); a 1.x release must not move it back
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Updates are more reliable: the app asks GitHub which release is newest instead of one fixed address, and "Install & restart" looks for the update again by itself if it lost track of it, rather than asking you to check first.
+
 ## 1.3.1
 
 - Fixed Mac shortcuts in Screen mode: Command combinations such as Cmd+W were typed as plain letters.
