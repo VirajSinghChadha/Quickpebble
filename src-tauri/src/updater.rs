@@ -22,6 +22,32 @@ pub struct UpdateInfo {
 
 const RELEASES_PAGE: &str = "https://github.com/VirajSinghChadha/Quickpebble/releases/latest";
 const FEED: &str = "https://github.com/VirajSinghChadha/Quickpebble/releases/latest/download/latest.json";
+const RELEASES_API: &str = "https://api.github.com/repos/VirajSinghChadha/Quickpebble/releases?per_page=30";
+
+/// The update file of the newest 1.x release, found by asking GitHub which releases exist. Reading the release list means
+/// the check keeps working even when a newer release of a different kind (for example the Chromium 2.x app) is the
+/// repository's "latest" and has no update file of its own. Falls back to the fixed address if GitHub can't be asked.
+async fn feed_url() -> String {
+    async fn newest() -> Option<String> {
+        let list: serde_json::Value = reqwest::Client::new()
+            .get(RELEASES_API)
+            .header("User-Agent", "quick-pebble-updater")
+            .header("Accept", "application/vnd.github+json")
+            .timeout(Duration::from_secs(15))
+            .send().await.ok()?.error_for_status().ok()?.json().await.ok()?;
+        list.as_array()?
+            .iter()
+            .filter(|r| !r["draft"].as_bool().unwrap_or(true) && !r["prerelease"].as_bool().unwrap_or(true))
+            .filter_map(|r| {
+                let tag = r["tag_name"].as_str()?;
+                let has_feed = r["assets"].as_array()?.iter().any(|a| a["name"].as_str() == Some("latest.json"));
+                (tag.starts_with("v1.") && has_feed).then(|| tag.to_string())
+            })
+            .max_by_key(|t| numeric(t))
+            .map(|t| format!("https://github.com/VirajSinghChadha/Quickpebble/releases/download/{t}/latest.json"))
+    }
+    newest().await.unwrap_or_else(|| FEED.to_string())
+}
 
 fn chain(e: &dyn std::error::Error) -> String {
     let mut out = e.to_string();
@@ -38,9 +64,9 @@ fn numeric(v: &str) -> Vec<u64> {
 }
 
 /// Backup check over the app's own HTTP client, used when the updater plugin's connection fails.
-async fn check_feed() -> Result<Option<UpdateInfo>, String> {
+async fn check_feed(url: &str) -> Result<Option<UpdateInfo>, String> {
     let body: serde_json::Value = reqwest::Client::new()
-        .get(FEED)
+        .get(url)
         .timeout(Duration::from_secs(20))
         .send()
         .await
@@ -78,15 +104,18 @@ pub struct UpdateProgress {
 async fn check(app: &AppHandle) -> Result<Option<UpdateInfo>, String> {
     let pending = app.state::<PendingUpdate>();
     let mut pending = pending.0.try_lock().map_err(|_| "An update operation is already running")?;
-    let result = match app.updater() {
+    let url = feed_url().await;
+    let result = match url.parse::<tauri::Url>().map_err(|e| e.to_string()).and_then(|u| {
+        app.updater_builder().endpoints(vec![u]).map_err(|e| chain(&e)).and_then(|b| b.build().map_err(|e| chain(&e)))
+    }) {
         Ok(u) => u.check().await.map_err(|e| chain(&e)),
-        Err(e) => Err(chain(&e)),
+        Err(e) => Err(e),
     };
     let update = match result {
         Ok(u) => u,
         Err(first) => {
             *pending = None;
-            return check_feed().await.map_err(|second| format!("Could not check for updates ({first}; backup check: {second})"));
+            return check_feed(&url).await.map_err(|second| format!("Could not check for updates ({first}; backup check: {second})"));
         }
     };
     let info = update.as_ref().map(|u| UpdateInfo {
@@ -110,9 +139,14 @@ pub async fn update_install(
     pending: State<'_, PendingUpdate>,
     progress: Channel<UpdateProgress>,
 ) -> Result<(), String> {
+    // If the stored update was lost (a later check came back empty or failed), look again instead of asking the person to.
+    let missing = pending.0.try_lock().map_err(|_| "An update operation is already running")?.is_none();
+    if missing {
+        check(&app).await?;
+    }
     let pending = pending.0.try_lock().map_err(|_| "An update operation is already running")?;
     // Borrow instead of taking the update so a failed download can be retried.
-    let update = pending.as_ref().ok_or("Check for an update before installing")?;
+    let update = pending.as_ref().ok_or("No update was found. Try Check now again in a minute.")?;
     let mut downloaded = 0_u64;
     update
         .download_and_install(
