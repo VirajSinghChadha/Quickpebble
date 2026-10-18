@@ -27,7 +27,7 @@ def capture(grid: Grid) -> tuple[Image.Image, str]:
     try:
         img: Image.Image = pyautogui.screenshot()
     except Exception as e:  # macOS raises when Screen Recording is denied
-        raise RuntimeError("Could not capture the screen. Allow your terminal/Quick Pebble under System Settings → Privacy & Security → Screen Recording.") from e
+        raise RuntimeError(f"Could not capture the screen ({type(e).__name__}). Allow your terminal/Quick Pebble under System Settings → Privacy & Security → Screen Recording, then quit and reopen the app.") from e
     scale = MAX_EDGE / max(img.size)
     small = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS) if scale < 1 else img
     # The model sees the reduced, gridded copy; the zoomed second looks are cut from the full-resolution original.

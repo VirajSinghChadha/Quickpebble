@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3
+
+- Screen mode now checks Screen Recording and Accessibility permission from Quick Pebble itself, asks macOS for it, opens the right Settings page and says exactly what to do. This fixes the case where the switch looked on but capture still failed after an update.
+
 ## 1.3.2
 
 - Updates are more reliable: the app asks GitHub which release is newest instead of one fixed address, and "Install & restart" looks for the update again by itself if it lost track of it, rather than asking you to check first.
