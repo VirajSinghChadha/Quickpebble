@@ -178,6 +178,38 @@ async fn post(port: u16, token: &str, path: &str, body: Value) -> Result<Value, 
     if ok { Ok(v) } else { Err(v["error"].as_str().unwrap_or("Screen agent request failed").to_string()) }
 }
 
+#[cfg(target_os = "macos")]
+mod mac_permissions {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGPreflightScreenCaptureAccess() -> bool;
+        fn CGRequestScreenCaptureAccess() -> bool;
+    }
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXIsProcessTrusted() -> bool;
+    }
+
+    /// Asks macOS about Quick Pebble itself (not the helper), so the answer matches what the Privacy settings list shows. When
+    /// the permission is missing, ask from this process: that makes macOS register or re-register the entry for this exact
+    /// build, which fixes a switch that shows "on" but belongs to an older build of the app.
+    pub fn check() -> Result<(), String> {
+        let open_pane = |pane: &str| {
+            let _ = std::process::Command::new("open").arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}")).spawn();
+        };
+        if !unsafe { CGPreflightScreenCaptureAccess() } {
+            unsafe { CGRequestScreenCaptureAccess() };
+            open_pane("Privacy_ScreenCapture");
+            return Err("Quick Pebble does not have Screen Recording permission yet. In System Settings → Privacy & Security → Screen Recording, turn Quick Pebble on (if it is already on, switch it off and on again), then quit Quick Pebble with Cmd+Q, reopen it and try again.".into());
+        }
+        if !unsafe { AXIsProcessTrusted() } {
+            open_pane("Privacy_Accessibility");
+            return Err("Quick Pebble does not have Accessibility permission yet, which it needs to click and type for you. In System Settings → Privacy & Security → Accessibility, turn Quick Pebble on, then quit with Cmd+Q, reopen it and try again.".into());
+        }
+        Ok(())
+    }
+}
+
 /// Screenshot + Gemini. Returns `{ user: {thinking, message}, action: {...} }`; nothing is executed.
 #[tauri::command]
 pub async fn screen_propose(
@@ -192,6 +224,8 @@ pub async fn screen_propose(
     if goal.trim().is_empty() || goal.len() > 4000 || history.len() > 40 {
         return Err("Invalid request".into());
     }
+    #[cfg(target_os = "macos")]
+    mac_permissions::check()?;
     let (port, token) = {
         let (app, db, state) = (app.clone(), &*db, &*state);
         tokio::task::block_in_place(|| connection(&app, db, state))?
