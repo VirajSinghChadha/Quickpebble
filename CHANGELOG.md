@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+- Version bump only. Same features as 2.2.0.
+
 ## 2.2.0
 
 - **Safety foundation for the computer-controlling assistant:** an undo list, dry runs with receipts, per-app permission, Watch mode and protected folders.
