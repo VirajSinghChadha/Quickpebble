@@ -8,6 +8,9 @@ import { docxText, FileIndex, fileText, htmlText, rtfText } from "./fileindex.mj
 import { collapse, dayBounds, Timeline } from "./timeline.mjs";
 import { noteTracker } from "./adblock.mjs";
 
+// These check macOS/POSIX path behaviour (Trash, ~, Library); the features are Mac-focused.
+const onWindows = process.platform === "win32";
+
 const dirs = [];
 afterEach(() => { for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
 const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "qp-know-")); dirs.push(d); return d; };
@@ -66,7 +69,7 @@ describe("answer from my files", () => {
     expect(idx.search("glaciers")).toEqual([]);
     expect(idx.stats()).toEqual({ folders: 0, files: 0 });
   });
-  it("refuses system folders and limits how many folders", () => {
+  it.skipIf(onWindows)("refuses system folders and limits how many folders", () => {
     const idx = new FileIndex(new Db(":memory:"));
     expect(() => idx.addFolder("/usr/lib")).toThrow(/System/);
     expect(() => idx.addFolder("/")).toThrow(/whole disk/);
