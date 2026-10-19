@@ -1,5 +1,5 @@
 // Quick Pebble (Chromium edition): Electron main process.
-import { app, ipcMain, Menu, session, dialog, globalShortcut } from "electron";
+import { app, ipcMain, Menu, session, dialog, globalShortcut, powerMonitor } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -24,6 +24,7 @@ import { Prices } from "./prices.mjs";
 import { initUsage } from "./usage.mjs";
 import { installDiagnostics } from "./diagnostics.mjs";
 import { Updater } from "./updater.mjs";
+import { buildBrief, shouldShow, todayKey } from "./morning.mjs";
 import { ghostHandler, registerGhostScheme } from "./ghost/index.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +131,19 @@ app.whenReady().then(async () => {
   browser.trackScroll();
   browser.openWindow({ label: "main" });
   updater.start();
+  // Morning brief: the first time Quick Pebble is opened (or the Mac wakes or unlocks) each day.
+  const maybeMorning = async () => {
+    try {
+      if (!shouldShow({ enabled: db.getSetting("morning_brief") !== "0", last: db.getSetting("morning_last") ?? "" })) return;
+      const w = [...browser.windows.values()].find((x) => !x.private && !x.win.isDestroyed());
+      if (!w) return;
+      db.setSetting("morning_last", todayKey());   // marked first, so a second wake-up a minute later does not show it twice
+      browser.emitUi(w, "qp://morning", await buildBrief(db));
+    } catch { /* the brief must never get in the way */ }
+  };
+  setTimeout(() => void maybeMorning(), 6000).unref?.();
+  powerMonitor.on("unlock-screen", () => void maybeMorning());
+  powerMonitor.on("resume", () => setTimeout(() => void maybeMorning(), 5000).unref?.());
   // Talk to the assistant from any app: bring the browser forward with the assistant open and the cursor in its box.
   const HOTKEY = "CommandOrControl+Shift+Space";
   try {

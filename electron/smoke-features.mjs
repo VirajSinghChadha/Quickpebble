@@ -247,6 +247,16 @@ export async function run({ browser, commands, statusBar, safety, files, school 
   commands.ctx_clear(win, { chatIds: [cid], projectIds: [pid] });
   check("test data erased only when asked", commands.ctx_chats(win).length === 0 && commands.ctx_projects(win).length === 0);
 
+  // ---- morning brief, allowed sites, Education Perfect notes
+  const brief = await commands.morning_preview(win);
+  check("the morning brief builds with a Mac check-up", Array.isArray(brief.checkup) && brief.checkup.length >= 2 && Array.isArray(brief.news), JSON.stringify(brief.checkup.map((c) => c.label)));
+  commands.settings_set(win, { key: "agent_allowed_sites", value: JSON.stringify(["educationperfect.com"]) });
+  check("allowed websites can be saved", JSON.parse(commands.settings_get(win).agent_allowed_sites)[0] === "educationperfect.com");
+  check("a bad allowed-site list is refused", (() => { try { commands.settings_set(win, { key: "agent_allowed_sites", value: "{\"a\":1}" }); return false; } catch { return true; } })());
+  commands.settings_set(win, { key: "ep_notes", value: "fractions: 3/4" });
+  check("Education Perfect notes are saved", commands.settings_get(win).ep_notes === "fractions: 3/4");
+  check("open-at-login is refused outside the installed app", (() => { try { commands.login_item_set(win, { on: true }); return false; } catch (e) { return /installed app/.test(String(e)); } })());
+
   console.log(failed ? `\n${failed} CHECK(S) FAILED` : "\nALL FEATURE CHECKS PASSED");
   app.exit(failed ? 1 : 0);
 }

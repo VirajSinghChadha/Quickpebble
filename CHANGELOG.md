@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.0
+
+- **Morning brief.** Once a day, the first time you open Quick Pebble (or your Mac wakes or unlocks), a card shows today's weather, headlines for up to three countries you choose, today's calendar (optional) and a quick Mac check-up. Settings → Morning brief, including "open Quick Pebble when I log in".
+- **Opening apps uses Spotlight.** When the assistant needs to open an app on a Mac it now presses Cmd+Space, types the name and presses Return, like you would. It only types if Spotlight really opened, and otherwise falls back to the old method.
+- **Fewer permission questions.** Each step prompt now has "Allow everything on this website". Routine steps on that site then run without asking; it still asks before anything that pays, deletes or sends. Manage the list in Settings.
+- **Education Perfect mode.** On educationperfect.com the assistant is told how the site works: answers must be fully simplified, a green tick means correct, a blue tick means on the right track but not finished. Write your own typing shortcuts in Settings and it follows them.
+
 ## 2.3.0
 
 - Version bump only. Same features as 2.2.0.

@@ -30,6 +30,7 @@ import { TabSearch } from "./components/TabSearch";
 import { TabStrip } from "./components/TabStrip";
 import { Toolbar } from "./components/Toolbar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
+import { MorningBrief } from "./components/MorningBrief";
 import { AuthGate } from "./components/AuthGate";
 import { Tour } from "./components/Tour";
 import { ReportDialog } from "./components/ReportDialog";
@@ -127,6 +128,7 @@ export default function App() {
         {overlay === "prices" && <PricesPanel key="prices" />}
       </AnimatePresence>
       <UpdatePrompt />
+      <MorningBrief />
       {accountStatus !== "ready" && <AuthGate />}
       {accountStatus === "ready" && <Tour />}
       <ReportDialog />

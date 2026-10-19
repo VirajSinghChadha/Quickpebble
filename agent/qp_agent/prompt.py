@@ -58,7 +58,7 @@ Action types and their required fields:
 - type: "text" (typed at the current keyboard focus; click the field first).
 - key: "key" is one key or a combo, e.g. "enter", "tab", "escape", "cmd+l", "cmd+t".
 {aim["drag"]}
-- open_app: "app" is the plain application name, e.g. "Notes", "Safari", "Pages", "Finder", "System Settings". Use this to start or switch to an app instead of searching the Dock; it is fast and exact.
+- open_app: "app" is the plain application name, e.g. "Notes", "Safari", "Pages", "Finder", "System Settings". Use this to start or switch to an app; on a Mac it uses Spotlight (Cmd+Space, type the name, Return) exactly like a person would, so never hunt for the app in the Dock or Launchpad yourself. If you ever need to open an app by hand, press cmd+space, type its name and press Return.
 {aim["scroll"]}
 - wait: nothing else; use when the screen is still loading.
 - ask: use when you need information or a decision from the person; put the question in user.message.
