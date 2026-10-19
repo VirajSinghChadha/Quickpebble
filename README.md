@@ -27,7 +27,7 @@ Real Chromium, built-in ad and tracker blocking, and an assistant that reads pag
 
 ## Download
 
-Pick your computer. The buttons download the current release, **2.4.0**, straight from GitHub.
+Pick your computer. The buttons download the current release, **2.4.1**, straight from GitHub.
 
 <table align="center">
   <tr>
@@ -36,11 +36,11 @@ Pick your computer. The buttons download the current release, **2.4.0**, straigh
   </tr>
   <tr>
     <td align="center">
-      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.0/Quick.Pebble_2.4.0_arm64.dmg"><b>⬇️&nbsp; Apple silicon (M1 and newer)<br>Quick.Pebble_2.4.0_arm64.dmg · 148 MB</b></a><br><br>
-      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.0/Quick.Pebble_2.4.0_x64.dmg"><b>⬇️&nbsp; Intel Mac<br>Quick.Pebble_2.4.0_x64.dmg · 154 MB</b></a>
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.1/Quick.Pebble_2.4.1_arm64.dmg"><b>⬇️&nbsp; Apple silicon (M1 and newer)<br>Quick.Pebble_2.4.1_arm64.dmg · 148 MB</b></a><br><br>
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.1/Quick.Pebble_2.4.1_x64.dmg"><b>⬇️&nbsp; Intel Mac<br>Quick.Pebble_2.4.1_x64.dmg · 154 MB</b></a>
     </td>
     <td align="center">
-      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.0/Quick.Pebble_2.4.0_x64.exe"><b>⬇️&nbsp; Download for Windows<br>Quick.Pebble_2.4.0_x64.exe · 126 MB</b></a>
+      <a href="https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.1/Quick.Pebble_2.4.1_x64.exe"><b>⬇️&nbsp; Download for Windows<br>Quick.Pebble_2.4.1_x64.exe · 126 MB</b></a>
     </td>
   </tr>
   <tr>
@@ -53,7 +53,7 @@ Pick your computer. The buttons download the current release, **2.4.0**, straigh
   </tr>
 </table>
 
-Linux: [`Quick.Pebble_2.4.0_x86_64.AppImage`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.0/Quick.Pebble_2.4.0_x86_64.AppImage) (148 MB) or [`Quick.Pebble_2.4.0_amd64.deb`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.0/Quick.Pebble_2.4.0_amd64.deb) (114 MB). All files are on the [releases page](https://github.com/VirajSinghChadha/Quickpebble/releases/latest).
+Linux: [`Quick.Pebble_2.4.1_x86_64.AppImage`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.1/Quick.Pebble_2.4.1_x86_64.AppImage) (148 MB) or [`Quick.Pebble_2.4.1_amd64.deb`](https://github.com/VirajSinghChadha/Quickpebble/releases/download/v2.4.1/Quick.Pebble_2.4.1_amd64.deb) (114 MB). All files are on the [releases page](https://github.com/VirajSinghChadha/Quickpebble/releases/latest).
 
 > **The apps are not signed with a paid certificate yet.** Your Mac or PC will ask you to confirm the first time you open Quick Pebble. That's expected; the steps below show exactly what to click. Updates are checked by Quick Pebble itself (checksum, app ID, version and signature) before they are installed.
 
@@ -94,7 +94,7 @@ Quick Pebble updates itself after that, so you don't need `brew upgrade`.
 
 **It takes about a minute.**
 
-1. **Click "Download for Windows" above.** `Quick.Pebble_2.4.0_x64.exe` saves to your **Downloads** folder.
+1. **Click "Download for Windows" above.** `Quick.Pebble_2.4.1_x64.exe` saves to your **Downloads** folder.
    If Chrome or Edge says the file *isn't commonly downloaded*, click **Keep** (in Edge, open the **…** menu next to the file first).
 2. **Double-click the file.**
    If a blue **"Windows protected your PC"** window appears, click **More info**, then **Run anyway**. Windows shows this for every app that doesn't pay for a code-signing certificate; the full source code is in this repository.
