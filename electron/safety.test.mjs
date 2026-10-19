@@ -8,11 +8,14 @@ import { moveToTrash, trashInfo, trashTarget } from "./trash.mjs";
 import { ActionLog, undoStep } from "./actionlog.mjs";
 import { checkItems, describeItem, Tasks } from "./receipts.mjs";
 
+// These check macOS/POSIX path behaviour (Trash, ~, Library); the features are Mac-focused.
+const onWindows = process.platform === "win32";
+
 const id = (p) => p;   // realpath stand-in: no symlinks
 const L = { platform: "linux", home: "/home/me", realpath: id };
 
 describe("protected and chosen folders", () => {
-  it("knows what is inside what, without being fooled by look-alike names", () => {
+  it.skipIf(onWindows)("knows what is inside what, without being fooled by look-alike names", () => {
     expect(isInside("/home/me/Downloads/a.pdf", "/home/me/Downloads", "linux")).toBe(true);
     expect(isInside("/home/me/Downloads2/a.pdf", "/home/me/Downloads", "linux")).toBe(false);
     expect(isInside("/home/me/Downloads/../Documents/a.pdf", "/home/me/Downloads", "linux")).toBe(false);
@@ -39,7 +42,7 @@ describe("protected and chosen folders", () => {
     expect(checkPath("/home/me/Library/Caches", { ...L, roots: ["/home/me/Library"] })).toMatch(/too important/);
     expect(checkPath("/home/me/Library/Caches/app.cache", { ...L, roots: ["/home/me/Library/Caches"] })).toBeNull();
   });
-  it("follows symlinks in folders, so a link can't lead outside", () => {
+  it.skipIf(onWindows)("follows symlinks in folders, so a link can't lead outside", () => {
     const fake = (p) => (p.startsWith("/home/me/Downloads/sneaky") ? p.replace("/home/me/Downloads/sneaky", "/etc") : p);
     expect(checkPath("/home/me/Downloads/sneaky/passwd", { ...L, roots: ["/home/me/Downloads"], realpath: fake })).toMatch(/System/);
     const real = fs.mkdtempSync(path.join(os.tmpdir(), "qp-guard-"));
@@ -66,7 +69,7 @@ describe("protected and chosen folders", () => {
 });
 
 describe("the Trash", () => {
-  it("picks a free name like Finder does", () => {
+  it.skipIf(onWindows)("picks a free name like Finder does", () => {
     const taken = new Set(["/T/report.pdf", "/T/report 2.pdf"]);
     expect(trashTarget("/T", "report.pdf", (p) => taken.has(p))).toBe(path.join("/T", "report 3.pdf"));
     expect(trashTarget("/T", "notes", () => false)).toBe(path.join("/T", "notes"));
@@ -211,7 +214,7 @@ describe("dry run, confirm, receipt", () => {
 });
 
 describe("paths on screen", () => {
-  it("shows the home folder as ~", async () => {
+  it.skipIf(onWindows)("shows the home folder as ~", async () => {
     const { tilde } = await import("./receipts.mjs");
     expect(tilde("/Users/alex/Downloads/a.pdf", "/Users/alex")).toBe(`~${path.sep === "/" ? "/Downloads/a.pdf" : "\\Downloads\\a.pdf"}`.replace(/\\/g, path.sep));
     expect(tilde("/Users/alexandra/x", "/Users/alex")).toBe("/Users/alexandra/x");

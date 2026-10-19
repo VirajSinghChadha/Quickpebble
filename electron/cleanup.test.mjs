@@ -8,6 +8,9 @@ import { culprits, groupByApp, parseLsappinfo, parsePs, unusedApps } from "./sys
 import { needsBetterName, parseVisionKind, photoKind, pngSize, renameMode, tidyPlan } from "./tidy.mjs";
 import { checkPath } from "./fsguard.mjs";
 
+// These check macOS/POSIX path behaviour (Trash, ~, Library); the features are Mac-focused.
+const onWindows = process.platform === "win32";
+
 const dirs = [];
 afterEach(() => { for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
 const DAY = 86400_000;
@@ -67,7 +70,7 @@ describe("apps", () => {
     expect(installerFor("Figma.dmg", apps)).toBeNull();
     expect(installerFor("Slack screenshot.png", apps)).toBeNull();
   });
-  it("lists leftovers only in the person's Library, from safe names", () => {
+  it.skipIf(onWindows)("lists leftovers only in the person's Library, from safe names", () => {
     const l = leftoverCandidates("/Users/me", "com.tinyspeck.slackmacgap", "Slack");
     expect(l).toContain("/Users/me/Library/Application Support/com.tinyspeck.slackmacgap");
     expect(l).toContain("/Users/me/Library/Preferences/com.tinyspeck.slackmacgap.plist");
@@ -118,7 +121,7 @@ describe("why is my Mac slow", () => {
 });
 
 describe("tidy-up, photos and names", () => {
-  it("sorts loose files into kind folders, never two onto one name", () => {
+  it.skipIf(onWindows)("sorts loose files into kind folders, never two onto one name", () => {
     const plan = tidyPlan("/D", [{ name: "a.pdf", isFile: true }, { name: "b.png", isFile: true }, { name: ".DS_Store", isFile: true }, { name: "half.crdownload", isFile: true }, { name: "a.pdf", isFile: true }], (p) => p === "/D/PDFs/a.pdf");
     expect(plan.map((i) => i.to)).toEqual([path.join("/D", "PDFs", "a (1).pdf"), path.join("/D", "Images", "b.png"), path.join("/D", "PDFs", "a (2).pdf")]);
   });
