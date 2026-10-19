@@ -153,6 +153,8 @@ export type AgentEvent =
 
 export interface RunOptions {
   mode: Mode;
+  /** Pages on an allowed site run routine steps without asking (sensitive ones are still asked about). */
+  siteAllowed?: (url: string) => boolean;
   signal: { aborted: boolean };
   maxSteps?: number;
 }
@@ -208,7 +210,7 @@ export async function runAgent(goal: string, prior: ChatMsg[], io: AgentIO, opts
     if (repeats >= 2) return io.onEvent({ kind: "error", text: "I keep repeating the same action, so I stopped. Try rephrasing the task." });
 
     const desc = describeStep(step, snap);
-    if (needsApproval(step, snap, opts.mode)) {
+    if (needsApproval(step, snap, opts.siteAllowed?.(snap?.url ?? "") ? "auto" : opts.mode)) {
       const ok = await io.approve(desc);
       if (!ok) {
         io.onEvent({ kind: "step", text: `${desc} — declined`, ok: false });

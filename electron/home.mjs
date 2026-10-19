@@ -76,6 +76,10 @@ export function parseRss(xml, max) {
   }
   return out;
 }
+/** Headlines from any feed address the caller has already validated (used for country news). */
+export async function newsFromUrl(url, count = 5) {
+  return parseRss(await getText(url), Math.min(10, Math.max(1, count)));
+}
 export async function newsFetch(source, count = 5) {
   const url = NEWS_SOURCES[source];
   if (!url) throw new Error("Unknown news source.");

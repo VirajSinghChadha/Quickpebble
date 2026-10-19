@@ -162,8 +162,32 @@ def press_keys(keys: list[str]) -> None:
     pyautogui.hotkey(*keys, interval=0.08)
 
 
+SPOTLIGHT = os.environ.get("QP_AGENT_SPOTLIGHT", "1") != "0"
+
+
+def _open_with_spotlight(name: str) -> bool:
+    """Open an app the way a person does: Cmd+Space, type its name, Return. Only types if Spotlight really came to the front,
+    so a changed shortcut can never send the name (and Return) into whatever app is open. False means: use `open -a` instead."""
+    try:
+        if not mac_shortcut(["command", "space"]):
+            return False
+        time.sleep(0.5)
+        if (_frontmost_mac() or "").lower() != "spotlight":
+            return False
+        pyautogui.write(name, interval=0.03)
+        time.sleep(0.7)   # let the first result settle on the app
+        pyautogui.press("return")
+        return True
+    except Exception:
+        return False
+
+
 def open_app(name: str) -> None:
-    """Launch (or bring forward) an application by name. The name was validated by the schema; no shell is involved."""
+    """Launch (or bring forward) an application by name. The name was validated by the schema; no shell is involved.
+    On a Mac this uses Spotlight (Cmd+Space) like a person would, and falls back to `open -a`."""
+    if sys.platform == "darwin" and SPOTLIGHT and _open_with_spotlight(name):
+        time.sleep(1.5)   # let the window appear before the next screenshot
+        return
     if sys.platform == "darwin":
         result = subprocess.run(["open", "-a", name], capture_output=True, text=True, timeout=15)
         if result.returncode != 0:

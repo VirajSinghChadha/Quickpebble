@@ -196,6 +196,7 @@ def test_open_app_launches_without_a_shell(monkeypatch):
         stderr = ""
 
     monkeypatch.setattr(executor.sys, "platform", "darwin")
+    monkeypatch.setattr(executor, "_open_with_spotlight", lambda name: False)   # Spotlight not available: fall back to `open -a`
     monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: calls.append((args, kw.get("shell"))) or Done())
     monkeypatch.setattr(executor.time, "sleep", lambda s: None)
     executor.open_app("Notes")
@@ -211,6 +212,7 @@ def test_open_app_reports_a_missing_app(monkeypatch):
         stderr = "Unable to find application"
 
     monkeypatch.setattr(executor.sys, "platform", "darwin")
+    monkeypatch.setattr(executor, "_open_with_spotlight", lambda name: False)
     monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: Fail())
     with pytest.raises(RuntimeError, match="Is it installed"):
         executor.open_app("NoSuchApp")
@@ -416,3 +418,28 @@ def test_frontmost_app_never_raises():
     from qp_agent.executor import frontmost_app
     name = frontmost_app()
     assert name is None or (isinstance(name, str) and 0 < len(name) <= 80)
+
+
+@pytest.mark.skipif(_sys.platform not in ("darwin", "win32"), reason="needs a desktop session to import pyautogui")
+def test_open_app_uses_spotlight_only_when_it_really_opened(monkeypatch):
+    from qp_agent import executor
+    typed, pressed, ran = [], [], []
+    monkeypatch.setattr(executor.sys, "platform", "darwin")
+    monkeypatch.setattr(executor.time, "sleep", lambda s: None)
+    monkeypatch.setattr(executor, "mac_shortcut", lambda keys: keys == ["command", "space"])
+    monkeypatch.setattr(executor.pyautogui, "write", lambda text, interval=0: typed.append(text))
+    monkeypatch.setattr(executor.pyautogui, "press", lambda k: pressed.append(k))
+    monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: ran.append(args))
+    # Spotlight is in front: type the name and press Return, and do not run `open -a`.
+    monkeypatch.setattr(executor, "_frontmost_mac", lambda: "Spotlight")
+    executor.open_app("Notes")
+    assert typed == ["Notes"] and pressed == ["return"] and ran == []
+    # Spotlight did not appear (shortcut changed): nothing is typed anywhere, and it falls back to `open -a`.
+    typed.clear(); pressed.clear()
+    monkeypatch.setattr(executor, "_frontmost_mac", lambda: "TextEdit")
+    class Done:
+        returncode = 0
+        stderr = ""
+    monkeypatch.setattr(executor.subprocess, "run", lambda args, **kw: ran.append(args) or Done())
+    executor.open_app("Notes")
+    assert typed == [] and pressed == [] and ran == [["open", "-a", "Notes"]]

@@ -1,6 +1,6 @@
 {
   "name": "quick-pebble",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "description": "Quick Pebble — browse quicker. A privacy-first Chromium browser with local AI.",
   "type": "module",

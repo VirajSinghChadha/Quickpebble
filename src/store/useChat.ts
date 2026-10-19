@@ -1,3 +1,5 @@
+import { guideFor } from "../lib/siteGuides";
+import { addSite, hostOfUrl, isSiteAllowed, parseSites } from "../lib/siteAllow";
 import { create } from "zustand";
 import { runAgent, type AgentIO, type Mode } from "../lib/agent";
 import { runScreenAgent, type Choice, type ScreenMode, type WatchFrame } from "../lib/screenAgent";
@@ -88,6 +90,9 @@ async function activePageText(): Promise<string | undefined> {
   const snap = await ipc.agentExec<PageSnapshot>(tab.id, "snapshot").catch(() => null);
   return snap?.text ? snap.text.slice(0, 6000) : undefined;
 }
+
+/** Websites the person said to allow everything on (saved in Settings; read at the start of each task). */
+let allowedSites: string[] = [];
 
 /** Apps allowed "just for this task". Cleared when a new task starts. */
 const onceApps = new Set<string>();
@@ -216,8 +221,9 @@ function askPlan(plan: Plan, words: { title?: string; run?: string; skip?: strin
 }
 
 /** Numbered choices shown in the chat panel; resolves with the one the person picks. */
-function askChoice(description: string, risky: boolean, offerAuto: boolean): Promise<Choice> {
+function askChoice(description: string, risky: boolean, offerAuto: boolean, site?: string | null): Promise<Choice> {
   const options: { choice: Choice; label: string }[] = [{ choice: "allow", label: "Allow this step" }];
+  if (site && !risky) options.push({ choice: "site", label: `Allow everything on ${site}` });
   if (offerAuto && !risky) options.push({ choice: "auto", label: "Allow, and auto-run routine steps from now on" });
   options.push({ choice: "skip", label: "Skip this step and try another way" }, { choice: "stop", label: "Stop" });
   return new Promise<Choice>((resolve) => {
@@ -239,9 +245,15 @@ function makeIO(): AgentIO {
     newTab: async (url) => st().newTab(url),
     switchTab: (id) => st().activate(id),
     approve: async (description) => {
-      const c = await askChoice(description, false, true);
+      const host = hostOfUrl(st().tabs.find((t) => t.id === st().activeId)?.url ?? "");
+      const c = await askChoice(description, false, true, host);
       if (c === "auto") useChat.setState({ approvalMode: "auto" });
-      return c === "allow" || c === "auto";
+      if (c === "site" && host) {
+        allowedSites = addSite(allowedSites, host);
+        await ipc.settingsSet("agent_allowed_sites", JSON.stringify(allowedSites)).catch(() => {});
+        add("say", `Okay, I won't ask again for routine steps on ${host}. I'll still ask before anything that pays, deletes or sends.`);
+      }
+      return c === "allow" || c === "auto" || c === "site";
     },
     sleep,
     onEvent: (e) => {
@@ -277,9 +289,14 @@ function persistNew(): void {
   }).catch(() => {});
 }
 
+/** The person's own Education Perfect typing notes (Settings), read at the start of each task. */
+let guideNotes = "";
+
 function activeContext(): string {
   const { projects, projectId } = useChat.getState();
-  return projectContext(projects.find((p) => p.id === projectId));
+  const tab = useStore.getState().tabs.find((t) => t.id === useStore.getState().activeId);
+  const guide = tab?.url ? guideFor(tab.url) : null;
+  return [projectContext(projects.find((p) => p.id === projectId)), guide ? guide.text(guideNotes) : ""].filter(Boolean).join("\n\n");
 }
 
 export const useChat = create<ChatState>((set, get) => ({
@@ -398,6 +415,7 @@ export const useChat = create<ChatState>((set, get) => ({
     let goal = text.trim();
     if (!goal || get().busy) return;
     // Slash commands are Ask-mode shortcuts; in the other modes they are sent as typed.
+    guideNotes = (await ipc.settingsGet().catch(() => ({}) as Record<string, string>)).ep_notes ?? "";
     const slash = get().mode === "ask" ? parseSlash(goal) : null;
     let slashTabs: string[] | null = null;
     let slashRecall = false;
@@ -543,7 +561,8 @@ export const useChat = create<ChatState>((set, get) => ({
         }, runSignal, undefined, screenHistory);
       } else {
         const ctx = activeContext();
-        await runAgent(ctx ? `${ctx}\n\nTask: ${goal}` : goal, prior, makeIO(), { mode: get().approvalMode, signal });
+        allowedSites = parseSites((await ipc.settingsGet().catch(() => ({}) as Record<string, string>)).agent_allowed_sites);
+        await runAgent(ctx ? `${ctx}\n\nTask: ${goal}` : goal, prior, makeIO(), { mode: get().approvalMode, signal, siteAllowed: (url) => isSiteAllowed(allowedSites, url) });
       }
     } catch (e) {
       if (!runSignal.aborted) add("error", String(e));

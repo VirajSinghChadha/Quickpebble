@@ -8,6 +8,7 @@ import { Modal, ModalHeader } from "./Modal";
 import { PRESETS, presetLabel } from "../hooks/useTheme";
 import { HomeOptions } from "./home/HomeOptions";
 import { ImportDialog } from "./ImportDialog";
+import { AssistantExtrasSettings } from "./AssistantExtrasSettings";
 import { StoragePanel } from "./StoragePanel";
 import { UsageMeter } from "./UsageMeter";
 import { useTour } from "../store/useTour";
@@ -170,6 +171,8 @@ export function SettingsPanel() {
             </div>
           )}
         </div>
+
+        <AssistantExtrasSettings />
 
         <div className="py-2">
           <h3 className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-secondary">Home page</h3>

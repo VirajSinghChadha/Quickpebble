@@ -163,6 +163,8 @@ export const ipc = {
   bookmarkToggle: (url: string, title: string) => call<boolean>("bookmark_toggle", { url, title }, false),
   bookmarkSetFolder: (url: string, folder: string) => call<void>("bookmark_set_folder", { url, folder }),
   bookmarksImportChrome: () => call<number>("bookmarks_import_chrome", undefined, 0),
+  morningPreview: () => call<MorningBrief>("morning_preview"),
+  loginItemSet: (on: boolean) => call<void>("login_item_set", { on }),
   hoverShow: (id: string, r: { x: number; y: number; width: number; height: number }, dark: boolean) => call<void>("hover_show", { id, ...r, dark }),
   hoverHide: () => call<void>("hover_hide"),
   importScan: (browser: "chrome" | "safari") => call<ImportScan>("import_scan", { browser }),
@@ -386,6 +388,21 @@ export async function onHttpsFallback(cb: (e: { id: string; url: string }) => vo
 /** A page asked to open a link in a new tab (target=_blank, window.open, "Open Link in New Tab"). */
 export async function onOpenUrl(cb: (e: { url: string }) => void): Promise<UnlistenFn> {
   return listen<{ url: string }>("qp://open-url", (e) => cb(e.payload));
+}
+
+export interface MorningBrief {
+  date: string;
+  weather: ({ place: string; unit: string } & Weather) | null;
+  news: { country: string; items: Headline[] }[];
+  /** null: calendar is off or could not be read */
+  calendar: { time: string; title: string }[] | null;
+  checkup: { label: string; status: "ok" | "tip"; text: string }[];
+  notes: string[];
+}
+
+export async function onMorning(cb: (brief: MorningBrief) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {};
+  return listen<MorningBrief>("qp://morning", (e) => cb(e.payload));
 }
 
 export async function onUpdate(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {

@@ -24,7 +24,7 @@ const WORD_CATEGORY: [RegExp, string][] = [
   [/\b(sign out|log out|unsubscribe)\b/i, "accounts"],
 ];
 
-export type Choice = "allow" | "auto" | "skip" | "stop";
+export type Choice = "allow" | "auto" | "site" | "skip" | "stop";
 export type ScreenMode = "ask" | "auto"; // ask = confirm every step, auto = confirm only risky steps
 
 export interface ScreenIO {

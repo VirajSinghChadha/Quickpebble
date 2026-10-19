@@ -1,4 +1,5 @@
 import { GeminiKeyGuide } from "./GeminiKeyGuide";
+import { guideFor } from "../lib/siteGuides";
 import { AppPermissionCard, WatchCard } from "./SafetyCards";
 import { RoutineRunCard } from "./RoutineRunCard";
 import { ContextBar } from "./ContextBar";
@@ -31,6 +32,7 @@ export function ChatPanel() {
   const composer = useRef<HTMLTextAreaElement>(null);
   const hasPage = useStore((s) => !!selectActive(s).url);
   const { status, refresh: refreshAi } = useOllama(30000);
+  const siteGuide = useStore((s) => { const t = s.tabs.find((x) => x.id === s.activeId); return t?.url ? guideFor(t.url) : null; });
   const [text, setText] = useState("");
   const [recallStats, setRecallStats] = useState<{ pages: number; enabled: boolean } | null>(null);
   const [exported, setExported] = useState(false);
@@ -139,6 +141,7 @@ export function ChatPanel() {
         <button type="button" aria-label="Clear chat" title="Clear chat" onClick={clear} disabled={busy || items.length === 0} className="grid size-7 place-items-center rounded-lg text-text-secondary hover:bg-surface-secondary disabled:opacity-40">
           <Trash2 size={14} />
         </button>
+        {siteGuide && <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11.5px] font-medium text-primary" title="The assistant has been told how this site works (ticks, simplifying, your typing notes).">{siteGuide.name} mode</span>}
       </div>
 
       {mode === "ask" && <div className="border-b border-border px-3 py-2">
