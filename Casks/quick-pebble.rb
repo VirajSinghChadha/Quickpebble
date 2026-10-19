@@ -1,9 +1,9 @@
 cask "quick-pebble" do
   arch arm: "arm64", intel: "x64"
 
-  version "2.1.0"
-  sha256 arm:   "9797bc116397e452e5dd5c546cd0d0d8ac3ddb7b690e1d5dcc5624b6807cc8de",
-         intel: "638af3e1ae5fd174bb7e1553b4af46e8dad40c932cc814042a23859e181e6906"
+  version "2.2.0"
+  sha256 arm:   "f635287388849c8320853c5fbead51dbba05ab818b48a1bbd624271a1aefdf0f",
+         intel: "747e70bc829d69dc733b644cd28d6564e4cc0baa382fde2cc10081ca162d07f3"
 
   url "https://github.com/VirajSinghChadha/Quickpebble/releases/download/v#{version}/Quick.Pebble_#{version}_#{arch}.dmg"
   name "Quick Pebble"
