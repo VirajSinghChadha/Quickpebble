@@ -1,7 +1,7 @@
 // Screen mode bridge (port of screen.rs). The work (screenshot + grid, Gemini call, mouse/keyboard) lives in the Python
 // sidecar under agent/; this starts it on demand and proxies three calls to it over 127.0.0.1 with a per-run token.
 // Opt-in: nothing runs until the person sends a task in Screen mode. Every screenshot goes to Google Gemini.
-import { app } from "electron";
+import { app, shell, systemPreferences } from "electron";
 import { spawn, execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -33,6 +33,23 @@ function runQuiet(cmd, args) {
   });
 }
 /** Private virtual environment (outside the app bundle). pip is upgraded first so prebuilt wheels are used instead of compiling for minutes. */
+/** Asks macOS about Quick Pebble itself (the helper inherits it). When something is missing, say exactly what to do and open
+ *  the right Settings page. Null when all is well or off macOS. */
+export function macPermissionProblem() {
+  if (process.platform !== "darwin") return null;
+  const open = (pane) => { shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`).catch(() => {}); };
+  if (systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+    open("Privacy_ScreenCapture");
+    return "Quick Pebble does not have Screen Recording permission yet. In System Settings → Privacy & Security → Screen Recording, turn Quick Pebble on (if it is already on, switch it off and on again), then quit Quick Pebble with Cmd+Q, reopen it and try again.";
+  }
+  if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+    systemPreferences.isTrustedAccessibilityClient(true);   // makes macOS list Quick Pebble and show its own prompt
+    open("Privacy_Accessibility");
+    return "Quick Pebble does not have Accessibility permission yet, which it needs to click and type for you. In System Settings → Privacy & Security → Accessibility, turn Quick Pebble on, then quit with Cmd+Q, reopen it and try again.";
+  }
+  return null;
+}
+
 async function installDeps(dir, venv) {
   await runQuiet(pythonCommand(), ["-m", "venv", venv]);
   const py = venvPython(venv);
@@ -104,7 +121,7 @@ export class ScreenAgent {
   commands() {
     const check = (goal, history, extra = 0) => { if (!String(goal).trim() || goal.length > 4000 || history.length > 40 || extra) throw new Error("Invalid request"); };
     return {
-      screen_propose: async (_w, { goal, history, categories, pageText, watch }) => { check(goal, history); const r = await this.post(await this.connection(), "/propose", { goal, history, categories, page_text: pageText, watch: watch === true }); bumpUsage(r.calls); return r; },
+      screen_propose: async (_w, { goal, history, categories, pageText, watch }) => { check(goal, history); const missing = macPermissionProblem(); if (missing) throw new Error(missing); const r = await this.post(await this.connection(), "/propose", { goal, history, categories, page_text: pageText, watch: watch === true }); bumpUsage(r.calls); return r; },
       screen_verify: async (_w, { goal, history, pending, pageText }) => { check(goal, history, String(pending).length > 300); const r = await this.post(await this.connection(), "/verify", { goal, history, pending, page_text: pageText }); bumpUsage(r.calls); return r; },
       screen_overlay: async (_w, { state }) => { this.overlay?.update(state); return true; },
       screen_act: async (_w, { action }) => {

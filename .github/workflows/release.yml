@@ -103,12 +103,15 @@ jobs:
       - name: Regenerate cask
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: ./scripts/update_cask.sh "$TAG"
+      - name: Point the README download buttons at this release
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: ./scripts/update_readme.sh "$TAG"
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/quick-pebble.rb
+          git add Casks/quick-pebble.rb README.md
           git diff --cached --quiet && exit 0
-          git commit -m "chore(brew): quick-pebble $TAG"
+          git commit -m "chore(release): quick-pebble $TAG (cask and README download links)"
           git pull --rebase origin main
           git push origin HEAD:main
