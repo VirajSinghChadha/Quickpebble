@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0
+
+- **Safety foundation for the computer-controlling assistant:** an undo list, dry runs with receipts, per-app permission, Watch mode and protected folders.
+- **Mac clean-up and speed:** disk usage, old installers, forgotten apps, tidy-up, rename by content, photo triage, slow-Mac check, quit unused apps, login items.
+- **Memory and knowledge:** answer from your files, workspaces that remember, a timeline of your day, and a page check.
+- **Learning and school:** study packs, timetable, assignments, slides to notes, submit-checker, practice partner.
+- **Routines and shortcuts:** teach by showing, approved replays, reminders, phrases, sharing, and "Do this for me".
+- **Compare prices** across local shops for your country. It only reads prices and never buys.
+- Names under every colour theme swatch, a rewritten README with fresh screenshots, and a theme gallery.
+- **Screen mode permissions:** Quick Pebble now checks Screen Recording and Accessibility itself, opens the right Settings page and says exactly what to do. Fixes the case where the switch looked on but capture still failed after an update.
+
 ## Unreleased
 
 ### Safety foundation
