@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1
+
+- **Permissions survive updates.** The app now has a fixed identity (its bundle identifier) instead of a one-off hash per build, so macOS keeps Screen Recording and Accessibility granted after an update. The first update to this version still needs one fresh grant; after that you shouldn't be asked again.
+
 ## 2.4.0
 
 - **Morning brief.** Once a day, the first time you open Quick Pebble (or your Mac wakes or unlocks), a card shows today's weather, headlines for up to three countries you choose, today's calendar (optional) and a quick Mac check-up. Settings → Morning brief, including "open Quick Pebble when I log in".

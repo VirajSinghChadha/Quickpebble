@@ -30,3 +30,8 @@ Buy a code-signing certificate (or use a signing service such as Azure Trusted S
 `src-tauri/tauri.conf.json` under `bundle.windows` (`certificateThumbprint` or `signCommand`) and add the
 certificate to the Windows runner in the workflow. SmartScreen reputation also builds up over time as more people
 install a signed app.
+
+
+## Permissions across updates without a certificate
+
+Unsigned builds are ad-hoc signed. A plain ad-hoc signature makes macOS identify the app by the hash of that exact build, so every update looked like a new app and Screen Recording / Accessibility had to be granted again. `scripts/adhoc-sign.cjs` now gives the app a fixed designated requirement (`identifier "app.quickpebble.browser"`), the same for every build. Check a build with `codesign -dr- "Quick Pebble.app"`: it should print `designated => identifier "app.quickpebble.browser"`. This is not a substitute for a real certificate: it only keeps permissions steady, and macOS still shows the unidentified-developer warning on first open.
