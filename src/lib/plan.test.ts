@@ -37,3 +37,14 @@ describe("plan preview", () => {
     expect(approvedPlanNote(plan)).toMatch(/approved this plan[\s\S]*1\. Open Notes[\s\S]*ask the person/);
   });
 });
+
+
+describe("plan preview in auto mode", () => {
+  it("skips the big-task preview unless the setting is always", () => {
+    const big = { big: true, steps: ["a"] };
+    expect(shouldPreview("big", big, false)).toBe(true);
+    expect(shouldPreview("big", big, true)).toBe(false);
+    expect(shouldPreview("always", big, true)).toBe(true);
+    expect(shouldPreview("never", big, false)).toBe(false);
+  });
+});

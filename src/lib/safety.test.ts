@@ -92,3 +92,12 @@ describe("the screen agent with safety on", () => {
     expect(t.frames[0].next).toMatch(/Click.*Open Downloads/);
   });
 });
+
+
+describe("auto mode and apps", () => {
+  it("allows an app with no answer yet, but never one that was refused", () => {
+    expect(appDecision("Notes", {}, new Set(), false)).toBe("ask");
+    expect(appDecision("Notes", {}, new Set(), true)).toBe("allow");
+    expect(appDecision("Notes", { Notes: "deny" }, new Set(), true)).toBe("deny");
+  });
+});

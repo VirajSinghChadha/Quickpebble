@@ -28,11 +28,11 @@ export function appFor(res: Pick<ScreenResponse, "action" | "app">): string | nu
   return name;
 }
 
-/** Saved answers win; "once" answers last for the current task only. */
-export function appDecision(app: string, saved: Record<string, AppAnswer>, once: ReadonlySet<string>): AppAnswer | "ask" {
+/** Saved answers win; "once" answers last for the current task only. In auto mode an app with no answer yet is simply allowed for this task. */
+export function appDecision(app: string, saved: Record<string, AppAnswer>, once: ReadonlySet<string>, auto = false): AppAnswer | "ask" {
   const key = Object.keys(saved).find((k) => k.toLowerCase() === app.toLowerCase());
-  if (key) return saved[key];
-  return once.has(app.toLowerCase()) ? "allow" : "ask";
+  if (key) return saved[key];   // an app the person said no to stays blocked, even in auto mode
+  return once.has(app.toLowerCase()) || auto ? "allow" : "ask";
 }
 
 export function withApp(json: string | undefined, app: string, answer: AppAnswer | null): string {

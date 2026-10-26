@@ -34,9 +34,9 @@ export function parsePlan(reply: string): Plan | null {
 }
 
 /** Should the person see this plan before anything happens? */
-export function shouldPreview(setting: PlanSetting, plan: Plan | null): boolean {
+export function shouldPreview(setting: PlanSetting, plan: Plan | null, auto = false): boolean {
   if (!plan || setting === "never") return false;
-  return setting === "always" || plan.big;
+  return setting === "always" || (plan.big && !auto);   // in auto mode only an explicit "always" still asks
 }
 
 /** The plan as the numbered text shown in the approval card. */
