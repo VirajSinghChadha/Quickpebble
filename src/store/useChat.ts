@@ -100,8 +100,9 @@ const onceApps = new Set<string>();
 /** Asks (or remembers) whether the screen agent may work in this app. */
 async function appAccess(app: string): Promise<boolean> {
   const s = await ipc.settingsGet().catch(() => ({}) as Record<string, string>);
-  const d = appDecision(app, parseAppPerms(s.screen_app_permissions), onceApps);
-  if (d !== "ask") return d === "allow";
+  const auto = useChat.getState().screenApprovalMode === "auto";
+  const d = appDecision(app, parseAppPerms(s.screen_app_permissions), onceApps, auto);
+  if (d !== "ask") { if (d === "allow" && auto) onceApps.add(app.toLowerCase()); return d === "allow"; }
   const choice = await new Promise<AppChoice>((resolve) => {
     useChat.setState({ appRequest: { app, resolve: (c) => { useChat.setState({ appRequest: null }); resolve(c); } } });
   });
@@ -512,7 +513,9 @@ export const useChat = create<ChatState>((set, get) => ({
           const curated = await curateSite(host, goal);
           set({ preparingPermissions: false });
           if (runSignal.aborted) return;
-          perms = await askPermissions(host, curated);
+          // Auto mode: use the permissions worked out for this site and task without asking (sensitive steps still ask).
+          perms = get().screenApprovalMode === "auto" ? curated : await askPermissions(host, curated);
+          if (perms && get().screenApprovalMode === "auto") sessionPerms.set(host, perms);
         }
         if (!perms) return void add("say", "Okay, I won't do anything without permissions. Send the task again when you're ready.");
         // Preview the plan: for big tasks (or always, or never, per Settings) the person approves the whole plan before anything runs.
@@ -528,7 +531,7 @@ export const useChat = create<ChatState>((set, get) => ({
           const plan = await makePlan(goal);
           void ipc.screenOverlay({ phase: "idle" }).catch(() => {});
           if (runSignal.aborted) return;
-          if (plan && shouldPreview(previewSetting, plan)) {
+          if (plan && shouldPreview(previewSetting, plan, get().screenApprovalMode === "auto")) {
             const choice = await askPlan(plan);
             if (runSignal.aborted || choice === "stop") return void add("say", "Okay, I cancelled that. Nothing was done.");
             if (choice === "allow") { goalWithPlan = `${goal}\n\n${approvedPlanNote(plan)}`; if (watching) set({ watchPlan: plan.steps }); }

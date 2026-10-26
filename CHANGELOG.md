@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.2
+
+- **Auto mode really is automatic.** In Screen mode with Auto selected, Quick Pebble no longer asks which permissions to give a website, no longer asks you to approve the plan for a big task, and no longer asks before using each app for the first time. Anything you refused earlier stays refused, a plan preview you set to "always" still shows, and it still asks before steps that pay, delete or send.
+
 ## 2.4.1
 
 - **Permissions survive updates.** The app now has a fixed identity (its bundle identifier) instead of a one-off hash per build, so macOS keeps Screen Recording and Accessibility granted after an update. The first update to this version still needs one fresh grant; after that you shouldn't be asked again.
